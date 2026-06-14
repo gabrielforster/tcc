@@ -1,0 +1,15 @@
+# PDF de saída (gerado por build.sh)
+main.pdf
+*.pdf
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+page*.png
