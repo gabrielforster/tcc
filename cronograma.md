@@ -56,7 +56,7 @@ gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no e
 |:--|:-----|:----------------------------------------|:------------------|:--------------|
 | 16 | 12/11 | **Testes e início do experimento.** Testes unitários (parser, *features*, motor de regras, intenção, *templates*) com ≥ 80% das funções críticas cobertas, testes de integração dos três fluxos e dos serviços externos; **experimento controlado iniciado** contra os dois baselines (manual e semiautomatizado sem ML) | Suíte de testes verde + experimento coletando dados | Protocolo experimental |
 | 17 | 19/11 | **Resultados consolidados.** Métricas preditivas finais vs. baseline, qualidade do RAG (*retrieval* + fidelidade/completude/alucinação das respostas), indicadores operacionais (taxa de recuperação, tempo médio de resolução, custo por contato, ≥ 100 interações concorrentes), análise estatística | Tabelas e gráficos finais de resultados | Seção de resultados e discussão |
-| 18 | **26/11** | **Revisão final.** Artigo completo revisado (resumo/abstract, referências, tabelas, figuras), limitações e trabalhos futuros, README de reprodução; ajuste dos pontos apontados pelo orientador | Artigo em PDF, versão candidata | Texto integral fechado |
+| 18 | **26/11** | **Revisão final.** Artigo completo revisado (resumo/abstract, referências, tabelas, figuras), limitações e trabalhos futuros, README de reprodução; ajuste dos pontos de revisão apontados | Artigo em PDF, versão candidata | Texto integral fechado |
 | 19 | **03/12** | **Trabalho finalizado.** Versão final entregue, repositório com *tag* de entrega, apresentação/defesa preparada e ensaiada | PDF final + *slides* + demonstração | — |
 
 ---

@@ -1,7 +1,7 @@
 # Artigo — Proposta de Portfólio (PAC 8)
 
 **Sistema Multiagente Inteligente de Cobrança com LLM, RAG e Machine Learning**
-Gabriel Forster Rocha · Orientador: Andrei Carniel — Centro Universitário Católica de Santa Catarina.
+Gabriel Forster Rocha — Centro Universitário Católica de Santa Catarina.
 
 Artigo no formato **SBC Reviews 2025**. O corpo tem 4 páginas (dentro do limite de 4–6); o
 Apêndice (tabela comparativa de trabalhos relacionados + cronograma de desenvolvimento) e as

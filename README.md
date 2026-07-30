@@ -5,7 +5,7 @@
 > Trabalho de Conclusão de Curso (TCC) — Engenharia de Software
 > Centro Universitário Católica de Santa Catarina
 
-**Autor:** Gabriel Forster Rocha · **Orientador:** Andrei Carniel
+**Autor:** Gabriel Forster Rocha
 
 ---
 
