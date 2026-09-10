@@ -1,2 +1,19 @@
 references-git/
 venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Data (LGPD: never commit the real dataset)
+data/raw/*
+data/interim/*
+data/processed/*
+!data/*/.gitkeep
+
+# Secrets
+.env
