@@ -156,6 +156,13 @@ def build_features(task: str = "propensity") -> pd.DataFrame:
 
     tables = load_interim()
     customers, invoices = tables["customers"], tables["invoices"].copy()
+    if invoices.empty:
+        raise ValueError(
+            "The ingested dataset has no receivables, so the predictive tasks cannot be "
+            "built from it. Sources covering contacts only (bank-marketing) feed "
+            "contact-strategy analysis instead. Use DATA_SOURCE=home-credit, erp or "
+            "synthetic for tasks 1 and 2."
+        )
     for col in ("issue_date", "due_date", "payment_date"):
         invoices[col] = pd.to_datetime(invoices[col])
 
