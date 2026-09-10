@@ -12,7 +12,10 @@ console = Console()
 
 @app.command()
 def extract(
-    source: str = typer.Option(None, help="synthetic | erp (defaults to DATA_SOURCE in .env)"),
+    source: str = typer.Option(
+        None,
+        help="synthetic | home-credit | bank-marketing | erp (defaults to DATA_SOURCE in .env)",
+    ),
 ) -> None:
     """Extract the raw dataset from the configured source into data/raw."""
     from collection.data.ingest import extract as _extract
@@ -21,8 +24,10 @@ def extract(
     table = Table(title=f"Raw dataset ({source or settings.data_source})")
     table.add_column("table")
     table.add_column("rows", justify="right")
+    table.add_column("covered", justify="center")
     for name, df in dataset.as_dict().items():
-        table.add_row(name, f"{len(df):,}")
+        covered = "[green]yes[/]" if name in dataset.provides else "[dim]-[/]"
+        table.add_row(name, f"{len(df):,}", covered)
     console.print(table)
     console.print(f"[green]Written to[/] {settings.dir_raw}")
 
@@ -62,7 +67,13 @@ def features(
 
     tasks = ["propensity", "default"] if task == "both" else [task]
     for t in tasks:
-        splits = build_splits(t)
+        try:
+            splits = build_splits(t)
+        except ValueError as error:
+            # Expected when the ingested source carries no receivables; a traceback here
+            # would suggest a bug rather than a source that covers a different table.
+            console.print(f"[yellow]skipped[/] {error}")
+            raise typer.Exit(code=1) from None
         save_splits(t)
         preprocessor_path = fit_and_save(splits)
         console.print(f"\n[bold]Task: {t}[/] (target `{splits.target}`)")

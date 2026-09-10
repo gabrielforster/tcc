@@ -1,10 +1,14 @@
 from collection.config import settings
+from collection.data.sources.bank_marketing import BankMarketingSource
 from collection.data.sources.base import DataSource, RawDataset
 from collection.data.sources.erp import ERPSource
+from collection.data.sources.home_credit import HomeCreditSource
 from collection.data.sources.synthetic import SyntheticSource
 
 SOURCES: dict[str, type[DataSource]] = {
     "synthetic": SyntheticSource,
+    "home-credit": HomeCreditSource,
+    "bank-marketing": BankMarketingSource,
     "erp": ERPSource,
 }
 
@@ -17,4 +21,13 @@ def get_source(name: str | None = None) -> DataSource:
     return SOURCES[name]()
 
 
-__all__ = ["SOURCES", "DataSource", "ERPSource", "RawDataset", "SyntheticSource", "get_source"]
+__all__ = [
+    "SOURCES",
+    "BankMarketingSource",
+    "DataSource",
+    "ERPSource",
+    "HomeCreditSource",
+    "RawDataset",
+    "SyntheticSource",
+    "get_source",
+]

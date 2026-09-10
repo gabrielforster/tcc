@@ -19,6 +19,7 @@ dependencies = [
     "seaborn>=0.13",
     "joblib>=1.4",
     "python-dateutil>=2.9",
+    "requests>=2.32",
     "tabulate>=0.9",
 ]
 

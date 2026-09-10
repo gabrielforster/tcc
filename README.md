@@ -76,7 +76,7 @@ automatizados.
 | Caminho | Conteúdo |
 |---|---|
 | [`src/collection/`](./src/collection) | System code: domain, data pipeline, EDA and features. |
-| [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA report). |
+| [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA reports) and the [data acquisition plan](./docs/data-acquisition-plan.md). |
 | `data/` | `raw` / `interim` / `processed` datasets — **never committed** (LGPD). |
 | [`article/`](./article) | Artigo científico (LaTeX, formato **SBC Reviews 2025**) — proposta de portfólio do PAC 8. Veja o [README do artigo](./article/README.md) para compilar. |
 | [`cronograma.md`](./cronograma.md) | Cronograma de 19 entregas (jul.–dez. 2026). |
@@ -134,17 +134,25 @@ make test lint
 | `data/interim/` | Anonymized dataset (LGPD) — the starting point for analysis |
 | `data/processed/` | Chronological 70/15/15 splits and the serialized preprocessor, per task |
 | `docs/data-dictionary.md` | Dictionary generated from the domain schema |
-| `docs/eda.md` + `docs/eda/*.png` | Exploratory report and the four charts |
+| `docs/eda-<source>.md` + `docs/eda/<source>/*.png` | Exploratory report and charts, one set per data source |
 
 ### Data source
 
-The pipeline talks to an interface (`DataSource`), not to a specific database:
+The pipeline talks to an interface (`DataSource`), not to a specific database. A source
+declares which of the four domain tables it covers, and the rest of the pipeline adapts —
+see [the data acquisition plan](./docs/data-acquisition-plan.md) for why the project runs
+on public data.
 
-- `DATA_SOURCE=synthetic` — generator that reproduces the real domain schema (customers,
-  receivables, collection events, agreements) with latent propensity, seasonality and
-  contact effects. The fallback foreseen in the schedule while ERP access is pending.
-- `DATA_SOURCE=erp` — real extraction; fill in `ERP_DATABASE_URL` and adjust the table
-  names in `src/collection/data/sources/erp.py`. Nothing downstream changes.
+| `DATA_SOURCE` | Covers | Notes |
+|---|---|---|
+| `synthetic` | all four tables | Generated. Reproduces the domain schema with latent propensity, seasonality and contact effects. The default, and what the test suite runs on |
+| `home-credit` | customers, receivables | Real payment behavior from [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk). Needs a Kaggle account: put `application_train.csv` and `installments_payments.csv` in `data/raw/home-credit/` |
+| `bank-marketing` | customers, contacts | Real contact attempts from [UCI Bank Marketing](https://archive.ics.uci.edu/dataset/222/bank+marketing), CC BY 4.0. Downloads on first use, no account needed |
+| `erp` | all four tables | The real extraction. Fill in `ERP_DATABASE_URL` and adjust table names in `src/collection/data/sources/erp.py` |
+
+The two predictive tasks need receivables, so they do not run on `bank-marketing`; that
+source feeds contact-strategy analysis instead, and `collection eda` produces the matching
+report automatically.
 
 ### Predictive tasks
 

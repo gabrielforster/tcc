@@ -89,7 +89,7 @@ no longer blocks anything: steps 1-2 stay open in the background, and if authori
 arrives before mid-October the remaining steps are about a day of work, because the
 extraction and anonymization code is already written and tested.
 
-## 4. Track B — public datasets (adopted)
+## 4. Track B — public datasets (adopted, implemented)
 
 None of these can answer the research question on its own. They do two things that matter:
 validate that the modelling pipeline produces sane results on real human behavior, and
@@ -108,11 +108,12 @@ from real human behavior, with the honest caveat that they come from two differe
 populations and cannot be joined — each supports its own claim, and the paper must not
 imply a single integrated dataset.
 
-### How they enter the codebase
+### How they enter the codebase — implemented
 
-No new architecture: each becomes a `DataSource` implementation next to `SyntheticSource`
-and `ERPSource`, mapping onto the same four domain tables. Everything downstream —
-anonymization, EDA, features, splits, models — is untouched.
+Each is a `DataSource` implementation next to `SyntheticSource` and `ERPSource`, mapping
+onto the same four domain tables. A source now declares which tables it covers
+(`provides`), so validation accepts a legitimately empty table instead of flagging it.
+Everything downstream — anonymization, EDA, features, splits, models — is untouched.
 
 | Source | Maps to | Mapping notes |
 |---|---|---|
@@ -121,12 +122,23 @@ anonymization, EDA, features, splits, models — is untouched.
 
 Two practical constraints, both worth settling before the code is written:
 
-- **Home Credit needs a Kaggle account** and acceptance of the competition rules. The data
-  cannot be committed to this repository; the loader downloads to `data/raw/` on demand
-  and the licence terms need a read before anything derived from it is published in the
-  paper.
-- **Bank Marketing is CC BY 4.0** and downloads straight from UCI with no account, so it
-  can be fetched in CI if we ever want that.
+- **Home Credit needs a Kaggle account** and acceptance of the competition rules. The
+  loader raises with copy-pasteable download instructions until the files are in
+  `data/raw/home-credit/`, and the licence terms still need a read before anything derived
+  from it is published in the paper.
+- **Bank Marketing is CC BY 4.0** and downloads straight from UCI with no account.
+
+**First result from the Bank Marketing run** (41,188 real contacts, `docs/eda-bank-marketing.md`):
+response rate falls from 13.0% on the first attempt to 5.5% by the sixth, a 58% decline.
+That is real evidence for a cooldown and an attempt cap in the rules engine, replacing what
+would otherwise have been an arbitrary choice in the active module.
+
+**One caveat on the reconstructed calendar.** Bank Marketing has no date column — only
+month and day of week, with rows ordered chronologically. The timestamps are reconstructed
+by walking the month sequence and assuming a year boundary whenever the month goes
+backwards. The reconstruction lands exactly on the documented May 2008 - November 2010
+span, but it is an inference: good for ordering and month-level seasonality, meaningless at
+day-level precision, and it must be described that way in the methodology.
 
 ## 5. Track C — the synthetic generator (keep regardless)
 
