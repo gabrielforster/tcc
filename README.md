@@ -75,7 +75,11 @@ automatizados.
 
 | Caminho | Conteúdo |
 |---|---|
+| [`src/collection/`](./src/collection) | System code: domain, data pipeline, EDA and features. |
+| [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA report). |
+| `data/` | `raw` / `interim` / `processed` datasets — **never committed** (LGPD). |
 | [`article/`](./article) | Artigo científico (LaTeX, formato **SBC Reviews 2025**) — proposta de portfólio do PAC 8. Veja o [README do artigo](./article/README.md) para compilar. |
+| [`cronograma.md`](./cronograma.md) | Cronograma de 19 entregas (jul.–dez. 2026). |
 | [`rfc.pdf`](./rfc.pdf) | RFC do projeto: documento de proposta detalhada. |
 | `tabela-comparativa.pdf` | Tabela comparativa de trabalhos relacionados (artigos e soluções comerciais). |
 | `old-article/` | Versões anteriores do artigo (histórico). |
@@ -110,10 +114,57 @@ cd article
 > primeira execução. Detalhes, alternativas (Overleaf) e notas de compilação estão no
 > [README do artigo](./article/README.md).
 
+## Running it
+
+Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
+
+```sh
+cp .env.example .env      # set your own ANONYMIZATION_SALT
+make setup                # creates .venv (Python 3.12) and installs dependencies
+make up                   # Postgres with pgvector + Redis
+make pipeline             # extract -> ingest -> dictionary -> eda -> features
+make test lint
+```
+
+`make pipeline` runs schedule deliverables 3-5 end to end and produces:
+
+| Output | Contents |
+|---|---|
+| `data/raw/` | Raw dataset from the configured source (personal data; never committed) |
+| `data/interim/` | Anonymized dataset (LGPD) — the starting point for analysis |
+| `data/processed/` | Chronological 70/15/15 splits and the serialized preprocessor, per task |
+| `docs/data-dictionary.md` | Dictionary generated from the domain schema |
+| `docs/eda.md` + `docs/eda/*.png` | Exploratory report and the four charts |
+
+### Data source
+
+The pipeline talks to an interface (`DataSource`), not to a specific database:
+
+- `DATA_SOURCE=synthetic` — generator that reproduces the real domain schema (customers,
+  receivables, collection events, agreements) with latent propensity, seasonality and
+  contact effects. The fallback foreseen in the schedule while ERP access is pending.
+- `DATA_SOURCE=erp` — real extraction; fill in `ERP_DATABASE_URL` and adjust the table
+  names in `src/collection/data/sources/erp.py`. Nothing downstream changes.
+
+### Predictive tasks
+
+| Task | Population | Reference date | Target |
+|---|---|---|---|
+| Payment propensity | Already-due receivables | Due date | Settled within 30 days |
+| Future default | Not-yet-due receivables | Issue date | Goes past 60 days unsettled |
+
+No feature uses information dated after the reference date, and the split is
+chronological — there are automated tests covering exactly that (`tests/test_features.py`).
+
+### Contributing
+
+Code, commit messages and documentation are written in English. Every change lands
+through a pull request; `master` is never committed to directly.
+
 ## Status
 
-📚 Pesquisa e proposta (PAC 8). O planejamento e o artigo estão completos; a implementação
-dos módulos segue o roteiro de 8 fases descrito acima.
+📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados
+(entregas 3–5) está pronto; o próximo passo é o módulo preditivo do Bloco II.
 
 ---
 
