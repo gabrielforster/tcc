@@ -1,0 +1,18 @@
+[
+  {"question": "posso parcelar minha divida?", "relevant": ["tabela-de-parcelamento.csv", "script-de-negociacao.md"], "note": "instalment options"},
+  {"question": "em quantas vezes consigo dividir um atraso de 45 dias?", "relevant": ["tabela-de-parcelamento.csv"], "note": "row lookup by delinquency band"},
+  {"question": "qual o desconto para pagamento a vista?", "relevant": ["tabela-de-parcelamento.csv", "limites-de-alcada.md"], "note": "discount"},
+  {"question": "quero a segunda via do boleto", "relevant": ["faq.md"], "note": "common intent"},
+  {"question": "ja paguei mas continuo recebendo cobranca", "relevant": ["faq.md"], "note": "payment confirmation"},
+  {"question": "quais sao os juros e a multa por atraso?", "relevant": ["faq.md"], "note": "fees"},
+  {"question": "voces podem me ligar no domingo?", "relevant": ["politica-de-cobranca.md"], "note": "permitted hours"},
+  {"question": "nao quero mais receber mensagens de cobranca", "relevant": ["politica-de-cobranca.md"], "note": "opt-out"},
+  {"question": "quantas vezes voces podem me contatar por semana?", "relevant": ["politica-de-cobranca.md"], "note": "frequency"},
+  {"question": "nao reconheco essa divida, o valor esta errado", "relevant": ["politica-de-cobranca.md", "limites-de-alcada.md", "script-de-negociacao.md"], "note": "dispute"},
+  {"question": "quando o atendimento precisa chamar um humano?", "relevant": ["limites-de-alcada.md"], "note": "escalation"},
+  {"question": "qual o valor minimo de cada parcela?", "relevant": ["limites-de-alcada.md"], "note": "minimum instalment"},
+  {"question": "posso pagar com pix?", "relevant": ["faq.md"], "note": "payment methods"},
+  {"question": "meu nome foi negativado, como resolvo?", "relevant": ["faq.md"], "note": "credit bureau"},
+  {"question": "como comecar a conversa de cobranca por telefone?", "relevant": ["script-de-negociacao.md"], "note": "call opening"},
+  {"question": "o cliente disse que esta desempregado, o que ofereco?", "relevant": ["script-de-negociacao.md"], "note": "objection handling"}
+]
