@@ -172,8 +172,9 @@ to each — see [`docs/architecture.md`](./docs/architecture.md).
 Every interaction is an immutable event carrying `caused_by`, so the log reconstructs why
 any contact happened. The orchestrator does four things only: route, prioritise
 (responsive → escalation → proactive), enforce opt-out **before any agent runs**, and
-record. The responsive agent is still a stub; the proactive one runs the
-[collection rules](./docs/collection-rules.md) and the predictive one is behind
+record. All three agents are now real: the [responsive one](./docs/responsive-agent.md)
+classifies and answers from the knowledge base, the proactive one runs the
+[collection rules](./docs/collection-rules.md), and the predictive one is behind
 `POST /score`.
 
 ### RAG
