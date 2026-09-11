@@ -162,6 +162,39 @@ def serve(
 
 
 @app.command()
+def demo() -> None:
+    """Route a mix of events through the orchestrator and show what happened to each."""
+    from collection.agents.demo import run
+
+    result = run()
+    trace = result.trace
+
+    table = Table(title="Events processed, in the order the orchestrator handled them")
+    table.add_column("#", justify="right")
+    table.add_column("event")
+    table.add_column("customer")
+    table.add_column("priority")
+    table.add_column("handled by")
+    for i, event in enumerate(trace.processed, start=1):
+        table.add_row(
+            str(i),
+            event.type.value,
+            event.customer_id,
+            event.priority.name.lower(),
+            trace.handled_by[event.event_id],
+        )
+    console.print(table)
+
+    for event in trace.suppressed:
+        console.print(
+            f"[yellow]suppressed[/] {event.type.value} for {event.customer_id} (opted out)"
+        )
+    for event in trace.unrouted:
+        console.print(f"[dim]unrouted[/] {event.type.value} (no agent handles it yet)")
+    console.print(f"\n[green]summary[/] {trace.counts()}")
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)

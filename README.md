@@ -76,7 +76,7 @@ automatizados.
 | Caminho | Conteúdo |
 |---|---|
 | [`src/collection/`](./src/collection) | System code: domain, data pipeline, EDA and features. |
-| [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA reports) and the [data acquisition plan](./docs/data-acquisition-plan.md). |
+| [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA reports), the [architecture](./docs/architecture.md) and the [data acquisition plan](./docs/data-acquisition-plan.md). |
 | `data/` | `raw` / `interim` / `processed` datasets — **never committed** (LGPD). |
 | [`article/`](./article) | Artigo científico (LaTeX, formato **SBC Reviews 2025**) — proposta de portfólio do PAC 8. Veja o [README do artigo](./article/README.md) para compilar. |
 | [`cronograma.md`](./cronograma.md) | Cronograma de 19 entregas (jul.–dez. 2026). |
@@ -195,6 +195,17 @@ values — writing `docs/interpretability-<source>-<task>.md`.
 The ranking is the operational output, not the probability: the active module works down a
 finite queue each day, which is also why models are selected on average precision. Unknown
 or missing feature columns are rejected with a 422 rather than silently scored.
+
+### Multi-agent architecture
+
+`collection demo` routes a mix of events through the orchestrator and shows what happened
+to each — see [`docs/architecture.md`](./docs/architecture.md).
+
+Every interaction is an immutable event carrying `caused_by`, so the log reconstructs why
+any contact happened. The orchestrator does four things only: route, prioritise
+(responsive → escalation → proactive), enforce opt-out **before any agent runs**, and
+record. The responsive and proactive agents are stubs for now; the predictive one is real,
+behind `POST /score`.
 
 ### Contributing
 

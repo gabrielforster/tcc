@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve pipeline test lint fmt
+.PHONY: setup up down extract ingest dictionary eda features train explain serve demo pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -32,6 +32,9 @@ explain:          ## permutation importance and SHAP for the champion
 
 serve:            ## run the scoring API on http://127.0.0.1:8000
 	uv run collection serve
+
+demo:             ## route a mix of events through the orchestrator
+	uv run collection demo
 
 pipeline:         ## the whole data pipeline, end to end
 	uv run collection pipeline
