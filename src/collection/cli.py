@@ -82,6 +82,86 @@ def features(
 
 
 @app.command()
+def train(
+    task: str = typer.Option("both", help="propensity | default | both"),
+    tune: bool = typer.Option(True, help="run the randomised hyperparameter search"),
+) -> None:
+    """Train the candidate models, pick a champion and score it once on the test split."""
+    import joblib
+
+    from collection.models import report as model_report
+    from collection.models.train import train_task
+
+    tasks = ["propensity", "default"] if task == "both" else [task]
+    for t in tasks:
+        console.print(f"\n[bold]Training: {t}[/]")
+        result = train_task(t, tune=tune)
+        console.print(result.comparison_table().to_string(index=False))
+        console.print(f"\n[green]champion[/] {result.champion} (threshold {result.threshold:.2f})")
+        console.print(
+            f"[green]test[/] average_precision={result.test.average_precision:.4f} "
+            f"roc_auc={result.test.roc_auc:.4f} f1={result.test.f1:.4f} "
+            f"(majority baseline average_precision={result.test_baseline['average_precision']:.4f})"
+        )
+
+        from collection.features.build import build_splits
+
+        splits = build_splits(t)
+        bundle = joblib.load(settings.dir_processed / f"model_{t}.joblib")
+        x_test = splits.test.drop(columns=[splits.target])
+        curve = model_report.curves(
+            bundle["pipeline"], x_test, splits.test[splits.target], result.source, t
+        )
+        console.print(f"[green]report[/] -> {model_report.write(result, curve)}")
+
+
+@app.command()
+def explain(
+    task: str = typer.Option("both", help="propensity | default | both"),
+) -> None:
+    """Permutation importance and SHAP values for the trained champion."""
+    import joblib
+
+    from collection.features.build import build_splits
+    from collection.models.explain import explain as _explain
+    from collection.models.explain import write_report
+
+    tasks = ["propensity", "default"] if task == "both" else [task]
+    for t in tasks:
+        path = settings.dir_processed / f"model_{t}.joblib"
+        if not path.exists():
+            console.print(f"[yellow]skipped[/] no model for '{t}'. Run `collection train` first.")
+            continue
+        bundle = joblib.load(path)
+        splits = build_splits(t)
+        x_test = splits.test[bundle["features"]]
+        y_test = splits.test[splits.target].to_numpy()
+        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']})")
+        explanation = _explain(bundle["pipeline"], x_test, y_test, t, bundle["source"])
+        console.print(explanation.permutation.head(10).to_string(index=False))
+        console.print(f"[green]report[/] -> {write_report(explanation)}")
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8000),
+    reload: bool = typer.Option(False, help="reload on code changes"),
+) -> None:
+    """Serve the scoring API (POST /score)."""
+    import uvicorn
+
+    from collection.api.app import available_models
+
+    models = available_models()
+    if not models:
+        console.print("[yellow]warning[/] no trained models found; /score will return 404.")
+    else:
+        console.print(f"[green]models[/] {', '.join(models)}")
+    uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)

@@ -123,6 +123,7 @@ cp .env.example .env      # set your own ANONYMIZATION_SALT
 make setup                # creates .venv (Python 3.12) and installs dependencies
 make up                   # Postgres with pgvector + Redis
 make pipeline             # extract -> ingest -> dictionary -> eda -> features
+make train                # train the models and write the comparison report
 make test lint
 ```
 
@@ -163,6 +164,37 @@ report automatically.
 
 No feature uses information dated after the reference date, and the split is
 chronological — there are automated tests covering exactly that (`tests/test_features.py`).
+
+### Predictive module
+
+`make train` compares six candidates — logistic regression as the baseline, random forest
+and XGBoost, each under both imbalance strategies (class weighting and SMOTE) — and writes
+`docs/model-<source>-<task>.md`.
+
+The protocol is fixed before any result is read: candidates are cross-validated on the
+training split with `TimeSeriesSplit` (k=5, so no fold is scored on rows preceding its own
+training data), the two tunable families get a small randomised search over the same folds,
+the champion is whichever maximises **average precision on validation**, and the test split
+is scored exactly once at the end. Accuracy is reported because the schedule asks for it,
+but it never decides: at a 17% positive rate the majority class already scores 83%, so
+every report carries the majority-class baseline next to the champion.
+
+`make explain` adds interpretability — permutation importance on the test split plus SHAP
+values — writing `docs/interpretability-<source>-<task>.md`.
+
+### Scoring API
+
+`make serve` runs the inference API the active module consumes:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /score` | Score a batch of receivables; returns probability, decision at the tuned threshold, and position in the contact queue |
+| `GET /models/{task}` | Champion name, threshold and the exact feature columns the model expects |
+| `GET /health` | Which models are loaded |
+
+The ranking is the operational output, not the probability: the active module works down a
+finite queue each day, which is also why models are selected on average precision. Unknown
+or missing feature columns are rejected with a 422 rather than silently scored.
 
 ### Contributing
 
