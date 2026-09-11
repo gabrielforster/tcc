@@ -18,8 +18,8 @@ Run `collection demo` to watch a mix of events routed end to end.
         ▼                         ▼                          ▼
 ┌────────────────┐      ┌──────────────────┐      ┌────────────────────┐
 │   RESPONSIVE   │      │     PROACTIVE    │      │     PREDICTIVE     │
-│  LLM + RAG     │      │  rules + queue   │      │  ranking via API   │
-│  (stub)        │      │  (stub)          │      │  POST /score       │
+│  LLM + RAG     │      │  rules engine    │      │  ranking via API   │
+│  (stub)        │      │                  │      │  POST /score       │
 └────────────────┘      └──────────────────┘      └────────────────────┘
         │                         │                          │
         ▼                         ▼                          ▼
@@ -28,10 +28,11 @@ Run `collection demo` to watch a mix of events routed end to end.
 └────────────────┘      └──────────────────┘      └────────────────────┘
 ```
 
-The predictive layer is real (`POST /score`). The responsive and proactive agents are
-stubs: the coordination is delivered first so it can be reviewed and tested before the LLM
-and the telephony integration exist, and each stub is replaced in place without the
-orchestrator changing.
+The predictive layer is real (`POST /score`) and so is the proactive agent, which now runs
+the collection rules (see [`docs/collection-rules.md`](./collection-rules.md)). The
+responsive agent is still a stub: the coordination was delivered first so it could be
+reviewed and tested before the LLM and the telephony integration exist, and each stub is
+replaced in place without the orchestrator changing.
 
 ## The event contract
 
