@@ -18,8 +18,8 @@ Run `collection demo` to watch a mix of events routed end to end.
         ▼                         ▼                          ▼
 ┌────────────────┐      ┌──────────────────┐      ┌────────────────────┐
 │   RESPONSIVE   │      │     PROACTIVE    │      │     PREDICTIVE     │
-│  LLM + RAG     │      │  rules engine    │      │  ranking via API   │
-│  (stub)        │      │                  │      │  POST /score       │
+│  intent + RAG  │      │  rules engine    │      │  ranking via API   │
+│                │      │                  │      │  POST /score       │
 └────────────────┘      └──────────────────┘      └────────────────────┘
         │                         │                          │
         ▼                         ▼                          ▼
@@ -28,11 +28,13 @@ Run `collection demo` to watch a mix of events routed end to end.
 └────────────────┘      └──────────────────┘      └────────────────────┘
 ```
 
-The predictive layer is real (`POST /score`) and so is the proactive agent, which now runs
-the collection rules (see [`docs/collection-rules.md`](./collection-rules.md)). The
-responsive agent is still a stub: the coordination was delivered first so it could be
-reviewed and tested before the LLM and the telephony integration exist, and each stub is
-replaced in place without the orchestrator changing.
+All three agents are real now. The coordination was delivered first, as stubs, so it could
+be reviewed and tested before the agents existed — and each stub was then replaced in place
+without the orchestrator changing, which is the property that layer was built for. What
+remains stubbed is generation itself: the responsive agent composes answers from retrieved
+passages rather than from an LLM (see
+[`docs/responsive-agent.md`](./responsive-agent.md)), and the telephony integration is not
+built.
 
 ## The event contract
 

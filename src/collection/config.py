@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     dir_interim: Path = ROOT / "data" / "interim"
     dir_processed: Path = ROOT / "data" / "processed"
     dir_docs: Path = ROOT / "docs"
+    dir_knowledge: Path = ROOT / "knowledge"
 
     def prepare_directories(self) -> None:
         for d in (self.dir_raw, self.dir_interim, self.dir_processed, self.dir_docs / "eda"):

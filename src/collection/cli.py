@@ -128,6 +128,48 @@ def demo() -> None:
 
 
 @app.command()
+def rag(
+    query: str = typer.Option(None, help="run a single query against the index"),
+    top_k: int = typer.Option(5),
+    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer"),
+    evaluate_only: bool = typer.Option(False, "--evaluate", help="only run the evaluation"),
+) -> None:
+    """Build the knowledge index, evaluate retrieval, or answer a single query."""
+    from collection.rag.documents import load_directory
+    from collection.rag.embeddings import get_embedder
+    from collection.rag.evaluate import load_questions, sweep
+    from collection.rag.index import VectorIndex
+
+    documents = load_directory(settings.dir_knowledge)
+    index = VectorIndex(embedder=get_embedder(embedder))
+    index.add_documents(documents).build()
+
+    stats = index.stats()
+    console.print(
+        f"[green]indexed[/] {stats['documents']} documents -> {stats['chunks']} chunks "
+        f"({stats['embedder']}, {stats['dimensions']} dims, "
+        f"mean {stats['mean_words_per_chunk']} words/chunk)"
+    )
+
+    if query and not evaluate_only:
+        for hit in index.search(query, top_k=top_k):
+            preview = " ".join(hit.text.split())[:160]
+            console.print(f"\n[bold]{hit.document_id}[/] ({hit.score:.3f})\n  {preview}...")
+        return
+
+    questions_file = settings.dir_knowledge / "questions.json"
+    if not questions_file.exists():
+        console.print("[yellow]no questions.json; skipping evaluation[/]")
+        return
+    questions = load_questions(questions_file)
+    table = sweep(index, questions)
+    console.print(f"\n[bold]Retrieval over {len(questions)} labelled questions[/]")
+    console.print(table.to_string(index=False))
+
+    index.save(settings.dir_processed / f"rag_index_{embedder}.joblib")
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)

@@ -172,8 +172,21 @@ to each — see [`docs/architecture.md`](./docs/architecture.md).
 Every interaction is an immutable event carrying `caused_by`, so the log reconstructs why
 any contact happened. The orchestrator does four things only: route, prioritise
 (responsive → escalation → proactive), enforce opt-out **before any agent runs**, and
-record. The responsive and proactive agents are stubs for now; the predictive one is real,
-behind `POST /score`.
+record. All three agents are now real: the [responsive one](./docs/responsive-agent.md)
+classifies and answers from the knowledge base, the proactive one runs the
+[collection rules](./docs/collection-rules.md), and the predictive one is behind
+`POST /score`.
+
+### RAG
+
+`collection rag` builds the knowledge index from `knowledge/` and evaluates retrieval
+against a labelled question set — see [`docs/rag.md`](./docs/rag.md).
+
+Retrieval is measured **before** any LLM is involved: an agent that invents an answer
+because nothing relevant was retrieved has a retrieval failure, not a generation one, and
+the eventual hallucination numbers only mean something if retrieval quality is already
+known. The default embedder is TF-IDF over word and character n-grams — no API key, no
+model download, and a real lexical baseline for a neural retriever to be measured against.
 
 ### Contributing
 

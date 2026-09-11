@@ -14,6 +14,10 @@ from collection.agents.base import StubAgent
 from collection.agents.events import Event, EventType
 from collection.agents.orchestrator import Orchestrator
 from collection.agents.proactive import ProactiveAgent
+from collection.agents.responsive import ResponsiveAgent
+from collection.config import settings
+from collection.rag.documents import load_directory
+from collection.rag.index import VectorIndex
 
 
 @dataclass
@@ -24,11 +28,9 @@ class DemoResult:
 
 def build() -> Orchestrator:
     """The three agents of the architecture, still as stubs."""
-    responsive = StubAgent(
-        "responsive",
-        frozenset({EventType.MESSAGE_RECEIVED, EventType.AUDIO_RECEIVED}),
-        emits=EventType.REPLY_SENT,
-    )
+    # No longer a stub either: it classifies the message and answers from the index.
+    index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
+    responsive = ResponsiveAgent(index=index)
     # No longer a stub: the rules engine decides whether each contact may happen.
     # A fixed clock inside business hours, so the demo reads the same whenever it is run.
     proactive = ProactiveAgent(
