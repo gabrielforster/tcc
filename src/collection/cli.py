@@ -116,6 +116,52 @@ def train(
 
 
 @app.command()
+def explain(
+    task: str = typer.Option("both", help="propensity | default | both"),
+) -> None:
+    """Permutation importance and SHAP values for the trained champion."""
+    import joblib
+
+    from collection.features.build import build_splits
+    from collection.models.explain import explain as _explain
+    from collection.models.explain import write_report
+
+    tasks = ["propensity", "default"] if task == "both" else [task]
+    for t in tasks:
+        path = settings.dir_processed / f"model_{t}.joblib"
+        if not path.exists():
+            console.print(f"[yellow]skipped[/] no model for '{t}'. Run `collection train` first.")
+            continue
+        bundle = joblib.load(path)
+        splits = build_splits(t)
+        x_test = splits.test[bundle["features"]]
+        y_test = splits.test[splits.target].to_numpy()
+        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']})")
+        explanation = _explain(bundle["pipeline"], x_test, y_test, t, bundle["source"])
+        console.print(explanation.permutation.head(10).to_string(index=False))
+        console.print(f"[green]report[/] -> {write_report(explanation)}")
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8000),
+    reload: bool = typer.Option(False, help="reload on code changes"),
+) -> None:
+    """Serve the scoring API (POST /score)."""
+    import uvicorn
+
+    from collection.api.app import available_models
+
+    models = available_models()
+    if not models:
+        console.print("[yellow]warning[/] no trained models found; /score will return 404.")
+    else:
+        console.print(f"[green]models[/] {', '.join(models)}")
+    uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)

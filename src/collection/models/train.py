@@ -17,7 +17,7 @@ to test rather than an untested 0.5.
 """
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import joblib
@@ -58,6 +58,7 @@ class TaskResult:
     test: Scores
     test_baseline: dict[str, float]
     split_sizes: dict[str, int]
+    feature_columns: list[str] = field(default_factory=list)
 
     def comparison_table(self) -> pd.DataFrame:
         rows = []
@@ -160,6 +161,7 @@ def train_task(task: str = "propensity", tune: bool = True) -> TaskResult:
             "validation": len(splits.validation),
             "test": len(splits.test),
         },
+        feature_columns=list(x_train.columns),
     )
     _persist(result, champion_estimator)
     return result
@@ -185,7 +187,16 @@ def _plain(value: Any) -> Any:
 def _persist(result: TaskResult, estimator: Any) -> None:
     settings.prepare_directories()
     joblib.dump(
-        {"pipeline": estimator, "threshold": result.threshold, "target": result.target},
+        {
+            "pipeline": estimator,
+            "threshold": result.threshold,
+            "target": result.target,
+            "task": result.task,
+            "source": result.source,
+            "champion": result.champion,
+            # The serving layer validates incoming payloads against these.
+            "features": result.feature_columns,
+        },
         settings.dir_processed / f"model_{result.task}.joblib",
     )
     payload = asdict(result)
