@@ -52,3 +52,7 @@ jobs:
           uv run collection dictionary
           uv run collection features
           uv run collection demo
+
+      - name: Retrieval evaluation
+        # Fails if a change to the knowledge base or the retriever drops retrieval quality.
+        run: uv run collection rag
