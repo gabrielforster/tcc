@@ -109,6 +109,19 @@ def demo() -> None:
         console.print(
             f"[yellow]suppressed[/] {event.type.value} for {event.customer_id} (opted out)"
         )
+    for event in trace.produced:
+        if event.type.value == "contact_scheduled":
+            console.print(
+                f"[green]scheduled[/] {event.customer_id} via {event.payload['channel']} "
+                f"(stage {event.payload['delinquency_stage']}, attempt "
+                f"{event.payload['attempt_number']}, expected value "
+                f"R$ {event.payload['expected_value']})"
+            )
+        if event.type.value == "suppressed":
+            console.print(
+                f"[yellow]blocked[/] {event.customer_id}: {event.payload['reason']} — "
+                f"{event.payload['detail']}"
+            )
     for event in trace.unrouted:
         console.print(f"[dim]unrouted[/] {event.type.value} (no agent handles it yet)")
     console.print(f"\n[green]summary[/] {trace.counts()}")
