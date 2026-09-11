@@ -9,8 +9,8 @@ import pytest
 
 from collection.data.sources.bank_marketing import BankMarketingSource, _reconstruct_dates
 from collection.data.sources.base import ALL_TABLES
-from collection.data.sources.home_credit import HomeCreditSource
 from collection.data.sources.home_credit import REQUIRED_FILES as HOME_CREDIT_FILES
+from collection.data.sources.home_credit import HomeCreditSource
 
 BANK_HEADER = (
     '"age";"job";"marital";"education";"default";"housing";"loan";"contact";"month";'

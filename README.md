@@ -164,6 +164,17 @@ report automatically.
 No feature uses information dated after the reference date, and the split is
 chronological — there are automated tests covering exactly that (`tests/test_features.py`).
 
+### RAG
+
+`collection rag` builds the knowledge index from `knowledge/` and evaluates retrieval
+against a labelled question set — see [`docs/rag.md`](./docs/rag.md).
+
+Retrieval is measured **before** any LLM is involved: an agent that invents an answer
+because nothing relevant was retrieved has a retrieval failure, not a generation one, and
+the eventual hallucination numbers only mean something if retrieval quality is already
+known. The default embedder is TF-IDF over word and character n-grams — no API key, no
+model download, and a real lexical baseline for a neural retriever to be measured against.
+
 ### Contributing
 
 Code, commit messages and documentation are written in English. Every change lands
