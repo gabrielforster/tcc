@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --all-extras --frozen
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+      - name: Format check
+        run: uv run ruff format --check src tests
+
+      - name: Tests
+        # The suite trains real models, so it is slower than a unit-test suite and the
+        # timeout above is set accordingly.
+        run: uv run pytest -q -p no:warnings
+
+      - name: Pipeline smoke test
+        # Runs the data pipeline end to end on the synthetic source, which needs no
+        # credentials and no network. Catches breakage that unit tests can miss, such as
+        # a report template referring to a column the features no longer produce.
+        env:
+          DATA_SOURCE: synthetic
+          SYNTHETIC_N_CUSTOMERS: "150"
+          SYNTHETIC_N_INVOICES: "1500"
+          ANONYMIZATION_SALT: ci-salt
+        run: |
+          uv run collection extract
+          uv run collection ingest
+          uv run collection dictionary
+          uv run collection features
+          uv run collection demo
+
+      - name: Retrieval evaluation
+        # Fails if a change to the knowledge base or the retriever drops retrieval quality.
+        run: uv run collection rag
