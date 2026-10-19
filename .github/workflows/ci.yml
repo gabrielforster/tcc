@@ -56,3 +56,10 @@ jobs:
       - name: Retrieval evaluation
         # Fails if a change to the knowledge base or the retriever drops retrieval quality.
         run: uv run collection rag
+
+      - name: Responder evaluation
+        # The template arm only: it needs no API key and no network, and it exercises the
+        # whole generation path -- prompt assembly, answering, escalation and the
+        # faithfulness measure. The LLM arm is run by hand, because a step that calls a
+        # paid API on every pull request is a step that gets removed.
+        run: uv run collection answer --responder template

@@ -9,9 +9,15 @@
 | Pipeline smoke test | End-to-end breakage that unit tests miss — a report template naming a column the features no longer produce, for instance |
 | Orchestrator demo | A change to the event contract or the routing rules that stops the agents from running end to end |
 | Retrieval evaluation | A change to the knowledge base or the retriever that quietly drops retrieval quality |
+| Responder evaluation | A change that breaks answering, escalation or the faithfulness measure — the template arm, which needs no API key |
 
 The smoke test runs on the synthetic source with a reduced dataset, so it needs no
 credentials, no network and no Kaggle account.
+
+The responder evaluation runs the template arm only. The LLM arm needs `ANTHROPIC_API_KEY`
+and costs money per run, so it is run by hand (`make answer ARGS="--compare"`) and its
+results are committed in `docs/responder-comparison.md`. A CI step that calls a paid API on
+every pull request is a step that gets deleted the first week it is slow.
 
 The test suite trains real models, so it is slower than a typical unit-test suite. That is
 deliberate — the protocol tests are the ones worth having — and the job timeout accounts

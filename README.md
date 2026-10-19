@@ -220,6 +220,22 @@ the eventual hallucination numbers only mean something if retrieval quality is a
 known. The default embedder is TF-IDF over word and character n-grams — no API key, no
 model download, and a real lexical baseline for a neural retriever to be measured against.
 
+### Generation
+
+`collection answer` answers a customer message, or evaluates the responders against the
+labelled questions — see [`docs/llm-responder.md`](./docs/llm-responder.md).
+
+The LLM sits behind the same `Responder` seam as the templated baseline, so retrieval and
+intent classification are identical between the two arms and any difference belongs to
+generation alone. That is why the baseline stays: it is the control, and because it quotes
+rather than writes it cannot hallucinate, which makes it the ceiling the LLM is read
+against. Every answer is scored for faithfulness — invented figures, unsupported claims
+and citations of documents that were never retrieved — and
+[`docs/responder-comparison.md`](./docs/responder-comparison.md) carries the results.
+
+The template arm needs no API key and runs in CI. The LLM arm needs `ANTHROPIC_API_KEY`
+and is run by hand.
+
 ### Contributing
 
 Code, commit messages and documentation are written in English. Every change lands
@@ -227,8 +243,10 @@ through a pull request; `master` is never committed to directly.
 
 ## Status
 
-📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados
-(entregas 3–5) está pronto; o próximo passo é o módulo preditivo do Bloco II.
+📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados, o
+módulo preditivo, a arquitetura multiagente, o RAG e o módulo responsivo — agora com
+geração por LLM e medição de fidelidade — estão prontos. O próximo passo é o Bloco III
+final: canal de WhatsApp e transcrição de áudio.
 
 ---
 

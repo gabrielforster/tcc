@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     anonymization_salt: str = "change-this-salt"
     erp_database_url: str = ""
 
+    # Generation. The key is read from the environment like any other secret and is never
+    # committed; without it the LLM responder refuses and the template arm still runs.
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-5-5"
+    anthropic_api_key: str = ""
+
     # Pipeline directories
     dir_raw: Path = ROOT / "data" / "raw"
     dir_interim: Path = ROOT / "data" / "interim"

@@ -45,6 +45,9 @@ class Answer:
     text: str
     citations: list[str] = field(default_factory=list)
     grounded: bool = True
+    #: Which responder wrote this. Carried on the answer so an evaluation run cannot
+    #: report a templated fallback under the LLM's name.
+    responder: str = "template"
 
 
 class Responder(ABC):
@@ -82,6 +85,7 @@ class TemplateResponder(Responder):
                 ),
                 citations=[],
                 grounded=False,
+                responder=self.name,
             )
         opener = self.OPENERS.get(intent, self.OPENERS[Intent.UNKNOWN])
         body = "\n\n".join(" ".join(p.text.split()) for p in passages[:2])
@@ -90,6 +94,7 @@ class TemplateResponder(Responder):
             text=f"{opener}\n\n{body}\n\nFonte: {', '.join(citations)}",
             citations=citations,
             grounded=True,
+            responder=self.name,
         )
 
 
@@ -211,3 +216,19 @@ class ResponsiveAgent(Agent):
                 latency_ms=round(reply.latency_ms, 2),
             )
         ]
+
+
+def get_responder(name: str = "template") -> Responder:
+    """Pick a responder by name.
+
+    The LLM import is deferred: `collection.llm.responder` imports `Responder` from this
+    module, and naming it at the top would close the cycle. Deferring it also keeps the
+    optional SDK out of the import path for anyone running the template arm.
+    """
+    if name == "template":
+        return TemplateResponder()
+    if name == "llm":
+        from collection.llm.responder import LLMResponder
+
+        return LLMResponder()
+    raise ValueError(f"Unknown responder: {name!r}. Available: template, llm")

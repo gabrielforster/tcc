@@ -250,6 +250,66 @@ def rag(
 
 
 @app.command()
+def answer(
+    message: str = typer.Option(None, help="answer a single customer message"),
+    responder: str = typer.Option("template", help="template | llm"),
+    compare: bool = typer.Option(False, help="evaluate both responders and write the report"),
+    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer"),
+) -> None:
+    """Answer a message, or evaluate the responders against the labelled questions."""
+    from collection.agents.responsive import ResponsiveAgent, get_responder
+    from collection.llm import evaluate as responder_eval
+    from collection.rag.documents import load_directory
+    from collection.rag.embeddings import get_embedder
+    from collection.rag.evaluate import load_questions
+    from collection.rag.index import VectorIndex
+
+    index = VectorIndex(embedder=get_embedder(embedder))
+    index.add_documents(load_directory(settings.dir_knowledge)).build()
+
+    if message:
+        agent = ResponsiveAgent(index=index, responder=get_responder(responder))
+        reply = agent.answer(message)
+        console.print(
+            f"[bold]intent[/] {reply.classification.intent.value} "
+            f"(confidence {reply.classification.confidence:.2f}) "
+            f"· [bold]{reply.latency_ms:.0f} ms[/]"
+        )
+        if reply.escalated:
+            console.print(f"[yellow]escalated[/] {reply.escalation_reason}")
+        console.print(f"\n{reply.answer.text}\n")
+        for hit in reply.passages:
+            console.print(f"[dim]retrieved[/] {hit.document_id} ({hit.score:.3f})")
+        return
+
+    questions_file = settings.dir_knowledge / "questions.json"
+    if not questions_file.exists():
+        console.print("[yellow]no questions.json; nothing to evaluate[/]")
+        raise typer.Exit(code=1)
+    questions = load_questions(questions_file)
+
+    arms = ["template", "llm"] if compare else [responder]
+    table, results = responder_eval.compare(index, questions, arms)
+    console.print(f"\n[bold]Responders over {len(questions)} labelled questions[/]")
+    console.print(table.to_string(index=False))
+    for result in results:
+        if not result.within_budget:
+            console.print(
+                f"[yellow]over budget[/] {result.responder} p95 {result.latency_p95:.0f} ms "
+                f"> {responder_eval.LATENCY_BUDGET_MS:.0f} ms"
+            )
+        if result.fallbacks:
+            console.print(
+                f"[yellow]{result.fallbacks} fallback(s)[/] in {result.responder}: "
+                "generation failed and the template answered instead."
+            )
+    path = responder_eval.write_report(
+        table, results, settings.dir_docs / "responder-comparison.md"
+    )
+    console.print(f"[green]report[/] -> {path}")
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)
