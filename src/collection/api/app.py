@@ -17,7 +17,9 @@ from typing import Any
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
+from collection.api.chat import ChatService, create_router
 from collection.api.schemas import (
     HealthResponse,
     ModelInfo,
@@ -64,20 +66,39 @@ class ModelRegistry:
         return sorted(self._bundles)
 
 
-def create_app(registry: ModelRegistry | None = None) -> FastAPI:
+def create_app(
+    registry: ModelRegistry | None = None,
+    chat: ChatService | None = None,
+) -> FastAPI:
     registry = registry or ModelRegistry()
+    chat = chat or ChatService()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         registry.load()
+        if settings.chat_enabled:
+            # Building the retrieval index costs a second or two. Paying it at startup
+            # keeps it off the first customer's latency, which is the one measured.
+            chat.load()
         yield
 
     app = FastAPI(
-        title="Collection scoring API",
-        description="Priority ranking for the active collection module.",
+        title="Collection API",
+        description="Priority ranking for the active module, and the web chat channel.",
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    if settings.chat_enabled:
+        # The widget is embedded on another origin by definition, so without CORS the
+        # browser refuses every call before it reaches this process.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.chat_origins,
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["Content-Type"],
+        )
+        app.include_router(create_router(chat))
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:

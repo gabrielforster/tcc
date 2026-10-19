@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     anonymization_salt: str = "change-this-salt"
     erp_database_url: str = ""
 
+    # Web chat. The widget is embedded on another origin by definition, so the browser
+    # will preflight every call; `*` is the default because an anonymous FAQ chat has
+    # nothing to leak, and a deployment that identifies customers should narrow it to its
+    # own domains.
+    chat_enabled: bool = True
+    chat_allowed_origins: str = "*"
+
     # Generation. The key is read from the environment like any other secret and is never
     # committed; without it the LLM responder refuses and the template arm still runs.
     llm_provider: str = "anthropic"
@@ -33,6 +40,10 @@ class Settings(BaseSettings):
     dir_processed: Path = ROOT / "data" / "processed"
     dir_docs: Path = ROOT / "docs"
     dir_knowledge: Path = ROOT / "knowledge"
+
+    @property
+    def chat_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.chat_allowed_origins.split(",") if origin.strip()]
 
     def prepare_directories(self) -> None:
         for d in (self.dir_raw, self.dir_interim, self.dir_processed, self.dir_docs / "eda"):

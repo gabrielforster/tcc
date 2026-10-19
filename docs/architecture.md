@@ -30,11 +30,18 @@ Run `collection demo` to watch a mix of events routed end to end.
 
 All three agents are real now. The coordination was delivered first, as stubs, so it could
 be reviewed and tested before the agents existed — and each stub was then replaced in place
-without the orchestrator changing, which is the property that layer was built for. What
-remains stubbed is generation itself: the responsive agent composes answers from retrieved
-passages rather than from an LLM (see
-[`docs/responsive-agent.md`](./responsive-agent.md)), and the telephony integration is not
-built.
+without the orchestrator changing, which is the property that layer was built for. Generation is
+real too: the responsive agent answers through an LLM held to the retrieved passages, with
+the templated responder kept as the control arm (see
+[`docs/llm-responder.md`](./llm-responder.md)). What remains unbuilt is voice — speech to
+text and the telephony integration.
+
+The system also has its first channel. The embeddable web chat
+([`docs/web-chat.md`](./web-chat.md)) is an *adapter*: it owns transport and identity and
+submits `message_received` events to the orchestrator, never calling an agent directly. So
+the chat inherits the priority rule, the cascade guard, the audit trail and the opt-out
+check for free, and WhatsApp becomes another adapter over this same contract rather than a
+second copy of the conversation logic.
 
 ## The event contract
 

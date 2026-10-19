@@ -191,6 +191,9 @@ values — writing `docs/interpretability-<source>-<task>.md`.
 | `POST /score` | Score a batch of receivables; returns probability, decision at the tuned threshold, and position in the contact queue |
 | `GET /models/{task}` | Champion name, threshold and the exact feature columns the model expects |
 | `GET /health` | Which models are loaded |
+| `POST /chat/sessions` | Open a chat conversation (see the web chat channel below) |
+| `POST /chat/sessions/{id}/messages` | Send one customer message and get the agent's reply |
+| `GET /chat/widget.js` | The embeddable widget |
 
 The ranking is the operational output, not the probability: the active module works down a
 finite queue each day, which is also why models are selected on average precision. Unknown
@@ -236,6 +239,25 @@ and citations of documents that were never retrieved — and
 The template arm needs no API key and runs in CI. The LLM arm needs `ANTHROPIC_API_KEY`
 and is run by hand.
 
+### Web chat channel
+
+`make serve` exposes an embeddable chat widget at `/chat/demo`, documented in
+[`docs/web-chat.md`](./docs/web-chat.md). One `<script>` tag embeds it on any page:
+
+```html
+<script src="https://host/chat/widget.js" data-api="https://host" defer></script>
+```
+
+It is a **channel adapter**: every message becomes a `message_received` event handed to the
+orchestrator, never a direct call to the agent. The chat therefore inherits responsive
+priority, the audit trail and the opt-out enforced before any agent runs — and the next
+channel is another adapter over the same contract rather than a second copy of the
+conversation logic.
+
+Identity never comes from the browser. The host application's backend mints a signed token
+with `issue_token(customer_id)`; without one the session is anonymous, which still answers
+anything in the knowledge base because none of it is customer-specific.
+
 ### Contributing
 
 Code, commit messages and documentation are written in English. Every change lands
@@ -245,8 +267,9 @@ through a pull request; `master` is never committed to directly.
 
 📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados, o
 módulo preditivo, a arquitetura multiagente, o RAG e o módulo responsivo — agora com
-geração por LLM e medição de fidelidade — estão prontos. O próximo passo é o Bloco III
-final: canal de WhatsApp e transcrição de áudio.
+geração por LLM e medição de fidelidade — estão prontos, e o agente já é acessível por um
+widget de chat embedável. O próximo passo é a transcrição de áudio (OGG/OPUS → STT) e o
+canal de WhatsApp.
 
 ---
 
