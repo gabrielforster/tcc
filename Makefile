@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve demo pipeline test lint fmt
+.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -35,6 +35,9 @@ serve:            ## run the scoring API on http://127.0.0.1:8000
 
 demo:             ## route a mix of events through the orchestrator
 	uv run collection demo
+
+rag:              ## build the knowledge index and evaluate retrieval
+	uv run collection rag
 
 pipeline:         ## the whole data pipeline, end to end
 	uv run collection pipeline
