@@ -80,9 +80,12 @@ could never fire — a bug the tests caught.
 hallucinate, because it does not generate** — it can only answer awkwardly, which is
 exactly the trade an LLM comparison will quantify.
 
-An LLM responder implements the same `Responder` interface. Retrieval stays identical
+`LLMResponder` implements the same `Responder` interface. Retrieval stays identical
 across the two, so any measured difference is attributable to generation alone — which is
-what makes the comparison worth reporting.
+what makes the comparison worth reporting. It is built in
+[`docs/llm-responder.md`](./llm-responder.md), together with the faithfulness measure that
+scores both arms, and the results live in
+[`docs/responder-comparison.md`](./responder-comparison.md).
 
 ## Latency
 
