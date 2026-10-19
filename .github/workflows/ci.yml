@@ -51,3 +51,4 @@ jobs:
           uv run collection ingest
           uv run collection dictionary
           uv run collection features
+          uv run collection demo
