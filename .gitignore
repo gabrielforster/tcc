@@ -17,3 +17,6 @@ data/processed/*
 
 # Secrets
 .env
+
+# Local working notes: a scratch handoff file, never shared
+HANDOFF.md
