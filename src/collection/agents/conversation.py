@@ -37,9 +37,37 @@ from dataclasses import dataclass, field, replace
 
 from collection.agents.intent import Classification, Intent, IntentClassifier
 
-#: Turns of context carried into retrieval and generation. Four is two exchanges: enough
-#: to resolve "e em 6 vezes?", short enough that a topic change two questions ago does not
-#: still colour the answer.
+#: How far back the agent may look, counted in turns -- customer and agent alike, so four
+#: is two exchanges.
+#:
+#: Two things depend on it, and only one of them is sensitive to the value:
+#:
+#: * the transcript handed to the LLM, in `LLMRewriter` and in the responder prompt;
+#: * how far `Conversation.last_intent` may search when a message carries no intent.
+#:
+#: Derived rather than chosen, by sweeping it over the labelled dialogues
+#: (`collection answer --conversations`, reported in `docs/multi-turn.md`):
+#:
+#:     window   intent accuracy   inherited   prompt chars
+#:     0        0.600             0           0
+#:     2        0.657             4           101
+#:     4        0.657             4           172
+#:     6        0.657             4           245
+#:     99       0.657             4           439
+#:
+#: Zero disables inheritance and costs accuracy. Everything from 2 up scores the same on
+#: this set, because each customer turn is recorded with its resolved intent, so the
+#: search almost never needs to reach past the previous exchange -- and prompt cost grows
+#: linearly the whole way.
+#:
+#: Four rather than two is the one case the sweep cannot show, because the dialogue set
+#: contains no courtesy turns: when an uninformative turn sits between the question and
+#: the follow-up ("posso parcelar?" / "ok obrigado" / "sim"), `last_intent` skips it, and
+#: a two-turn window has nothing left to find. Four survives exactly one such exchange.
+#: Six and above buy nothing measurable and cost tokens on every call.
+#:
+#: Retrieval is unaffected: the lexical rewriter only ever reads the previous customer
+#: message, which is why `hit_rate` is flat across the whole sweep.
 CONTEXT_WINDOW = 4
 #: A message this short is a continuation rather than a new question.
 FOLLOW_UP_MAX_WORDS = 6
@@ -148,9 +176,16 @@ class Conversation:
     def window(self, size: int = CONTEXT_WINDOW) -> list[Turn]:
         return self.turns[-size:] if size > 0 else []
 
-    def last_intent(self) -> Intent | None:
-        """The most recent intent the classifier was confident about."""
-        for turn in reversed(self.turns):
+    def last_intent(self, size: int = CONTEXT_WINDOW) -> Intent | None:
+        """The most recent intent the classifier was confident about, within the window.
+
+        Bounded on purpose. An unbounded search looks harmless -- it only runs when the
+        current message has no intent of its own -- but it is the one place where a stale
+        intent does real damage: a customer who opened a thread about instalments, moved
+        on to a payment claim, and then types "sim" would inherit `negotiation` from a
+        question asked ten turns ago, and be answered about the wrong thing entirely.
+        """
+        for turn in reversed(self.window(size)):
             if turn.role == "customer" and turn.intent:
                 try:
                     intent = Intent(turn.intent)
@@ -337,6 +372,7 @@ def resolve_intent(
     message: str,
     conversation: Conversation | None,
     vocabulary: set[str] | None = None,
+    window: int = CONTEXT_WINDOW,
 ) -> Classification:
     """Inherit the thread's intent when the message alone carries none.
 
@@ -351,7 +387,7 @@ def resolve_intent(
     """
     if classification.is_confident or not is_follow_up(message, conversation):
         return classification
-    inherited = conversation.last_intent() if conversation else None
+    inherited = conversation.last_intent(window) if conversation else None
     if inherited is None:
         return classification
     if vocabulary is not None and known_ratio(message, vocabulary) < MIN_KNOWN_RATIO:

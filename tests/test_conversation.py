@@ -283,10 +283,15 @@ def test_the_evaluation_splits_follow_ups_from_the_rest(index, dialogues):
 
 
 def test_every_dialogue_gets_its_own_customer_id(index, dialogues):
-    # Sharing one would leak the unclear counter between dialogues and attribute the
-    # escalations to the rewriter under test.
+    """Sharing one would leak the unclear counter and escalate for the wrong reason.
+
+    Asserted on the *reason*, not on the escalation count: a turn that legitimately
+    retrieves nothing still escalates, and counting those would make this test fail for
+    reasons that have nothing to do with customer ids.
+    """
     scores = run(index, dialogues, "none", TemplateResponder())
-    assert scores.escalations == 0
+    reasons = {r.escalation_reason for r in scores.records if r.escalated}
+    assert "unclear_repeatedly" not in reasons, "the unclear counter leaked between dialogues"
 
 
 def test_comparing_arms_scores_each(index, dialogues):
@@ -310,3 +315,58 @@ def test_the_dialogue_set_labels_its_follow_ups(dialogues):
     assert dialogues
     assert any(turn.follow_up for dialogue in dialogues for turn in dialogue.turns)
     assert all(turn.relevant for dialogue in dialogues for turn in dialogue.turns)
+
+
+# -------------------------------------------------------------- the context window
+def test_a_zero_window_disables_inheritance(classifier, vocabulary):
+    assert not resolve_intent(classifier.classify("sim"), "sim", thread(), vocabulary, 0).inherited
+
+
+def test_four_turns_survive_one_uninformative_exchange(classifier, vocabulary):
+    """Why the window is 4 and not 2.
+
+    A courtesy turn between the question and the follow-up is skipped by `last_intent`,
+    so a two-turn window — one exchange — has nothing left to find. This is the case the
+    dialogue sweep cannot show, because the labelled set contains no courtesy turns.
+    """
+    conversation = (
+        Conversation()
+        .add("customer", "posso parcelar minha divida?", "negotiation")
+        .add("agent", "Sobre as condições de parcelamento: ...")
+        .add("customer", "ok obrigado", "small_talk")
+        .add("agent", "Posso ajudar com mais alguma coisa?")
+    )
+    narrow = resolve_intent(classifier.classify("sim"), "sim", conversation, vocabulary, 2)
+    default = resolve_intent(
+        classifier.classify("sim"), "sim", conversation, vocabulary, CONTEXT_WINDOW
+    )
+    assert not narrow.inherited, "one exchange cannot see past a courtesy turn"
+    assert default.intent is Intent.NEGOTIATION
+    assert default.inherited
+
+
+def test_the_window_bounds_how_far_back_an_intent_can_come_from():
+    """An unbounded search would apply an intent from the start of a long thread."""
+    conversation = Conversation().add("customer", "posso parcelar?", "negotiation")
+    for _ in range(10):
+        conversation.add("customer", "bom dia", "small_talk").add("agent", "Olá!")
+    assert conversation.last_intent(CONTEXT_WINDOW) is None
+    assert conversation.last_intent(999) is Intent.NEGOTIATION
+
+
+def test_the_sweep_reports_the_cost_and_the_benefit(index, dialogues):
+    from collection.agents.conversation_eval import sweep_window
+
+    table = sweep_window(index, dialogues, (0, 2, 4), responder=TemplateResponder())
+    rows = table.set_index("window")
+    assert rows.loc[0, "intents_inherited"] == 0
+    assert rows.loc[4, "intent_accuracy"] > rows.loc[0, "intent_accuracy"]
+    # The cost side: a wider window always sends more to the model.
+    assert rows.loc[4, "max_prompt_chars"] > rows.loc[2, "max_prompt_chars"]
+
+
+def test_retrieval_is_unaffected_by_the_window(index, dialogues):
+    from collection.agents.conversation_eval import sweep_window
+
+    table = sweep_window(index, dialogues, (0, 4, 99), responder=TemplateResponder())
+    assert table["hit_rate"].nunique() == 1, "the window must not touch retrieval"

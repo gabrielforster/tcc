@@ -304,8 +304,14 @@ def answer(
             f"\n[bold]Context strategies over {len(dialogues)} dialogues ({turns} turns)[/]"
         )
         console.print(table.to_string(index=False))
+        sweep = conversation_eval.sweep_window(index, dialogues, responder=get_responder(responder))
+        console.print("\n[bold]Context window[/]")
+        console.print(sweep.to_string(index=False))
         path = conversation_eval.write_report(
-            table, results, settings.dir_docs / "conversation-comparison.md"
+            table,
+            results,
+            settings.dir_docs / "conversation-comparison.md",
+            window_sweep=sweep,
         )
         console.print(f"[green]report[/] -> {path}")
         return

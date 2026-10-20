@@ -48,13 +48,22 @@ Passages are therefore **interleaved by rank**: every query's best passage is ta
 any query's second. Each query is compared only against itself, so the message's top hit
 is always present no matter how the context scored.
 
-| rewriter | hit rate | follow-up hit rate |
-|---|---|---|
-| none | 0.900 | 0.889 |
-| concat | 0.900 | 0.889 |
+| rewriter | hit rate | follow-up hit rate | escalations |
+|---|---|---|---|
+| none | 0.857 | 0.733 | 1 |
+| concat | 0.886 | **0.800** | 0 |
 
-Context now costs nothing. On this corpus it also gains nothing, which is reported rather
-than buried — see the honest reading below.
+Context helps, and the escalation column is the clearest part: with no context a bare
+`"sim"` retrieves nothing, finds no grounding and is handed to a person. With context it
+is answered.
+
+An earlier version of this document reported that context *neither helped nor hurt*. That
+was measured on a dialogue set where every thread was two turns long, which is too short
+for the effect to appear — a two-turn thread has no room for a follow-up that depends on
+anything but its immediate predecessor. Extending the set to threads of four to six turns,
+with bare continuations in them, is what made the difference visible. The lesson is about
+the evaluation, not the code: a benchmark that cannot express the failure cannot measure
+the fix.
 
 ## Intent: inheriting the thread's intent, safely
 
@@ -102,11 +111,68 @@ which is a real cost — an answer can now quote something from four turns back 
 has moved on from. It is the right trade, because a metric that cannot tell memory from
 fabrication measures neither.
 
+## The context window: why 4
+
+`CONTEXT_WINDOW` counts turns — customer and agent alike — so four is two exchanges. Two
+things depend on it:
+
+* the transcript handed to the LLM, in `LLMRewriter` and in the responder prompt;
+* how far `Conversation.last_intent` may search when a message carries no intent of its
+  own.
+
+Swept over the labelled dialogues (`collection answer --conversations`):
+
+| window | intent accuracy | inherited | stale | hit rate | prompt chars |
+|---|---|---|---|---|---|
+| 0 | 0.600 | 0 | 0 | 0.886 | 0 |
+| 2 | 0.657 | 4 | 2 | 0.886 | 101 |
+| 4 | 0.657 | 4 | 2 | 0.886 | 172 |
+| 6 | 0.657 | 4 | 2 | 0.886 | 245 |
+| 8 | 0.657 | 4 | 2 | 0.886 | 315 |
+| 99 | 0.657 | 4 | 2 | 0.886 | 439 |
+
+**Zero disables inheritance and costs accuracy** — 0.600 against 0.657.
+
+**Everything from 2 upwards scores the same**, and the reason is worth stating because it
+is not obvious: each customer turn is recorded with its *resolved* intent, so an inherited
+intent propagates forward turn by turn and the search almost never needs to reach past the
+previous exchange. Prompt cost, meanwhile, grows linearly the whole way.
+
+**So why 4 and not 2?** The one case the table cannot show, because the dialogue set
+contains no courtesy turns. When an uninformative turn sits between the question and the
+follow-up —
+
+```
+Cliente: posso parcelar minha divida?     negotiation
+Cliente: ok obrigado                      small_talk   ← skipped by last_intent
+Cliente: sim                              ?
+```
+
+— `last_intent` skips the courtesy turn, and a two-turn window has nothing left to find.
+Measured: window 2 inherits nothing, window 4 inherits `negotiation`. Four survives
+exactly one such exchange. Six and above buy nothing measurable and cost tokens on every
+call. `test_four_turns_survive_one_uninformative_exchange` holds that in place.
+
+**Retrieval is unaffected**, which the flat `hit_rate` column confirms: the lexical
+rewriter only ever reads the previous customer message, and the window never reaches it.
+
+### What the window does not fix
+
+Two of the four inherited intents are wrong, and a bigger or smaller window changes
+neither. They are not stale-by-distance; they are **propagated classifier errors**. In
+`longa-segunda-via` the classifier confidently reads `"aceita pix?"` as a payment claim,
+and the next turn inherits that mistake rather than the thread's real subject.
+
+Inheritance therefore *amplifies* intent errors: a confident misclassification becomes the
+default for every short turn that follows it. The window is the wrong lever for that — the
+fix is a better classifier, which is what the LLM comparison in `docs/responsive-agent.md`
+is for. It is recorded here so the inheritance rule is not read as more reliable than it is.
+
 ## The honest reading of the results
 
-On this corpus, lexical context **neither helps nor hurts** once queries are merged by
-rank. That is a weaker claim than "context improves retrieval", and it is the one the data
-supports.
+Lexical context helps on this set — follow-up hit rate 0.733 → 0.800, and one fewer
+handover — but the set is small enough that the figure should be read as a direction, not
+a measurement.
 
 The single follow-up that still fails is `"e em 6 vezes?"`, and it is instructive. An
 oracle rewrite — *"em quantas parcelas posso dividir a minha dívida?"* — **does** retrieve
@@ -121,7 +187,7 @@ direction.
 
 Two caveats on the numbers. The knowledge base is five documents, so a standalone query
 often lands on the right one by having few wrong options — the control arm is flattered.
-And ten dialogues is a small set; the follow-up column rests on nine turns.
+And thirteen dialogues is a small set; the follow-up column rests on fifteen turns.
 
 ## Running it
 
@@ -149,9 +215,7 @@ system's own words is not context, it is an echo.
 
 ## Known limitations
 
-**The window is four turns.** Enough to resolve `"e em 6 vezes?"`, short enough that a
-topic change two questions ago does not still colour the answer. It is a constant, not a
-tuned value — there is no evaluation behind the number.
+**The window is four turns**, and the derivation is in its own section above.
 
 **Generation sees the thread, but the thread is not evidence.** The prompt marks it
 *"apenas para entender a pergunta; não é fonte"*, because a model handed a transcript will

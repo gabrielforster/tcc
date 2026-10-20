@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from collection.agents.base import Agent
 from collection.agents.conversation import (
+    CONTEXT_WINDOW,
     Conversation,
     QueryRewriter,
     build_vocabulary,
@@ -146,6 +147,7 @@ class ResponsiveAgent(Agent):
         classifier: IntentClassifier | None = None,
         responder: Responder | None = None,
         rewriter: QueryRewriter | None = None,
+        context_window: int = CONTEXT_WINDOW,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.index = index
@@ -154,6 +156,8 @@ class ResponsiveAgent(Agent):
         # Concatenation by default: it needs no key, so multi-turn works on a fresh
         # clone, and it is the baseline the LLM rewriter is measured against.
         self.rewriter = rewriter or get_rewriter("concat")
+        #: Turns of thread the agent may look back over. Derived in docs/multi-turn.md.
+        self.context_window = context_window
         self.clock = clock
         #: Consecutive messages we failed to understand, per customer.
         self._unclear: dict[str, int] = {}
@@ -175,7 +179,11 @@ class ResponsiveAgent(Agent):
     ) -> Reply:
         started = self.clock()
         classification = resolve_intent(
-            self.classifier.classify(message), message, history, self.vocabulary
+            self.classifier.classify(message),
+            message,
+            history,
+            self.vocabulary,
+            self.context_window,
         )
 
         reason = self._escalation_reason(classification, customer_id)
