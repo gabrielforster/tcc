@@ -59,8 +59,8 @@ the LGPD requires and the evaluation needs as evidence.
 | `escalated_to_human` | Agent handed the conversation over | escalation |
 | `overdue_detected` | A receivable passed its due date | proactive |
 | `risk_detected` | The predictive module flagged a not-yet-due receivable | proactive |
-| `contact_scheduled` | The rules engine cleared a contact | proactive |
-| `contact_sent` | A message or call went out | proactive |
+| `contact_scheduled` | The rules engine cleared a contact, and the message was written and checked | proactive |
+| `contact_sent` | A message or call went out — no producer yet, no provider is integrated | proactive |
 | `reply_sent` | The system answered the customer | proactive |
 | `suppressed` | A contact was blocked by a rule | proactive |
 

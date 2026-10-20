@@ -64,6 +64,13 @@ jobs:
         # paid API on every pull request is a step that gets removed.
         run: uv run collection answer --responder template
 
+      - name: Outbound composer evaluation
+        # The template arm only, for the same reason as above. It exercises the whole
+        # outbound path -- terms read from the instalment table, composition, the
+        # compliance checker, the report -- and guards the property the design rests on:
+        # a slot-filling composer must be compliant on every labelled brief.
+        run: uv run collection outreach --composer template
+
       - name: Multi-turn evaluation
         # Context strategies against the labelled dialogues, lexical arms only. Guards
         # the property the design rests on: adding context must never lose a passage the
