@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat de cobrança — página de exemplo</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 48px 20px;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        color: #1a1d21;
+        background: #fff;
+      }
+      main { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 26px; margin-bottom: 4px; }
+      p.lead { color: #596270; margin-top: 0; }
+      pre {
+        background: #f6f7f9;
+        border: 1px solid #e3e6ea;
+        border-radius: 8px;
+        padding: 14px;
+        overflow-x: auto;
+        font-size: 13px;
+      }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      ul { color: #39414d; }
+      /* A deliberately aggressive global rule: the widget renders in a shadow root, so
+         this cannot reach it. If the launcher turns pink, the isolation is broken. */
+      button { background: hotpink !important; border: 4px dashed red !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Página de exemplo</h1>
+      <p class="lead">
+        Esta página existe para ver o widget funcionando como um site externo o veria.
+        O botão no canto inferior direito abre a conversa.
+      </p>
+
+      <h2>Como embedar</h2>
+      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
+        data-api="https://SEU-HOST"
+        data-title="Atendimento"
+        defer&gt;&lt;/script&gt;</code></pre>
+
+      <h2>Identificando o cliente</h2>
+      <p>
+        Sem token a conversa é anônima e responde qualquer coisa da base de conhecimento
+        (política, FAQ, tabela de parcelamento). Para identificar o cliente, o
+        <strong>backend</strong> da aplicação gera o token e o entrega à página:
+      </p>
+      <pre><code>from collection.channels.session import issue_token
+
+token = issue_token(customer_id)  # nunca no navegador</code></pre>
+      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
+        data-api="https://SEU-HOST"
+        data-token="{{ token }}"
+        defer&gt;&lt;/script&gt;</code></pre>
+
+      <h2>O que testar aqui</h2>
+      <ul>
+        <li><code>quais sao os juros e a multa por atraso?</code> — resposta ancorada no FAQ</li>
+        <li><code>posso parcelar em 6 vezes?</code> — tabela de parcelamento</li>
+        <li><code>esse valor ta errado, nao e isso que eu devo</code> — contestação, escala para humano</li>
+        <li><code>parem de me mandar mensagem</code> — opt-out registrado</li>
+      </ul>
+
+      <p>
+        O botão acima está estilizado com uma regra global agressiva
+        (<code>button { background: hotpink }</code>). Se o botão do widget continuar azul,
+        o isolamento por shadow DOM está funcionando.
+      </p>
+      <button type="button">Botão da página hospedeira</button>
+    </main>
+
+    <script src="/chat/widget.js" data-api="" data-title="Atendimento" defer></script>
+  </body>
+</html>

@@ -158,6 +158,9 @@ def serve(
         console.print("[yellow]warning[/] no trained models found; /score will return 404.")
     else:
         console.print(f"[green]models[/] {', '.join(models)}")
+    if settings.chat_enabled:
+        console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
+        console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")
     uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
 
 

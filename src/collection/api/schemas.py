@@ -47,3 +47,54 @@ class ModelInfo(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     models: list[str]
+
+
+# ------------------------------------------------------------------- web chat
+class SessionRequest(BaseModel):
+    """Open a conversation.
+
+    `token` is minted by the host application's backend with
+    `collection.channels.session.issue_token`. Without it the session is anonymous, which
+    is a supported mode rather than a degraded one: the knowledge base holds policy, FAQ
+    and instalment tables, none of it customer-specific.
+    """
+
+    token: str | None = Field(default=None, description="signed identity token, server-issued")
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    greeting: str
+    identified: bool = Field(description="false when the visitor is anonymous")
+
+
+class MessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class MessageResponse(BaseModel):
+    session_id: str
+    text: str
+    intent: str | None = None
+    confidence: float = 0.0
+    citations: list[str] = Field(default_factory=list)
+    escalated: bool = False
+    escalation_reason: str | None = None
+    opted_out: bool = False
+    latency_ms: float = 0.0
+    responder: str = ""
+    events: list[str] = Field(default_factory=list)
+
+
+class TranscriptTurn(BaseModel):
+    role: str
+    text: str
+    at: float
+    intent: str | None = None
+
+
+class TranscriptResponse(BaseModel):
+    session_id: str
+    identified: bool
+    escalated: bool
+    turns: list[TranscriptTurn]
