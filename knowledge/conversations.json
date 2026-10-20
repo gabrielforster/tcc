@@ -1,0 +1,151 @@
+[
+  {
+    "id": "parcelamento-prazo",
+    "note": "the canonical follow-up: the second turn is meaningless alone",
+    "turns": [
+      {
+        "customer": "posso parcelar minha divida?",
+        "relevant": ["tabela-de-parcelamento.csv", "script-de-negociacao.md"]
+      },
+      {
+        "customer": "e em 6 vezes?",
+        "relevant": ["tabela-de-parcelamento.csv", "limites-de-alcada.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "parcelamento-entrada",
+    "note": "a bare number as a turn",
+    "turns": [
+      {
+        "customer": "em quantas vezes consigo dividir um atraso de 45 dias?",
+        "relevant": ["tabela-de-parcelamento.csv"]
+      },
+      {
+        "customer": "e a entrada?",
+        "relevant": ["tabela-de-parcelamento.csv"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "desconto-limite",
+    "note": "follow-up crosses from the table to the approval limits",
+    "turns": [
+      {
+        "customer": "qual o desconto para pagamento a vista?",
+        "relevant": ["tabela-de-parcelamento.csv", "limites-de-alcada.md"]
+      },
+      {
+        "customer": "da pra fazer 50%?",
+        "relevant": ["limites-de-alcada.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "parcela-minima",
+    "note": "the answer is a floor, not a count",
+    "turns": [
+      {
+        "customer": "quero parcelar em 12 vezes",
+        "relevant": ["limites-de-alcada.md", "tabela-de-parcelamento.csv"]
+      },
+      {
+        "customer": "qual o valor minimo de cada parcela?",
+        "relevant": ["limites-de-alcada.md"]
+      }
+    ]
+  },
+  {
+    "id": "segunda-via-pagamento",
+    "note": "topic change in a short message: the trap for a concatenating rewriter",
+    "turns": [
+      {
+        "customer": "quero a segunda via do boleto",
+        "relevant": ["faq.md"]
+      },
+      {
+        "customer": "aceita pix?",
+        "relevant": ["faq.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "juros-depois-de-parcelamento",
+    "note": "topic change from instalments to fees",
+    "turns": [
+      {
+        "customer": "posso parcelar minha divida?",
+        "relevant": ["tabela-de-parcelamento.csv", "script-de-negociacao.md"]
+      },
+      {
+        "customer": "e os juros?",
+        "relevant": ["faq.md", "tabela-de-parcelamento.csv"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "horario-contato",
+    "note": "policy thread, follow-up about frequency",
+    "turns": [
+      {
+        "customer": "voces podem me ligar no domingo?",
+        "relevant": ["politica-de-cobranca.md"]
+      },
+      {
+        "customer": "e quantas vezes por semana?",
+        "relevant": ["politica-de-cobranca.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "pagamento-ja-feito",
+    "note": "follow-up asks what to send",
+    "turns": [
+      {
+        "customer": "ja paguei mas continuo recebendo cobranca",
+        "relevant": ["faq.md"]
+      },
+      {
+        "customer": "mando o comprovante como?",
+        "relevant": ["faq.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "negativacao",
+    "note": "follow-up about the deadline after resolving",
+    "turns": [
+      {
+        "customer": "meu nome foi negativado, como resolvo?",
+        "relevant": ["faq.md"]
+      },
+      {
+        "customer": "em quanto tempo sai?",
+        "relevant": ["faq.md"],
+        "follow_up": true
+      }
+    ]
+  },
+  {
+    "id": "opt-out-depois-de-duvida",
+    "note": "a follow-up that must NOT inherit: opt-out classifies on its own",
+    "turns": [
+      {
+        "customer": "quais sao os juros e a multa por atraso?",
+        "relevant": ["faq.md"]
+      },
+      {
+        "customer": "parem de me mandar mensagem",
+        "relevant": ["politica-de-cobranca.md"],
+        "follow_up": true
+      }
+    ]
+  }
+]

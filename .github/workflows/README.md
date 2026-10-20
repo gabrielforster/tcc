@@ -10,6 +10,7 @@
 | Orchestrator demo | A change to the event contract or the routing rules that stops the agents from running end to end |
 | Retrieval evaluation | A change to the knowledge base or the retriever that quietly drops retrieval quality |
 | Responder evaluation | A change that breaks answering, escalation or the faithfulness measure — the template arm, which needs no API key |
+| Multi-turn evaluation | A change that breaks follow-up resolution, or makes context lose a passage the bare message would have found |
 
 The smoke test runs on the synthetic source with a reduced dataset, so it needs no
 credentials, no network and no Kaggle account.

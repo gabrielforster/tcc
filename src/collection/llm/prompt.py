@@ -17,8 +17,13 @@ states the prohibitions explicitly and the escalation path exists for everything
 by matching prose is a string-matching problem that eventually matches a real answer.
 """
 
+from typing import TYPE_CHECKING
+
 from collection.agents.intent import Intent
 from collection.rag.index import Retrieved
+
+if TYPE_CHECKING:
+    from collection.agents.conversation import Conversation
 
 #: Emitted alone when the sources do not support an answer. Handed to a human.
 REFUSAL = "NAO_SEI"
@@ -75,12 +80,23 @@ def format_passages(passages: list[Retrieved]) -> str:
     return "\n\n".join(blocks)
 
 
-def build_user_prompt(message: str, intent: Intent, passages: list[Retrieved]) -> str:
+def build_user_prompt(
+    message: str,
+    intent: Intent,
+    passages: list[Retrieved],
+    history: "Conversation | None" = None,
+) -> str:
     """Assemble the turn: the retrieved evidence first, the customer's message last.
 
     Evidence before question is deliberate. The instruction the model should weigh most is
     the one closest to where it starts writing, and that instruction is "answer only from
     the trechos above".
+
+    The thread, when there is one, sits between them and is explicitly marked as context
+    rather than as evidence. A customer saying "entao sao 6 parcelas?" must not license an
+    answer confirming six parcelas -- the trechos decide that, not the fact that somebody
+    typed it. The prompt says so, because a model given a transcript will otherwise treat
+    the customer's own words as a source.
     """
     if not passages:
         return (
@@ -88,8 +104,15 @@ def build_user_prompt(message: str, intent: Intent, passages: list[Retrieved]) -
             f"MENSAGEM DO CLIENTE:\n{message}\n\n"
             f"Responda {REFUSAL}."
         )
+    thread = ""
+    if history and len(history) > 1:
+        thread = (
+            f"CONVERSA ATÉ AQUI (apenas para entender a pergunta; não é fonte):\n"
+            f"{history.transcript()}\n\n"
+        )
     return (
         f"TRECHOS:\n{format_passages(passages)}\n\n"
+        f"{thread}"
         f"CONTEXTO: {INTENT_HINT.get(intent, INTENT_HINT[Intent.UNKNOWN])}\n\n"
         f"MENSAGEM DO CLIENTE:\n{message}\n\n"
         "Responda usando apenas os trechos acima, em no máximo 3 frases, e cite a fonte."

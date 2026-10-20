@@ -63,3 +63,9 @@ jobs:
         # faithfulness measure. The LLM arm is run by hand, because a step that calls a
         # paid API on every pull request is a step that gets removed.
         run: uv run collection answer --responder template
+
+      - name: Multi-turn evaluation
+        # Context strategies against the labelled dialogues, lexical arms only. Guards
+        # the property the design rests on: adding context must never lose a passage the
+        # customer's own words would have found.
+        run: uv run collection answer --conversations --responder template

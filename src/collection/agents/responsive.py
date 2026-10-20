@@ -25,6 +25,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from collection.agents.base import Agent
+from collection.agents.conversation import (
+    Conversation,
+    QueryRewriter,
+    build_vocabulary,
+    get_rewriter,
+    resolve_intent,
+)
 from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
 from collection.rag.index import Retrieved, VectorIndex
@@ -54,8 +61,14 @@ class Responder(ABC):
     name: str
 
     @abstractmethod
-    def respond(self, message: str, intent: Intent, passages: list[Retrieved]) -> Answer:
-        """Compose an answer from the retrieved passages."""
+    def respond(
+        self,
+        message: str,
+        intent: Intent,
+        passages: list[Retrieved],
+        history: Conversation | None = None,
+    ) -> Answer:
+        """Compose an answer from the retrieved passages, in the context of the thread."""
 
 
 class TemplateResponder(Responder):
@@ -77,7 +90,16 @@ class TemplateResponder(Responder):
         Intent.UNKNOWN: "Encontrei estas informações:",
     }
 
-    def respond(self, message: str, intent: Intent, passages: list[Retrieved]) -> Answer:
+    def respond(
+        self,
+        message: str,
+        intent: Intent,
+        passages: list[Retrieved],
+        history: Conversation | None = None,
+    ) -> Answer:
+        # The template quotes passages, so the thread changes nothing for it: history is
+        # accepted to satisfy the interface and deliberately unused. That is also what
+        # makes it the control arm for the multi-turn comparison.
         if not passages:
             return Answer(
                 text=(
@@ -106,6 +128,12 @@ class Reply:
     escalated: bool
     escalation_reason: str | None
     latency_ms: float
+    #: The most context-aware query retrieval ran on. Differs from the message for a
+    #: follow-up, and the evaluation reports it so a bad answer can be traced to a bad
+    #: rewrite.
+    query: str = ""
+    #: Every query retrieval ran on, the raw message always among them.
+    queries: list[str] = field(default_factory=list)
 
 
 class ResponsiveAgent(Agent):
@@ -117,19 +145,38 @@ class ResponsiveAgent(Agent):
         index: VectorIndex,
         classifier: IntentClassifier | None = None,
         responder: Responder | None = None,
+        rewriter: QueryRewriter | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.index = index
         self.classifier = classifier or IntentClassifier()
         self.responder = responder or TemplateResponder()
+        # Concatenation by default: it needs no key, so multi-turn works on a fresh
+        # clone, and it is the baseline the LLM rewriter is measured against.
+        self.rewriter = rewriter or get_rewriter("concat")
         self.clock = clock
         #: Consecutive messages we failed to understand, per customer.
         self._unclear: dict[str, int] = {}
+        #: Words the corpus and the cue phrases use, for deciding whether an
+        #: unclassifiable message is a follow-up or nonsense. Built once.
+        # `getattr`: a test double standing in for the index is a legitimate thing to
+        # hand this agent, and the vocabulary is an aid to intent inheritance, not a
+        # requirement for answering.
+        self.vocabulary = build_vocabulary(
+            [chunk.text for chunk in getattr(index, "chunks", [])], self.classifier
+        )
 
     # ----------------------------------------------------------------- answering
-    def answer(self, message: str, customer_id: str = "anonymous") -> Reply:
+    def answer(
+        self,
+        message: str,
+        customer_id: str = "anonymous",
+        history: Conversation | None = None,
+    ) -> Reply:
         started = self.clock()
-        classification = self.classifier.classify(message)
+        classification = resolve_intent(
+            self.classifier.classify(message), message, history, self.vocabulary
+        )
 
         reason = self._escalation_reason(classification, customer_id)
         if reason is not None:
@@ -143,6 +190,7 @@ class ResponsiveAgent(Agent):
                 escalated=True,
                 escalation_reason=reason,
                 latency_ms=(self.clock() - started) * 1000,
+                query=message,
             )
 
         # Reset only when we actually understood the message. Resetting unconditionally
@@ -159,12 +207,16 @@ class ResponsiveAgent(Agent):
                 escalated=False,
                 escalation_reason=None,
                 latency_ms=(self.clock() - started) * 1000,
+                query=message,
             )
 
-        passages = [
-            hit for hit in self.index.search(message, top_k=TOP_K) if hit.score >= MIN_RELEVANCE
-        ]
-        answer = self.responder.respond(message, classification.intent, passages)
+        # Retrieval runs on every query the strategy offers -- always including the raw
+        # message -- and keeps the best passages across all of them. Replacing the
+        # message with a context-laden query measurably lost passages the message alone
+        # would have found; adding a query cannot.
+        queries = self.rewriter.queries(message, history)
+        passages = self._retrieve(queries)
+        answer = self.responder.respond(message, classification.intent, passages, history)
 
         return Reply(
             answer=answer,
@@ -174,7 +226,37 @@ class ResponsiveAgent(Agent):
             escalated=not answer.grounded,
             escalation_reason="no_grounding" if not answer.grounded else None,
             latency_ms=(self.clock() - started) * 1000,
+            query=queries[-1],
+            queries=queries,
         )
+
+    def _retrieve(self, queries: list[str]) -> list[Retrieved]:
+        """Best passages across every query, interleaved by rank rather than by score.
+
+        Sorting the union by score looks obvious and is wrong. A longer query produces
+        systematically higher cosines against long passages, so the contextual query wins
+        every comparison and crowds out the hits the customer's own words found -- which
+        is the failure the multi-query design was meant to remove, reintroduced one layer
+        down. Measured: merging by score still lost `e a entrada?`, a follow-up the bare
+        message retrieves correctly.
+
+        Interleaving by rank compares each query only against itself. Every query's best
+        passage is taken before any query's second, so the message's top hit is always
+        present no matter how the context scored.
+        """
+        ranked = [
+            [hit for hit in self.index.search(query, top_k=TOP_K) if hit.score >= MIN_RELEVANCE]
+            for query in queries
+        ]
+        merged: dict[str, Retrieved] = {}
+        for rank in range(TOP_K):
+            for hits in ranked:
+                if rank >= len(hits) or len(merged) >= TOP_K:
+                    continue
+                hit = hits[rank]
+                if hit.chunk.chunk_id not in merged:
+                    merged[hit.chunk.chunk_id] = hit
+        return list(merged.values())
 
     def _escalation_reason(self, classification: Classification, customer_id: str) -> str | None:
         if classification.intent in ALWAYS_ESCALATE:
@@ -191,7 +273,14 @@ class ResponsiveAgent(Agent):
         if not message:
             return [event.caused(EventType.ESCALATED_TO_HUMAN, reason="empty_message")]
 
-        reply = self.answer(message, customer_id=event.customer_id)
+        # The channel puts the thread on the event; a channel that does not have one
+        # (or does not keep it) simply omits it and the agent answers single-turn.
+        history = event.payload.get("history")
+        reply = self.answer(
+            message,
+            customer_id=event.customer_id,
+            history=history if isinstance(history, Conversation) else None,
+        )
 
         if reply.classification.intent is Intent.OPT_OUT:
             return [event.caused(EventType.OPT_OUT_REQUESTED, source="responsive_agent")]

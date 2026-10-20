@@ -184,7 +184,7 @@ def test_the_responder_is_replaceable_without_touching_retrieval(index):
     class ShoutingResponder(Responder):
         name = "shouting"
 
-        def respond(self, message, intent, passages):
+        def respond(self, message, intent, passages, history=None):
             return Answer(text="RESPOSTA", citations=[p.document_id for p in passages])
 
     agent = ResponsiveAgent(index=index, responder=ShoutingResponder())

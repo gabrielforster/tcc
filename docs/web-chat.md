@@ -135,11 +135,10 @@ domains.**
 
 ## Known limitations
 
-**Single turn.** The agent answers each message independently; it does not read the thread
-back. "E em 6 vezes?" after "posso parcelar?" is treated as a fresh question. The
-transcript is stored and the seam is there, but feeding history into the prompt changes
-what the faithfulness measure is scoring, so it belongs with its own evaluation rather
-than smuggled in here.
+**~~Single turn.~~** Resolved: the channel now puts the session transcript on the
+`message_received` event and the agent resolves follow-ups against it — see
+[`docs/multi-turn.md`](./multi-turn.md). The greeting is dropped on the way, since nobody
+typed it.
 
 **Sessions are in-memory.** They do not survive a restart and do not span processes. Redis
 is already in `docker-compose.yml` and `SessionStore` is the seam it would replace.
