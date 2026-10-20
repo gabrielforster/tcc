@@ -180,18 +180,33 @@ def evaluate(
     answer: str,
     passages: list[Retrieved],
     threshold: float = SUPPORT_THRESHOLD,
+    prior_passages: list[Retrieved] | None = None,
 ) -> Faithfulness:
     """Score `answer` against the passages it was supposed to be built from.
 
     With no passages, an answer with any content at all is unsupported by construction --
     which is the correct verdict, not a degenerate case to skip.
+
+    `prior_passages` carries the evidence retrieved earlier in the same conversation, and
+    it is what keeps this measure honest once the agent answers in threads. A customer
+    asks "posso parcelar?", then "e em 6 vezes?"; the reply may legitimately restate the
+    instalment count established one turn ago, from a passage this turn did not retrieve.
+    Scoring against only the current turn would report that as a hallucination -- the
+    measure would punish the system for remembering correctly.
+
+    The conversation's evidence set is therefore the union of what it has retrieved so
+    far. That widens what counts as supported, which is a real cost: an answer can now
+    quote something from four turns back that the customer has moved on from. It is the
+    right trade, because the alternative scores a correct answer as invented, and a
+    metric that cannot tell memory from fabrication measures neither.
     """
     cited = citations_in(answer)
-    sources = [hit.document_id for hit in passages]
+    evidence = list(passages) + list(prior_passages or [])
+    sources = [hit.document_id for hit in evidence]
     invalid = [name for name in cited if name not in sources]
 
     sentences = sentences_in(answer)
-    texts = [" ".join(hit.text.split()) for hit in passages]
+    texts = [" ".join(hit.text.split()) for hit in evidence]
 
     if not sentences:
         return Faithfulness(1.0, 1.0, cited=cited, invalid_citations=invalid)

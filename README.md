@@ -258,6 +258,12 @@ Identity never comes from the browser. The host application's backend mints a si
 with `issue_token(customer_id)`; without one the session is anonymous, which still answers
 anything in the knowledge base because none of it is customer-specific.
 
+Conversations are multi-turn: "e em 6 vezes?" after "posso parcelar?" resolves against the
+thread rather than being read as a fresh question — see
+[`docs/multi-turn.md`](./docs/multi-turn.md). Context **adds** a retrieval query and never
+replaces the customer's own words, because the version that replaced them measurably lost
+passages the bare message had found.
+
 ### Contributing
 
 Code, commit messages and documentation are written in English. Every change lands

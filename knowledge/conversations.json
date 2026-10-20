@@ -1,0 +1,349 @@
+[
+  {
+    "id": "parcelamento-prazo",
+    "note": "the canonical follow-up: the second turn is meaningless alone",
+    "turns": [
+      {
+        "customer": "posso parcelar minha divida?",
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "script-de-negociacao.md"
+        ],
+        "intent": "negotiation"
+      },
+      {
+        "customer": "e em 6 vezes?",
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "limites-de-alcada.md"
+        ],
+        "follow_up": true,
+        "intent": "negotiation"
+      }
+    ]
+  },
+  {
+    "id": "parcelamento-entrada",
+    "note": "a bare number as a turn",
+    "turns": [
+      {
+        "customer": "em quantas vezes consigo dividir um atraso de 45 dias?",
+        "relevant": [
+          "tabela-de-parcelamento.csv"
+        ],
+        "intent": "negotiation"
+      },
+      {
+        "customer": "e a entrada?",
+        "relevant": [
+          "tabela-de-parcelamento.csv"
+        ],
+        "follow_up": true,
+        "intent": "negotiation"
+      }
+    ]
+  },
+  {
+    "id": "desconto-limite",
+    "note": "follow-up crosses from the table to the approval limits",
+    "turns": [
+      {
+        "customer": "qual o desconto para pagamento a vista?",
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "limites-de-alcada.md"
+        ],
+        "intent": "negotiation"
+      },
+      {
+        "customer": "da pra fazer 50%?",
+        "relevant": [
+          "limites-de-alcada.md"
+        ],
+        "follow_up": true,
+        "intent": "negotiation"
+      }
+    ]
+  },
+  {
+    "id": "parcela-minima",
+    "note": "the answer is a floor, not a count",
+    "turns": [
+      {
+        "customer": "quero parcelar em 12 vezes",
+        "relevant": [
+          "limites-de-alcada.md",
+          "tabela-de-parcelamento.csv"
+        ],
+        "intent": "negotiation"
+      },
+      {
+        "customer": "qual o valor minimo de cada parcela?",
+        "relevant": [
+          "limites-de-alcada.md"
+        ],
+        "intent": "negotiation"
+      }
+    ]
+  },
+  {
+    "id": "segunda-via-pagamento",
+    "note": "topic change in a short message: the trap for a concatenating rewriter",
+    "turns": [
+      {
+        "customer": "quero a segunda via do boleto",
+        "relevant": [
+          "faq.md"
+        ],
+        "intent": "second_copy"
+      },
+      {
+        "customer": "aceita pix?",
+        "relevant": [
+          "faq.md"
+        ],
+        "follow_up": true,
+        "intent": "second_copy"
+      }
+    ]
+  },
+  {
+    "id": "juros-depois-de-parcelamento",
+    "note": "topic change from instalments to fees",
+    "turns": [
+      {
+        "customer": "posso parcelar minha divida?",
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "script-de-negociacao.md"
+        ],
+        "intent": "negotiation"
+      },
+      {
+        "customer": "e os juros?",
+        "relevant": [
+          "faq.md",
+          "tabela-de-parcelamento.csv"
+        ],
+        "follow_up": true,
+        "intent": "debt_inquiry"
+      }
+    ]
+  },
+  {
+    "id": "horario-contato",
+    "note": "policy thread, follow-up about frequency",
+    "turns": [
+      {
+        "customer": "voces podem me ligar no domingo?",
+        "relevant": [
+          "politica-de-cobranca.md"
+        ],
+        "intent": "debt_inquiry"
+      },
+      {
+        "customer": "e quantas vezes por semana?",
+        "relevant": [
+          "politica-de-cobranca.md"
+        ],
+        "follow_up": true,
+        "intent": "debt_inquiry"
+      }
+    ]
+  },
+  {
+    "id": "pagamento-ja-feito",
+    "note": "follow-up asks what to send",
+    "turns": [
+      {
+        "customer": "ja paguei mas continuo recebendo cobranca",
+        "relevant": [
+          "faq.md"
+        ],
+        "intent": "payment_claim"
+      },
+      {
+        "customer": "mando o comprovante como?",
+        "relevant": [
+          "faq.md"
+        ],
+        "follow_up": true,
+        "intent": "payment_claim"
+      }
+    ]
+  },
+  {
+    "id": "negativacao",
+    "note": "follow-up about the deadline after resolving",
+    "turns": [
+      {
+        "customer": "meu nome foi negativado, como resolvo?",
+        "relevant": [
+          "faq.md"
+        ],
+        "intent": "debt_inquiry"
+      },
+      {
+        "customer": "em quanto tempo sai?",
+        "relevant": [
+          "faq.md"
+        ],
+        "follow_up": true,
+        "intent": "debt_inquiry"
+      }
+    ]
+  },
+  {
+    "id": "opt-out-depois-de-duvida",
+    "note": "a follow-up that must NOT inherit: opt-out classifies on its own",
+    "turns": [
+      {
+        "customer": "quais sao os juros e a multa por atraso?",
+        "relevant": [
+          "faq.md"
+        ],
+        "intent": "debt_inquiry"
+      },
+      {
+        "customer": "parem de me mandar mensagem",
+        "relevant": [
+          "politica-de-cobranca.md"
+        ],
+        "follow_up": true,
+        "intent": "opt_out"
+      }
+    ]
+  },
+  {
+    "id": "longa-troca-de-assunto",
+    "note": "six turns; the topic changes at turn 3, so an unbounded window inherits a stale intent",
+    "turns": [
+      {
+        "customer": "posso parcelar minha divida?",
+        "intent": "negotiation",
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "script-de-negociacao.md"
+        ]
+      },
+      {
+        "customer": "e em quantas vezes?",
+        "intent": "negotiation",
+        "follow_up": true,
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "limites-de-alcada.md"
+        ]
+      },
+      {
+        "customer": "qual o valor minimo de cada parcela?",
+        "intent": "negotiation",
+        "relevant": [
+          "limites-de-alcada.md"
+        ]
+      },
+      {
+        "customer": "ja paguei mas continuo recebendo cobranca",
+        "intent": "payment_claim",
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "mando o comprovante como?",
+        "intent": "payment_claim",
+        "follow_up": true,
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "sim",
+        "intent": "payment_claim",
+        "follow_up": true,
+        "relevant": [
+          "faq.md"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "longa-duvida-e-opt-out",
+    "note": "five turns ending in opt-out; the last turn must not inherit anything",
+    "turns": [
+      {
+        "customer": "quanto eu to devendo?",
+        "intent": "debt_inquiry",
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "quais sao os juros e a multa por atraso?",
+        "intent": "debt_inquiry",
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "e se eu pagar a vista?",
+        "intent": "negotiation",
+        "follow_up": true,
+        "relevant": [
+          "tabela-de-parcelamento.csv",
+          "limites-de-alcada.md"
+        ]
+      },
+      {
+        "customer": "voces podem me ligar no domingo?",
+        "intent": "debt_inquiry",
+        "relevant": [
+          "politica-de-cobranca.md"
+        ]
+      },
+      {
+        "customer": "parem de me mandar mensagem",
+        "intent": "opt_out",
+        "relevant": [
+          "politica-de-cobranca.md"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "longa-segunda-via",
+    "note": "four turns; a bare number mid-thread, then a topic change",
+    "turns": [
+      {
+        "customer": "quero a segunda via do boleto",
+        "intent": "second_copy",
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "aceita pix?",
+        "intent": "second_copy",
+        "follow_up": true,
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "meu nome foi negativado, como resolvo?",
+        "intent": "debt_inquiry",
+        "relevant": [
+          "faq.md"
+        ]
+      },
+      {
+        "customer": "em quanto tempo sai?",
+        "intent": "debt_inquiry",
+        "follow_up": true,
+        "relevant": [
+          "faq.md"
+        ]
+      }
+    ]
+  }
+]

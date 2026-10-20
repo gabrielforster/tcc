@@ -107,9 +107,20 @@ class Classification:
     intent: Intent
     confidence: float
     scores: dict[str, float]
+    #: True when the intent came from the thread rather than from this message. See
+    #: `collection.agents.conversation.resolve_intent`.
+    inherited: bool = False
 
     @property
     def is_confident(self) -> bool:
+        """Whether the agent understood the message.
+
+        An inherited intent counts: "sim" carries no signal of its own, but in a thread
+        about instalments it was understood, and treating it as unclear would march the
+        customer towards a handover for answering a question we asked.
+        """
+        if self.inherited:
+            return True
         return self.intent is not Intent.UNKNOWN and self.confidence >= MIN_CONFIDENCE
 
 

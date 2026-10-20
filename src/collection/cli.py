@@ -257,6 +257,10 @@ def answer(
     message: str = typer.Option(None, help="answer a single customer message"),
     responder: str = typer.Option("template", help="template | llm"),
     compare: bool = typer.Option(False, help="evaluate both responders and write the report"),
+    conversations: bool = typer.Option(
+        False, "--conversations", help="evaluate multi-turn context instead"
+    ),
+    rewriter: str = typer.Option("concat", help="none | concat | llm (with --conversations)"),
     embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer"),
 ) -> None:
     """Answer a message, or evaluate the responders against the labelled questions."""
@@ -283,6 +287,33 @@ def answer(
         console.print(f"\n{reply.answer.text}\n")
         for hit in reply.passages:
             console.print(f"[dim]retrieved[/] {hit.document_id} ({hit.score:.3f})")
+        return
+
+    if conversations:
+        from collection.agents import conversation_eval
+
+        dialogues_file = settings.dir_knowledge / "conversations.json"
+        if not dialogues_file.exists():
+            console.print("[yellow]no conversations.json; nothing to evaluate[/]")
+            raise typer.Exit(code=1)
+        dialogues = conversation_eval.load_dialogues(dialogues_file)
+        arms = ["none", "concat", "llm"] if compare else ["none", rewriter]
+        table, results = conversation_eval.compare(index, dialogues, arms, get_responder(responder))
+        turns = sum(len(dialogue.turns) for dialogue in dialogues)
+        console.print(
+            f"\n[bold]Context strategies over {len(dialogues)} dialogues ({turns} turns)[/]"
+        )
+        console.print(table.to_string(index=False))
+        sweep = conversation_eval.sweep_window(index, dialogues, responder=get_responder(responder))
+        console.print("\n[bold]Context window[/]")
+        console.print(sweep.to_string(index=False))
+        path = conversation_eval.write_report(
+            table,
+            results,
+            settings.dir_docs / "conversation-comparison.md",
+            window_sweep=sweep,
+        )
+        console.print(f"[green]report[/] -> {path}")
         return
 
     questions_file = settings.dir_knowledge / "questions.json"

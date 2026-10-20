@@ -87,6 +87,11 @@ what makes the comparison worth reporting. It is built in
 scores both arms, and the results live in
 [`docs/responder-comparison.md`](./responder-comparison.md).
 
+Answering is multi-turn: the agent takes the thread and resolves a follow-up against it
+before retrieving, and inherits the thread's intent when a message like "sim" carries
+none. Both are in [`docs/multi-turn.md`](./multi-turn.md), including why the inheritance
+rule is keyed on vocabulary rather than on classifier confidence.
+
 ## Latency
 
 Measured on every reply and carried in the `reply_sent` event. The lexical path answers in

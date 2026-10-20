@@ -301,3 +301,29 @@ def test_cross_origin_requests_are_allowed(client):
 
 def test_the_scoring_api_still_works(client):
     assert client.get("/health").status_code == 200
+
+
+# ------------------------------------------------------------------ multi-turn
+def test_a_follow_up_in_the_widget_is_answered_not_escalated(client):
+    """The thread reaches the agent, or "sim" would be an unintelligible message."""
+    body = open_session(client)
+    say(client, body["session_id"], "posso parcelar minha divida?")
+    reply = say(client, body["session_id"], "sim").json()
+    assert not reply["escalated"]
+    assert reply["intent"] == "negotiation", "the thread's intent was not inherited"
+
+
+def test_the_greeting_is_not_a_conversational_turn(channel):
+    # Nobody typed it, so resolving a follow-up against it would be resolving against
+    # the system's own words.
+    session, _ = channel.open()
+    history = channel._history(session)
+    assert len(history) == 0
+
+
+def test_the_customer_turn_is_labelled_with_its_intent(client):
+    body = open_session(client)
+    say(client, body["session_id"], "posso parcelar minha divida?")
+    transcript = client.get(f"/chat/sessions/{body['session_id']}").json()
+    customer = [turn for turn in transcript["turns"] if turn["role"] == "customer"][0]
+    assert customer["intent"] == "negotiation"

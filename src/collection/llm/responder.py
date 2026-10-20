@@ -21,6 +21,7 @@ still gets the templated reply. The fallback is recorded on the answer rather th
 so an evaluation run cannot quietly report template results under the LLM's name.
 """
 
+from collection.agents.conversation import Conversation
 from collection.agents.intent import Intent
 from collection.agents.responsive import Answer, Responder, TemplateResponder
 from collection.llm.client import LLMClient, LLMError, get_client
@@ -52,16 +53,22 @@ class LLMResponder(Responder):
         #: Generation failures in this process, for the evaluation to report honestly.
         self.failures: list[str] = []
 
-    def respond(self, message: str, intent: Intent, passages: list[Retrieved]) -> Answer:
+    def respond(
+        self,
+        message: str,
+        intent: Intent,
+        passages: list[Retrieved],
+        history: Conversation | None = None,
+    ) -> Answer:
         if not passages:
             return Answer(text=HANDOVER, citations=[], grounded=False, responder=self.name)
 
-        user = build_user_prompt(message, intent, passages)
+        user = build_user_prompt(message, intent, passages, history)
         try:
             completion = self.client.complete(self.system_prompt, user)
         except LLMError as error:
             self.failures.append(str(error))
-            answer = self.fallback.respond(message, intent, passages)
+            answer = self.fallback.respond(message, intent, passages, history)
             answer.responder = f"{self.name}:fallback"
             return answer
 

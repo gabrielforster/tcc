@@ -25,6 +25,7 @@ the proactive ones that arrive through a different channel entirely.
 
 from dataclasses import dataclass, field
 
+from collection.agents.conversation import Conversation
 from collection.agents.events import Event, EventType
 from collection.agents.orchestrator import Orchestrator
 from collection.agents.responsive import Responder, ResponsiveAgent
@@ -100,14 +101,24 @@ class WebChatChannel:
         session = self.store.get(session_id)
         session.check_rate()
         text = clean_message(raw)
-        session.record("customer", text)
+        history = self._history(session)
+        customer_turn = session.record("customer", text)
 
         orchestrator = Orchestrator(agents=[self.agent], opted_out=self.opted_out)
         orchestrator.submit(
             Event(
                 type=EventType.MESSAGE_RECEIVED,
                 customer_id=session.customer_id,
-                payload={"text": text, "channel": "web", "session_id": session_id},
+                payload={
+                    "text": text,
+                    "channel": "web",
+                    "session_id": session_id,
+                    # The thread so far, excluding the message being answered: the agent
+                    # needs it to resolve "e em 6 vezes?" into a question it can retrieve
+                    # on. It rides on the event rather than being handed to the agent
+                    # directly, so the channel keeps talking to the orchestrator only.
+                    "history": history,
+                },
             )
         )
         trace = orchestrator.run()
@@ -116,10 +127,29 @@ class WebChatChannel:
         self.opted_out |= orchestrator.opted_out
 
         reply = self._render(session_id, trace.produced)
+        # The intent is only known after the agent has run, so the customer's turn is
+        # labelled retroactively. Without this the transcript carries no intent on the
+        # side that has one, and the next follow-up would have nothing to inherit.
+        customer_turn.intent = reply.intent
         session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
         if reply.escalated:
             session.escalated = True
         return reply
+
+    def _history(self, session: Session) -> Conversation:
+        """The session transcript as the agent's view of the thread.
+
+        A translation rather than a shared object: the session records what was displayed
+        (timestamps, escalation flags, the greeting), the agent needs what was said. A
+        greeting nobody typed is not a turn the agent should resolve a follow-up against,
+        so it is dropped here.
+        """
+        conversation = Conversation()
+        for turn in session.transcript:
+            if turn.role == "agent" and turn.text == GREETING:
+                continue
+            conversation.add(turn.role, turn.text, turn.intent)
+        return conversation
 
     def _render(self, session_id: str, produced: list[Event]) -> ChatReply:
         """Turn the events a run produced into the one reply the widget shows.

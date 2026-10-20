@@ -41,7 +41,9 @@ The system also has its first channel. The embeddable web chat
 submits `message_received` events to the orchestrator, never calling an agent directly. So
 the chat inherits the priority rule, the cascade guard, the audit trail and the opt-out
 check for free, and WhatsApp becomes another adapter over this same contract rather than a
-second copy of the conversation logic.
+second copy of the conversation logic. Conversations carry a thread: the channel puts the
+transcript on the event, and the agent resolves follow-ups against it
+([`docs/multi-turn.md`](./multi-turn.md)).
 
 ## The event contract
 
