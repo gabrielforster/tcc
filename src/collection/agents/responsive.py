@@ -36,11 +36,23 @@ from collection.agents.conversation import (
 from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
 from collection.rag.index import Retrieved, VectorIndex
+from collection.voice.audio import AudioError
+from collection.voice.transcribe import (
+    MIN_CONFIDENCE,
+    Transcriber,
+    Transcription,
+    TranscriptionError,
+    needs_confirmation,
+)
 
 #: Intents that always go to a human, per knowledge/limites-de-alcada.md.
 ALWAYS_ESCALATE = frozenset({Intent.DISPUTE})
 #: Answered directly; retrieval would only return something irrelevant to quote back.
 SMALL_TALK_REPLY = "Olá! Posso ajudar com a sua pendência, um parcelamento ou a segunda via."
+#: Read back to the customer before anything is acted on, when the message arrived as
+#: audio and carries a figure. Spoken numbers do not survive recognition error -- see the
+#: sweep in docs/voice.md -- and a misheard amount is indistinguishable from a correct one.
+CONFIRM_PREFIX = 'Entendi: "{transcript}". Confirma que é isso?'
 #: Consecutive unclear messages before handing over.
 UNCLEAR_LIMIT = 3
 #: Retrieved passages below this similarity are not worth quoting back.
@@ -149,6 +161,7 @@ class ResponsiveAgent(Agent):
         rewriter: QueryRewriter | None = None,
         context_window: int = CONTEXT_WINDOW,
         clock: Callable[[], float] = time.perf_counter,
+        transcriber: Transcriber | None = None,
     ) -> None:
         self.index = index
         self.classifier = classifier or IntentClassifier()
@@ -158,6 +171,10 @@ class ResponsiveAgent(Agent):
         self.rewriter = rewriter or get_rewriter("concat")
         #: Turns of thread the agent may look back over. Derived in docs/multi-turn.md.
         self.context_window = context_window
+        #: Recogniser for voice notes. `None` means the deployment has no speech backend,
+        #: and audio is escalated rather than guessed at -- the same answer the agent gives
+        #: when a model is present but cannot make the clip out.
+        self.transcriber = transcriber
         self.clock = clock
         #: Consecutive messages we failed to understand, per customer.
         self._unclear: dict[str, int] = {}
@@ -275,9 +292,50 @@ class ResponsiveAgent(Agent):
                 return "unclear_repeatedly"
         return None
 
+    # ------------------------------------------------------------------ hearing
+    def _hear(self, event: Event) -> Transcription:
+        """Transcribe the clip an `audio_received` event points at.
+
+        Raises rather than returning an empty transcript: the agent's answer to audio it
+        cannot read is a person, and that decision belongs in one place.
+        """
+        if self.transcriber is None:
+            raise TranscriptionError("no transcriber is configured; audio cannot be answered")
+        path = event.payload.get("audio_path") or event.payload.get("audio")
+        if not path:
+            raise TranscriptionError("audio_received carried no audio_path")
+        return self.transcriber.transcribe_path(str(path))
+
     # -------------------------------------------------------------------- agent
     def handle(self, event: Event) -> list[Event]:
-        message = str(event.payload.get("text", "")).strip()
+        heard: Transcription | None = None
+        if event.type is EventType.AUDIO_RECEIVED:
+            try:
+                heard = self._hear(event)
+            except (AudioError, TranscriptionError) as error:
+                return [
+                    event.caused(
+                        EventType.ESCALATED_TO_HUMAN,
+                        reason="audio_unintelligible",
+                        detail=str(error),
+                    )
+                ]
+            if not heard.usable:
+                # A low-confidence transcript is worse than none: it reads like a message
+                # and routes like one, and nothing downstream knows it was a guess.
+                return [
+                    event.caused(
+                        EventType.ESCALATED_TO_HUMAN,
+                        reason="audio_unintelligible",
+                        detail=f"confidence {heard.confidence:.2f} below {MIN_CONFIDENCE}",
+                        transcript=heard.text,
+                        confidence=round(heard.confidence, 3),
+                        transcriber=heard.transcriber,
+                    )
+                ]
+            message = heard.text.strip()
+        else:
+            message = str(event.payload.get("text", "")).strip()
         if not message:
             return [event.caused(EventType.ESCALATED_TO_HUMAN, reason="empty_message")]
 
@@ -294,23 +352,39 @@ class ResponsiveAgent(Agent):
             return [event.caused(EventType.OPT_OUT_REQUESTED, source="responsive_agent")]
 
         if reply.escalated:
+            # The transcript travels with the escalation: the person picking it up needs
+            # to see what the system thought it heard, not just that it gave up.
             return [
                 event.caused(
                     EventType.ESCALATED_TO_HUMAN,
                     reason=reply.escalation_reason,
                     intent=reply.classification.intent.value,
                     confidence=reply.classification.confidence,
+                    **({"transcript": heard.text} if heard is not None else {}),
                 )
             ]
+
+        text = reply.answer.text
+        spoken: dict[str, object] = {}
+        if heard is not None:
+            spoken = {
+                "transcript": heard.text,
+                "transcription_confidence": round(heard.confidence, 3),
+                "transcriber": heard.transcriber,
+                "needs_confirmation": needs_confirmation(message),
+            }
+            if spoken["needs_confirmation"]:
+                text = CONFIRM_PREFIX.format(transcript=heard.text) + " " + text
 
         return [
             event.caused(
                 EventType.REPLY_SENT,
-                text=reply.answer.text,
+                text=text,
                 intent=reply.classification.intent.value,
                 confidence=reply.classification.confidence,
                 citations=reply.answer.citations,
                 latency_ms=round(reply.latency_ms, 2),
+                **spoken,
             )
         ]
 

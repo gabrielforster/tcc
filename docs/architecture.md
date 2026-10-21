@@ -54,7 +54,7 @@ the LGPD requires and the evaluation needs as evidence.
 | Event | Meaning | Priority |
 |---|---|---|
 | `message_received` | Customer wrote in | responsive |
-| `audio_received` | Customer sent a voice message | responsive |
+| `audio_received` | Customer sent a voice message, transcribed before it is answered | responsive |
 | `opt_out_requested` | Customer asked not to be contacted | responsive |
 | `escalated_to_human` | Agent handed the conversation over | escalation |
 | `overdue_detected` | A receivable passed its due date | proactive |

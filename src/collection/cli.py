@@ -414,6 +414,63 @@ def outreach(
 
 
 @app.command()
+def voice(
+    audio: str = typer.Option(None, help="transcribe one clip and print what was heard"),
+    transcriber: str = typer.Option("whisper", help="transcriber for --audio"),
+    repeats: int = typer.Option(None, help="degraded variants per message per rate"),
+) -> None:
+    """Transcribe a voice note, or sweep what recognition error costs the pipeline."""
+    from collection.voice import audio as audio_module
+    from collection.voice import evaluate as voice_eval
+    from collection.voice.transcribe import (
+        MIN_CONFIDENCE,
+        TranscriptionError,
+        get_transcriber,
+        needs_confirmation,
+    )
+
+    if audio is not None:
+        try:
+            clip = audio_module.accept(audio)
+            result = get_transcriber(transcriber).transcribe(clip)
+        except (audio_module.AudioError, TranscriptionError) as error:
+            console.print(f"[red]{type(error).__name__}[/] {error}")
+            raise typer.Exit(code=1) from error
+        console.print(
+            f"[bold]{clip.path.name}[/] · {clip.codec} · {clip.duration_s:.1f}s "
+            f"· {result.transcriber} · confidence {result.confidence:.2f} "
+            f"· {result.real_time_factor:.2f}x real time"
+        )
+        console.print(f"\n{result.text}\n")
+        if not result.usable:
+            console.print(f"[yellow]below {MIN_CONFIDENCE} confidence[/]: this would escalate")
+        elif needs_confirmation(result.text):
+            console.print("[yellow]carries a figure[/]: the agent would read it back first")
+        return
+
+    messages_file = settings.dir_knowledge / "voice-messages.json"
+    if not messages_file.exists():
+        console.print("[yellow]no voice-messages.json; nothing to evaluate[/]")
+        raise typer.Exit(code=1)
+    messages = voice_eval.load(messages_file)
+    table, results = voice_eval.sweep(messages, repeats=repeats or voice_eval.REPEATS)
+    console.print(f"\n[bold]Recognition error over {len(messages)} labelled voice messages[/]")
+    console.print(table.to_string(index=False))
+    path = voice_eval.write_report(table, results, settings.dir_docs / "voice-report.md")
+    console.print(f"[green]report[/] -> {path}")
+
+    # The control arm is a hard gate for the same reason it is everywhere else. At zero
+    # corruption the transcript is the reference, so the first two conditions hold by
+    # construction and the third is the one that bites: a labelled message claiming a
+    # figure its own transcript does not contain as a whole token. That makes this an
+    # integrity check on the labelled set, which is what every row below it rests on.
+    control = results[0]
+    if control.wer > 0 or control.intent_agreement < 1.0 or control.figure_survival < 1.0:
+        console.print("[red]the control arm did not reproduce the reference transcripts[/]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)
