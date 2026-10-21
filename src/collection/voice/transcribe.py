@@ -124,6 +124,23 @@ class ScriptedTranscriber(Transcriber):
     name: str = "scripted"
     calls: list[str] = field(default_factory=list)
 
+    def transcribe_path(self, path: Path | str) -> Transcription:
+        """Stand in for the recogniser without standing in for ffmpeg.
+
+        The base implementation probes and length-checks the clip first, which needs
+        ffmpeg on the machine. That is the right default for a real backend and the wrong
+        one here: tests of the *agent* would then fail on a machine with no decoder, for a
+        reason that has nothing to do with the agent. Decoding is exercised by the audio
+        tests, which skip where ffmpeg is absent. The file still has to exist -- a control
+        arm that invents a transcript for a missing clip would hide a real failure.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise TranscriptionError(f"no such audio file: {path}")
+        return self.transcribe(
+            AudioClip(path=path, codec="scripted", duration_s=0.0, sample_rate=0, channels=0)
+        )
+
     def transcribe(self, clip: AudioClip) -> Transcription:
         self.calls.append(clip.path.name)
         key = clip.path.stem
