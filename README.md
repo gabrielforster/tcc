@@ -209,7 +209,8 @@ any contact happened. The orchestrator does four things only: route, prioritise
 (responsive → escalation → proactive), enforce opt-out **before any agent runs**, and
 record. All three agents are now real: the [responsive one](./docs/responsive-agent.md)
 classifies and answers from the knowledge base, the proactive one runs the
-[collection rules](./docs/collection-rules.md), and the predictive one is behind
+[collection rules](./docs/collection-rules.md) and
+[writes the outbound message](./docs/outreach.md), and the predictive one is behind
 `POST /score`.
 
 ### RAG
@@ -238,6 +239,23 @@ and citations of documents that were never retrieved — and
 
 The template arm needs no API key and runs in CI. The LLM arm needs `ANTHROPIC_API_KEY`
 and is run by hand.
+
+### Outbound messages
+
+`collection outreach` composes the message the proactive agent would send, or evaluates the
+composers against labelled briefs — see [`docs/outreach.md`](./docs/outreach.md).
+
+The commercial terms come from `knowledge/tabela-de-parcelamento.csv`, the same file the
+retriever serves to the chat, so the offer the system sends and the answer it gives cannot
+disagree. Every message is checked against its own brief before it is scheduled — invented
+figures, threatening vocabulary, missing disclosures, offers beyond the stage's authority,
+length — and one that fails is escalated to a person instead of sent. The check lives in the
+agent rather than in the composer, because a component that grades its own output cannot be
+compared against an alternative.
+
+The comparison is two-sided on purpose. The template arm is the compliance ceiling and the
+personalisation floor; what the LLM arm has to buy is **distinctness**, measured among
+customers who get the same offer on the same channel.
 
 ### Web chat channel
 

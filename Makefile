@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer pipeline test lint fmt
+.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer outreach pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -41,6 +41,9 @@ rag:              ## build the knowledge index and evaluate retrieval
 
 answer:           ## evaluate the responders; ARGS="--compare" also runs the LLM arm
 	uv run collection answer $(ARGS)
+
+outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs the LLM arm
+	uv run collection outreach $(ARGS)
 
 pipeline:         ## the whole data pipeline, end to end
 	uv run collection pipeline

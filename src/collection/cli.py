@@ -344,6 +344,76 @@ def answer(
 
 
 @app.command()
+def outreach(
+    composer: str = typer.Option("template", help="template | llm"),
+    compare: bool = typer.Option(False, help="evaluate both composers and write the report"),
+    days_late: int = typer.Option(None, help="compose one message for a debt this many days late"),
+    amount: float = typer.Option(1250.0, help="amount in BRL, with --days-late"),
+    name: str = typer.Option("", help="customer name, with --days-late"),
+    channel: str = typer.Option("whatsapp", help="whatsapp | sms | phone, with --days-late"),
+) -> None:
+    """Write one outbound message, or evaluate the composers against the labelled briefs."""
+    from collection.outreach import evaluate as outreach_eval
+    from collection.outreach.brief import Brief
+    from collection.outreach.compliance import check
+    from collection.outreach.compose import get_composer
+
+    if days_late is not None:
+        brief = Brief(
+            customer_id="cli",
+            customer_name=name,
+            amount=amount,
+            days_late=days_late,
+            channel=channel,
+        )
+        message = get_composer(composer).compose(brief)
+        result = check(message, brief)
+        console.print(
+            f"[bold]{message.stage}[/] via {message.channel} "
+            f"· {result.length} chars · {message.composer}"
+        )
+        console.print(f"\n{message.text}\n")
+        if result.compliant:
+            console.print("[green]compliant[/]")
+        else:
+            console.print(f"[red]violations[/] {', '.join(result.violations)}")
+        return
+
+    briefs_file = settings.dir_knowledge / "outreach-briefs.json"
+    if not briefs_file.exists():
+        console.print("[yellow]no outreach-briefs.json; nothing to evaluate[/]")
+        raise typer.Exit(code=1)
+    briefs = outreach_eval.load(briefs_file)
+
+    arms = ["template", "llm"] if compare else [composer]
+    table, results = outreach_eval.compare(briefs, arms)
+    console.print(f"\n[bold]Composers over {len(briefs)} labelled briefs[/]")
+    console.print(table.to_string(index=False))
+    for result in results:
+        if result.compliance_rate < 1.0:
+            offenders = [r for r in result.records if not r.compliance.compliant]
+            console.print(
+                f"[yellow]{len(offenders)} non-compliant[/] in {result.composer}: "
+                + "; ".join(sorted({v for r in offenders for v in r.compliance.violations}))
+            )
+        if result.fallbacks:
+            console.print(
+                f"[yellow]{result.fallbacks} fallback(s)[/] in {result.composer}: "
+                "generation failed and the template composed instead."
+            )
+    path = outreach_eval.write_report(table, results, settings.dir_docs / "outreach-comparison.md")
+    console.print(f"[green]report[/] -> {path}")
+
+    # The control arm is a hard gate, the LLM arm is not. Slot filling that cannot be
+    # compliant on every labelled brief means the templates and the checker disagree, and
+    # that has to stop a build; a model writing a bad message is a result to report.
+    control = next((r for r in results if r.composer == "template"), None)
+    if control is not None and control.compliance_rate < 1.0:
+        console.print("[red]the template arm is not compliant on every brief[/]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)
