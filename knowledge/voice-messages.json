@@ -1,0 +1,20 @@
+[
+  {"id": "voz_01", "text": "oi bom dia eu queria saber quanto que eu tô devendo aí", "intent": "debt_inquiry", "figures": [], "duration_s": 3.4, "note": "plain inquiry, no figure to lose"},
+  {"id": "voz_02", "text": "olha eu queria parcelar a minha dívida em seis vezes dá pra fazer", "intent": "negotiation", "figures": ["seis"], "duration_s": 4.1, "note": "instalment count spoken as a word"},
+  {"id": "voz_03", "text": "preciso da segunda via do boleto porque o meu venceu ontem", "intent": "second_copy", "figures": [], "duration_s": 3.8, "note": "second copy"},
+  {"id": "voz_04", "text": "eu já paguei essa fatura no dia dez e continuo recebendo cobrança", "intent": "payment_claim", "figures": ["dez"], "duration_s": 4.6, "note": "a date spoken as a number; corrupting it accuses the wrong invoice"},
+  {"id": "voz_05", "text": "essa dívida não é minha eu nunca contratei esse serviço", "intent": "dispute", "figures": [], "duration_s": 3.9, "note": "dispute, always escalates regardless of transcription"},
+  {"id": "voz_06", "text": "consigo pagar mil duzentos e cinquenta reais à vista tem desconto", "intent": "negotiation", "figures": ["mil", "duzentos", "cinquenta"], "duration_s": 5.2, "note": "the ruinous case: three spoken numbers composing one amount"},
+  {"id": "voz_07", "text": "qual é o valor total com os juros do atraso", "intent": "debt_inquiry", "figures": [], "duration_s": 3.1, "note": "inquiry that retrieval must ground in the table"},
+  {"id": "voz_08", "text": "bom dia tudo bem com você", "intent": "small_talk", "figures": [], "duration_s": 2.2, "note": "small talk, answered without retrieval"},
+  {"id": "voz_09", "text": "não quero mais receber essas mensagens me tira da lista por favor", "intent": "opt_out", "figures": [], "duration_s": 4.3, "note": "opt-out spoken; must be honoured from audio exactly as from text"},
+  {"id": "voz_10", "text": "ahn deixa eu ver é posso dar uma entrada de trezentos e parcelar o resto", "intent": "negotiation", "figures": ["trezentos"], "duration_s": 6.0, "note": "hesitations already present in the reference, as a recogniser emits them"},
+  {"id": "voz_11", "text": "eu queria renegociar esse débito de dois mil e quatrocentos", "intent": "negotiation", "figures": ["dois", "mil", "quatrocentos"], "duration_s": 4.4, "note": "amount spoken inside the negotiation request"},
+  {"id": "voz_12", "text": "o comprovante eu mandei semana passada vocês receberam", "intent": "payment_claim", "figures": [], "duration_s": 3.6, "note": "payment claim without a figure"},
+  {"id": "voz_13", "text": "quanto ficaria em doze vezes o meu parcelamento", "intent": "negotiation", "figures": ["doze"], "duration_s": 3.5, "note": "twelve is confusable with two; the offer would be eaten alive"},
+  {"id": "voz_14", "text": "eu quero saber o vencimento da próxima parcela do acordo", "intent": "debt_inquiry", "figures": [], "duration_s": 3.9, "note": "inquiry about an existing agreement"},
+  {"id": "voz_15", "text": "esse valor tá errado eu contestei isso no mês passado", "intent": "dispute", "figures": [], "duration_s": 3.7, "note": "dispute phrased as a figure complaint"},
+  {"id": "voz_16", "text": "manda o boleto no meu whatsapp que eu pago hoje ainda", "intent": "second_copy", "figures": [], "duration_s": 3.8, "note": "second copy with an intention to pay"},
+  {"id": "voz_17", "text": "oi eu recebi uma mensagem de vocês sobre uma pendência de quinhentos reais", "intent": "debt_inquiry", "figures": ["quinhentos"], "duration_s": 5.1, "note": "customer repeats back a figure the system sent; a corruption here contradicts our own message"},
+  {"id": "voz_18", "text": "tem como dar um desconto maior eu só consigo pagar oitocentos", "intent": "negotiation", "figures": ["oitocentos"], "duration_s": 4.2, "note": "counter-offer, the case where acting on a misheard number is worst"}
+]

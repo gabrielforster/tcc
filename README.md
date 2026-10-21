@@ -208,7 +208,8 @@ Every interaction is an immutable event carrying `caused_by`, so the log reconst
 any contact happened. The orchestrator does four things only: route, prioritise
 (responsive → escalation → proactive), enforce opt-out **before any agent runs**, and
 record. All three agents are now real: the [responsive one](./docs/responsive-agent.md)
-classifies and answers from the knowledge base, the proactive one runs the
+classifies and answers from the knowledge base — in writing or
+[from a voice note](./docs/voice.md) — the proactive one runs the
 [collection rules](./docs/collection-rules.md) and
 [writes the outbound message](./docs/outreach.md), and the predictive one is behind
 `POST /score`.
@@ -256,6 +257,26 @@ compared against an alternative.
 The comparison is two-sided on purpose. The template arm is the compliance ceiling and the
 personalisation floor; what the LLM arm has to buy is **distinctness**, measured among
 customers who get the same offer on the same channel.
+
+### Voice notes
+
+`collection voice` sweeps what recognition error costs the pipeline; `--audio FILE`
+transcribes one clip — see [`docs/voice.md`](./docs/voice.md). A customer's OGG/OPUS voice
+note is probed, decoded to 16 kHz mono and transcribed by Whisper running **locally**: a
+voice note is personal data under the LGPD, and sending it to a third-party recognition API
+is a transfer the operation would have to justify.
+
+The measurement is turned around, because a control transcriber that returns the labelled
+reference cannot be wrong. Instead of asking how often recognition fails, the sweep fixes
+the error rate and asks **what survives it** — and the answer is the module's reason for
+existing. At a word error rate of 0.099, a transcript that reads perfectly well, intent
+still classifies the same way 86% of the time while one spoken figure in seven is already
+wrong. Intent is said several ways in a sentence; an amount is said once, and nothing
+downstream can tell when it breaks.
+
+So an amount heard in audio is a proposal to confirm, never an instruction to execute: the
+agent reads it back before acting, and a transcript it is not confident about goes to a
+person with the transcript attached rather than being answered.
 
 ### Web chat channel
 

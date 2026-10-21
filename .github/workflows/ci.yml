@@ -71,6 +71,14 @@ jobs:
         # a slot-filling composer must be compliant on every labelled brief.
         run: uv run collection outreach --composer template
 
+      - name: Voice transcription evaluation
+        # No model, no audio, no network: the sweep corrupts the labelled transcripts at a
+        # controlled rate and measures what the rest of the pipeline loses. Guards the
+        # control arm -- at zero corruption the references must come through exactly, and
+        # if they do not, the error model and the measures have drifted apart and every
+        # number below is meaningless.
+        run: uv run collection voice
+
       - name: Multi-turn evaluation
         # Context strategies against the labelled dialogues, lexical arms only. Guards
         # the property the design rests on: adding context must never lose a passage the
