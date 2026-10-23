@@ -218,7 +218,13 @@ def create_router(service: ChatService) -> APIRouter:
             identified=session.identified,
             escalated=session.escalated,
             turns=[
-                TranscriptTurn(role=turn.role, text=turn.text, at=turn.at, intent=turn.intent)
+                TranscriptTurn(
+                    role=turn.role,
+                    text=turn.text,
+                    at=turn.at,
+                    intent=turn.intent,
+                    delivery_id=turn.delivery_id,
+                )
                 for turn in session.transcript
             ],
         )

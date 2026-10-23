@@ -574,6 +574,44 @@ def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
 # channel it is itself serving. These pin that it does, and that it stays off by default.
 
 
+def test_a_seeded_message_is_in_the_transcript_the_widget_opens_with(channel):
+    """The layer the promise lives at.
+
+    The widget draws the thread from `GET /chat/sessions/{id}` when it opens a session, so
+    a seeded message that reaches the mailbox but not this response is a message the
+    customer never sees. It carries a delivery id, or the bubble could not report on
+    itself.
+    """
+    channel.seed(
+        Event(
+            type=EventType.CONTACT_SCHEDULED,
+            customer_id="c1",
+            invoice_id="inv_1",
+            payload={"channel": "chat", "message": "Olá, temos uma fatura em aberto."},
+        )
+    )
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        session = open_session(http, token=issue_token("c1"))
+        turns = http.get(f"/chat/sessions/{session['session_id']}").json()["turns"]
+    assert [turn["text"] for turn in turns] == [GREETING, "Olá, temos uma fatura em aberto."]
+    assert all(turn["delivery_id"] for turn in turns), "every agent bubble must be reportable"
+    assert turns[0]["delivery_id"] != turns[1]["delivery_id"]
+
+
+def test_an_agent_reply_is_reportable_from_the_transcript_too(client):
+    """Every agent turn carries its delivery id, not only the ones the widget saw arrive."""
+    session = open_session(client)
+    reply = client.post(
+        f"/chat/sessions/{session['session_id']}/messages",
+        json={"text": "quais sao os juros por atraso?"},
+    ).json()
+    turns = client.get(f"/chat/sessions/{session['session_id']}").json()["turns"]
+    agent_turns = [turn for turn in turns if turn["role"] == "agent"]
+    assert agent_turns[-1]["delivery_id"] == reply["delivery_id"]
+    assert all(turn["delivery_id"] is None for turn in turns if turn["role"] == "customer")
+
+
 def test_the_server_seeds_its_own_channel_when_the_demo_flag_is_set(channel, monkeypatch):
     from collection.channels.outbound import SEED_DEMO_CUSTOMER
 

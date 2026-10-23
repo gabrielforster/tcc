@@ -526,10 +526,28 @@
       body: JSON.stringify({ token: config.token }),
     })
       .then(function (body) {
-        log.innerHTML = "";
-        dateChipShown = false;
         sessionId = body.session_id;
-        append("agent", body.greeting, null, body.delivery_id);
+        // The thread is drawn from the transcript rather than from `greeting`, because
+        // the greeting is not the whole thread: a message the system scheduled for this
+        // customer is already waiting in it, and rendering one string could only ever
+        // show the first turn. The greeting is in the transcript too, so it is not drawn
+        // twice. (This does not survive a page reload -- the session id lives in this
+        // closure and nothing persists it, so a reload opens a new session.)
+        return request("/chat/sessions/" + encodeURIComponent(sessionId), {
+          method: "GET",
+        }).then(
+          function (thread) {
+            render(thread && thread.turns ? thread.turns : []);
+          },
+          function () {
+            // The transcript is a convenience; the session is open either way.
+            render([
+              { role: "agent", text: body.greeting, delivery_id: body.delivery_id },
+            ]);
+          }
+        );
+      })
+      .then(function () {
         setEnabled(true);
         input.focus();
       })
@@ -540,6 +558,18 @@
       .then(function () {
         opening = false;
       });
+  }
+
+  /** Draw a thread from scratch: every turn the server has, in order. */
+  function render(turns) {
+    log.innerHTML = "";
+    dateChipShown = false;
+    // Bubbles just removed must not keep reporting that they are on screen.
+    inView.length = 0;
+    turns.forEach(function (turn) {
+      if (turn.role !== "agent" && turn.role !== "customer") return;
+      append(turn.role, turn.text, null, turn.delivery_id);
+    });
   }
 
   function showTyping() {

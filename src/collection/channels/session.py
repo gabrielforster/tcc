@@ -125,6 +125,11 @@ class Turn:
     at: float = field(default_factory=time.time)
     intent: str | None = None
     escalated: bool = False
+    #: The delivery record this turn is tracked by, for agent turns. It is on the turn
+    #: rather than only on the reply because the widget draws the thread from the
+    #: transcript when a session opens, and a bubble drawn with no delivery id would
+    #: silently stop reporting that it was rendered and read.
+    delivery_id: str | None = None
 
 
 @dataclass

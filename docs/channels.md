@@ -172,6 +172,18 @@ persisted either way: a restart loses the thread, exactly as it loses the sessio
 
 And the message still waits, possibly forever, for a customer who never comes back.
 
+**The mailbox is drained on the first `open()`, and that is a real hazard for a live
+demo.** A stray click on the widget while the room is still filling up consumes the seeded
+message, and the thread the professors then see is a greeting and nothing else — with no
+way to put it back, because nothing is persisted. The recovery is to restart the server
+with `--seed-demo` again, which re-seeds from the fixture. Draining on read is the right
+behaviour for a mailbox (a message delivered twice is worse than one delivered late), so
+this is recorded as a fragility to work around rather than a bug to fix.
+
+What the widget renders on open is the session transcript, not the greeting string: it
+asks `GET /chat/sessions/{id}` and draws every turn, which is why a seeded message appears
+at all and why each drawn agent bubble carries the delivery id it reports against.
+
 The receivables are a fixture written out in `channels/outbound.py`, not a query: no job in
 this repository reads overdue invoices out of a dataset, because the datasets live under
 `data/` and are never committed.

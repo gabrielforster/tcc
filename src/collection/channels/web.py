@@ -235,13 +235,13 @@ class ChatChannel:
         first. The customer's next turn answers all of them.
         """
         session = self.store.open(token)
-        session.record("agent", GREETING)
         # Tracked like any agent message, and its id is handed to the widget so it can
         # report the first message of the thread too.
         session.greeting_delivery_id = self.delivery.record(GREETING, owner=session.session_id).id
+        session.record("agent", GREETING, delivery_id=session.greeting_delivery_id)
         self._awaiting_reply[session.session_id] = [session.greeting_delivery_id]
         for pending in self._drain(session.customer_id):
-            session.record("agent", pending.text)
+            session.record("agent", pending.text, delivery_id=pending.delivery_id)
             self.delivery.reassign(pending.delivery_id, session.session_id)
             self._awaiting_reply[session.session_id].append(pending.delivery_id)
         return session, GREETING
@@ -249,7 +249,13 @@ class ChatChannel:
     def transcript(self, session_id: str) -> list[dict[str, object]]:
         session = self.store.get(session_id)
         return [
-            {"role": turn.role, "text": turn.text, "at": turn.at, "intent": turn.intent}
+            {
+                "role": turn.role,
+                "text": turn.text,
+                "at": turn.at,
+                "intent": turn.intent,
+                "delivery_id": turn.delivery_id,
+            }
             for turn in session.transcript
         ]
 
@@ -367,9 +373,18 @@ class ChatChannel:
             self.delivery.advance(delivery_id, DeliveryStatus.RESPONDIDA)
 
     def _track_reply(self, session: Session, reply: ChatReply) -> None:
-        """Record the agent's message and, unless it ends the thread, await an answer."""
+        """Record the agent's message and, unless it ends the thread, await an answer.
+
+        The id goes on the transcript turn too: a widget that draws the thread from the
+        transcript must be able to report on every agent bubble it draws, not only the
+        ones it saw arrive.
+        """
         record = self.delivery.record(reply.text, owner=session.session_id)
         reply.delivery_id = record.id
+        for turn in reversed(session.transcript):
+            if turn.role == "agent":
+                turn.delivery_id = record.id
+                break
         if not reply.escalated:
             self._awaiting_reply[session.session_id] = [record.id]
 

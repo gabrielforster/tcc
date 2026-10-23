@@ -125,6 +125,8 @@ class TranscriptTurn(BaseModel):
     text: str
     at: float
     intent: str | None = None
+    #: Agent turns only: what the widget reports `entregue` and `lida` against.
+    delivery_id: str | None = None
 
 
 class TranscriptResponse(BaseModel):
