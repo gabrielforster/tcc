@@ -6,6 +6,21 @@ reached from a Python process — and it is now one implementation of an explici
 what any channel owes the system, and what it must never decide, is in
 [`docs/channels.md`](./channels.md).
 
+## What it looks like
+
+Captured from `make serve ARGS="--seed-demo"` against the fixture receivables in
+`channels/outbound.py` — no real customer data is involved.
+
+| Seeded thread | Answer from the knowledge base | Escalation to a person |
+|---|---|---|
+| ![The widget on open, showing the greeting and a scheduled contact waiting in the mailbox](./images/chat-seeded-thread.png) | ![A customer question answered from the knowledge base, with the source file named under the reply](./images/chat-rag-answer.png) | ![A disputed amount handed to a human, with the composer disabled](./images/chat-escalation.png) |
+
+The customer's own messages sit on the right; everything the system says sits on the left,
+with the delivery ticks under it. The middle shot is the key-less extractive responder, so
+it quotes whole passages — `docs/llm-responder.md` explains why that fallback exists and
+what the generated arm does instead. The right-hand shot is the end of the thread: once a
+conversation is escalated the composer is disabled rather than silently ignored.
+
 ## It is an adapter, not a second agent
 
 Every message becomes a `message_received` event submitted to the **orchestrator**, which
