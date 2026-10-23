@@ -355,3 +355,20 @@ def test_an_opt_out_spoken_aloud_is_honoured_like_one_typed(index):
     )
     produced = agent.handle(_audio_event())
     assert produced[0].type is EventType.OPT_OUT_REQUESTED
+
+
+@needs_ffmpeg
+def test_a_streamed_webm_without_a_header_duration_is_measured(tmp_path):
+    """Chrome's MediaRecorder writes WebM with no duration; it must not read as 0 seconds."""
+    import subprocess
+
+    path = tmp_path / "live.webm"
+    with path.open("wb") as handle:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=d=2", "-c:a", "libopus"]
+            + ["-f", "webm", "-live", "1", "pipe:1"],
+            stdout=handle,
+            check=True,
+        )
+    clip = probe(path)
+    assert 1.5 < clip.duration_s < 2.5

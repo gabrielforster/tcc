@@ -65,11 +65,19 @@ token = issue_token(customer_id)  # nunca no navegador</code></pre>
         <li><code>posso parcelar em 6 vezes?</code> — tabela de parcelamento</li>
         <li><code>esse valor ta errado, nao e isso que eu devo</code> — contestação, escala para humano</li>
         <li><code>parem de me mandar mensagem</code> — opt-out registrado</li>
+        <li>
+          segure o botão do microfone e fale um valor — o widget grava, envia e, quando o
+          valor falado precisa de confirmação, mostra a leitura de volta em destaque
+        </li>
+        <li>
+          os tiques de cada mensagem enviada refletem o que o servidor registrou:
+          entregue quando a mensagem aparece, lida quando está à vista
+        </li>
       </ul>
 
       <p>
         O botão acima está estilizado com uma regra global agressiva
-        (<code>button { background: hotpink }</code>). Se o botão do widget continuar azul,
+        (<code>button { background: hotpink }</code>). Se o botão do widget continuar verde,
         o isolamento por shadow DOM está funcionando.
       </p>
       <button type="button">Botão da página hospedeira</button>

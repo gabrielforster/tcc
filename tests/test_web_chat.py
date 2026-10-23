@@ -463,3 +463,65 @@ def test_the_session_response_carries_the_greetings_delivery_id(client, channel)
     body = open_session(client)
     assert body["delivery_id"]
     assert channel.delivery.of(body["delivery_id"]).status.value == "enviada"
+
+
+# ------------------------------------------------------------ delivery reports
+def report(client, session_id, delivery_id, status):
+    return client.post(
+        f"/chat/sessions/{session_id}/deliveries/{delivery_id}", json={"status": status}
+    )
+
+
+def test_a_delivery_report_advances_the_record(client, channel):
+    opened = open_session(client)
+    sid, did = opened["session_id"], opened["delivery_id"]
+    first = report(client, sid, did, "entregue")
+    assert first.status_code == 200
+    assert first.json() == {"delivery_id": did, "status": "entregue", "applied": True}
+    assert report(client, sid, did, "lida").json()["status"] == "lida"
+    assert channel.delivery.of(did).status.value == "lida"
+
+
+def test_repeating_a_report_is_harmless(client):
+    opened = open_session(client)
+    sid, did = opened["session_id"], opened["delivery_id"]
+    report(client, sid, did, "lida")
+    again = report(client, sid, did, "lida")
+    assert again.status_code == 200 and again.json()["status"] == "lida"
+
+
+def test_a_report_that_loses_the_race_to_the_reply_is_benign(client, channel):
+    opened = open_session(client)
+    sid, did = opened["session_id"], opened["delivery_id"]
+    assert say(client, sid, "quais sao os juros?").status_code == 200
+    assert channel.delivery.of(did).status.value == "respondida"
+    late = report(client, sid, did, "entregue")
+    assert late.status_code == 200
+    assert late.json() == {"delivery_id": did, "status": "respondida", "applied": False}
+    assert channel.delivery.of(did).status.value == "respondida"
+
+
+def test_a_report_that_contradicts_the_record_is_a_conflict(client):
+    opened = open_session(client)
+    sid, did = opened["session_id"], opened["delivery_id"]
+    report(client, sid, did, "lida")
+    assert report(client, sid, did, "entregue").status_code == 409
+
+
+@pytest.mark.parametrize("status", ["enviada", "respondida", "recebida", ""])
+def test_a_status_the_client_cannot_report_is_rejected(client, status):
+    opened = open_session(client)
+    response = report(client, opened["session_id"], opened["delivery_id"], status)
+    assert response.status_code == 422
+
+
+def test_a_report_for_an_unknown_delivery_is_not_found(client, channel):
+    opened = open_session(client)
+    assert report(client, opened["session_id"], "dlv_nope", "entregue").status_code == 404
+    with pytest.raises(KeyError):
+        channel.delivery.of("dlv_nope")
+
+
+def test_a_report_for_an_unknown_session_is_not_found(client):
+    opened = open_session(client)
+    assert report(client, "nope", opened["delivery_id"], "entregue").status_code == 404

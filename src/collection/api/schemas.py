@@ -1,6 +1,6 @@
 """Request and response bodies for the scoring API."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -100,6 +100,24 @@ class AudioMessageResponse(MessageResponse):
     transcript: str | None = None
     transcription_confidence: float = 0.0
     needs_confirmation: bool = False
+
+
+class DeliveryReport(BaseModel):
+    """What the widget says happened to a message. Only the client-reportable rungs.
+
+    `enviada` is the server's own record and `respondida` is set when the customer replies,
+    so neither can be reported; anything else fails validation with a 422.
+    """
+
+    status: Literal["entregue", "lida"]
+
+
+class DeliveryResponse(BaseModel):
+    delivery_id: str
+    status: str = Field(description="the status on record after this report")
+    applied: bool = Field(
+        description="false when the report arrived late and the record was already further on"
+    )
 
 
 class TranscriptTurn(BaseModel):

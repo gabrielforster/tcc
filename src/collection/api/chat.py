@@ -31,6 +31,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from collection.agents.responsive import Responder, get_responder
 from collection.api.schemas import (
     AudioMessageResponse,
+    DeliveryReport,
+    DeliveryResponse,
     MessageRequest,
     MessageResponse,
     SessionRequest,
@@ -38,6 +40,7 @@ from collection.api.schemas import (
     TranscriptResponse,
     TranscriptTurn,
 )
+from collection.channels.delivery import BackwardsStatus, DeliveryStatus
 from collection.channels.session import (
     ConversationEnded,
     InvalidMessage,
@@ -165,6 +168,37 @@ def create_router(service: ChatService) -> APIRouter:
         except tuple(_STATUS) as error:
             raise _http_error(error) from error
         return AudioMessageResponse(**vars(reply))
+
+    @router.post("/sessions/{session_id}/deliveries/{delivery_id}", response_model=DeliveryResponse)
+    def report_delivery(
+        session_id: str, delivery_id: str, report: DeliveryReport
+    ) -> DeliveryResponse:
+        """The widget reporting that it rendered (`entregue`) or showed (`lida`) a message.
+
+        Client-reported, so it is a claim and not a receipt; see `channels.delivery`.
+
+        A report that lands after the customer already replied finds the record at
+        `respondida`. That is an ordinary race (the reply and the report travel
+        independently), so it answers 200 with `applied: false` and the status on record.
+        Any other step backwards, such as `entregue` after `lida`, contradicts the record and
+        is a 409. An unknown delivery id is a 404 and is never created.
+        """
+        try:
+            service.channel.store.get(session_id)
+        except Exception as error:
+            raise _http_error(error) from error
+        status = DeliveryStatus(report.status)
+        try:
+            record = service.channel.delivery.advance(delivery_id, status)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="unknown delivery id") from None
+        except BackwardsStatus as late:
+            if late.current is DeliveryStatus.RESPONDIDA:
+                return DeliveryResponse(
+                    delivery_id=delivery_id, status=late.current.value, applied=False
+                )
+            raise HTTPException(status_code=409, detail=str(late)) from late
+        return DeliveryResponse(delivery_id=delivery_id, status=record.status.value, applied=True)
 
     @router.get("/sessions/{session_id}", response_model=TranscriptResponse)
     def transcript(session_id: str) -> TranscriptResponse:

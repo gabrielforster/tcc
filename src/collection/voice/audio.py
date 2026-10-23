@@ -20,7 +20,7 @@ from pathlib import Path
 #: Containers worth accepting. OGG/OPUS is what WhatsApp sends; the rest are what a web
 #: client or an operator uploading a recording will produce.
 ACCEPTED_CODECS = frozenset({"opus", "vorbis", "mp3", "aac", "pcm_s16le", "pcm_f32le"})
-ACCEPTED_SUFFIXES = frozenset({".ogg", ".oga", ".opus", ".mp3", ".m4a", ".wav"})
+ACCEPTED_SUFFIXES = frozenset({".ogg", ".oga", ".opus", ".mp3", ".m4a", ".wav", ".webm"})
 
 #: Every speech model in use expects mono at this rate; sending it anything else makes
 #: the provider resample internally, which is the same work done less visibly.
@@ -72,6 +72,32 @@ def _run(command: list[str]) -> str:
     return completed.stdout
 
 
+def _packet_duration(path: Path) -> float:
+    """Length from the last packet's timestamp, for containers that carry no duration."""
+    out = _run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "packet=pts_time,duration_time",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ]
+    )
+    end = 0.0
+    for line in out.splitlines():
+        start, _, length = line.partition(",")
+        try:
+            end = max(end, float(start) + float(length or 0))
+        except ValueError:
+            continue
+    return end
+
+
 def probe(path: Path | str) -> AudioClip:
     """Read the clip's shape without decoding it.
 
@@ -109,6 +135,10 @@ def probe(path: Path | str) -> AudioClip:
         raise AudioError(f"unsupported codec {codec!r} in {path.name}")
 
     duration = stream.get("duration") or parsed.get("format", {}).get("duration") or 0.0
+    if not float(duration):
+        # A browser's MediaRecorder streams WebM without a duration in the header. Reading
+        # the packet timestamps is slower than the header but is the only honest length.
+        duration = _packet_duration(path)
     return AudioClip(
         path=path,
         codec=codec,
