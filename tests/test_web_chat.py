@@ -22,6 +22,7 @@ from collection.agents.responsive import TemplateResponder
 from collection.api.app import ModelRegistry, create_app
 from collection.api.chat import ChatService
 from collection.channels import session as session_module
+from collection.channels.delivery import DeliveryStatus
 from collection.channels.session import (
     ANONYMOUS_PREFIX,
     MAX_MESSAGE_CHARS,
@@ -610,6 +611,32 @@ def test_an_agent_reply_is_reportable_from_the_transcript_too(client):
     agent_turns = [turn for turn in turns if turn["role"] == "agent"]
     assert agent_turns[-1]["delivery_id"] == reply["delivery_id"]
     assert all(turn["delivery_id"] is None for turn in turns if turn["role"] == "customer")
+
+
+def test_a_message_the_customer_never_saw_is_still_marked_respondida(channel):
+    """The honest, uncomfortable half of `respondida`.
+
+    Delivery is to the *session*, not to a screen. If the widget never draws a seeded
+    message -- the transcript request fails, say -- the customer's next turn still advances
+    it. The status is defensible because the server did observe a reply, and the
+    documentation says exactly that rather than claiming the message was read. This test
+    exists so nobody later "fixes" the record into a stronger claim than it can carry.
+    """
+    delivery_id = channel.seed(
+        Event(
+            type=EventType.CONTACT_SCHEDULED,
+            customer_id="c1",
+            invoice_id="inv_1",
+            payload={"channel": "chat", "message": "Olá, temos uma fatura em aberto."},
+        )
+    )
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        session = open_session(http, token=issue_token("c1"))
+        # The transcript is never fetched: this client stands in for a widget that drew
+        # nothing but the greeting it got from the open response.
+        http.post(f"/chat/sessions/{session['session_id']}/messages", json={"text": "oi"})
+    assert channel.delivery.of(delivery_id).status is DeliveryStatus.RESPONDIDA
 
 
 def test_the_server_seeds_its_own_channel_when_the_demo_flag_is_set(channel, monkeypatch):

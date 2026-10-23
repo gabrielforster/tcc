@@ -183,7 +183,7 @@ def serve(
         if seed_demo:
             console.print(
                 "[green]seed[/] scheduled contacts are seeded into this server's channel "
-                "at startup; open the widget as cus_a or cus_b"
+                "at startup; the demo page identifies itself as the seeded customer"
             )
     uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
 

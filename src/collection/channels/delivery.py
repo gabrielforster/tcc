@@ -21,8 +21,10 @@ one means, because a status column is easy to read as a stronger claim than it i
 * `RESPONDIDA` -- set by the server when the customer's next turn arrives in the same
   thread. This is the one transition the server can observe first-hand, and it is the
   strongest signal in the ladder: a reply is evidence the message was seen even if the
-  client never reported it. It still says the customer answered *something*, not that
-  they understood or agreed.
+  client never reported it. Precisely, it means a turn arrived after the message was
+  delivered to the session -- not that the message was displayed, read, understood or
+  agreed with. A client that failed to draw the message still lets the next turn advance
+  it.
 
 The ladder is monotonic. A status never moves backwards, and trying to raises
 `BackwardsStatus` (a `ValueError` that carries the current and attempted status, so a

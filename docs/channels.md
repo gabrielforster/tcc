@@ -126,8 +126,9 @@ would be a made-up receipt").
 
 **`respondida` is the only rung the server observes first-hand**, and it is therefore the
 strongest signal in the ladder — a reply is evidence the message was seen even when the
-client never reported anything. It still says the customer answered *something*, not that
-they understood or agreed.
+client never reported anything. Precisely: it means a turn arrived after the message was
+delivered to the session, not that the message was displayed or read. It still says the
+customer answered *something*, not that they understood or agreed.
 
 Against a real WhatsApp receipt this is weaker in one specific way and stronger in another.
 Weaker: Meta's double tick is asserted by the *platform*, from the device's own
@@ -179,6 +180,15 @@ way to put it back, because nothing is persisted. The recovery is to restart the
 with `--seed-demo` again, which re-seeds from the fixture. Draining on read is the right
 behaviour for a mailbox (a message delivered twice is worse than one delivered late), so
 this is recorded as a fragility to work around rather than a bug to fix.
+
+A failed transcript fetch loses the same message the same way: the mailbox was drained
+when the session opened, so the seeded message exists only in that one response, and a
+request that does not arrive takes it with it. The widget therefore says so — a notice and
+a retry button rather than an ordinary-looking empty thread — and the recovery is again a
+restart. It is worth being blunt about the consequence: the message is still *delivered to
+the session*, so the customer's next turn advances it to `respondida` in the audit trail
+even though nothing was ever drawn on their screen. That is the sharpest illustration of
+why `respondida` is phrased the way it is above.
 
 What the widget renders on open is the session transcript, not the greeting string: it
 asks `GET /chat/sessions/{id}` and draws every turn, which is why a seeded message appears

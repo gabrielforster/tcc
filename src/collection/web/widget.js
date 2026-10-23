@@ -54,6 +54,8 @@
     heard: "transcrição",
     confidence: "confiança",
     readBackRequired: "leitura de volta exigida",
+    partialThread: "Não consegui carregar a conversa inteira. Pode faltar uma mensagem.",
+    retryThread: "Tentar de novo",
   };
 
   // What each rung means to the customer. The tick is drawn from the status the server
@@ -123,6 +125,10 @@
     ".msg.agent{background:#fff;align-self:flex-start;border-radius:14px 14px 14px 4px}",
     ".msg.system{align-self:center;background:#fdf2c7;border:1px solid #f0d98a;font-size:12px;",
     "border-radius:10px;padding:7px 12px;text-align:center}",
+    ".msg.system .retry{display:block;margin:6px auto 0;background:#fff;color:#1f5c4b;",
+    "border:1px solid #cbb66a;border-radius:8px;padding:4px 10px;font-size:12px;",
+    "cursor:pointer;font-family:inherit}",
+    ".msg.system .retry[disabled]{opacity:.5;cursor:default}",
     ".meta{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:4px;",
     "font-size:11px;color:#5a6b63;white-space:normal}",
     ".tick{display:inline-flex;color:#7a8f85}",
@@ -533,19 +539,7 @@
         // show the first turn. The greeting is in the transcript too, so it is not drawn
         // twice. (This does not survive a page reload -- the session id lives in this
         // closure and nothing persists it, so a reload opens a new session.)
-        return request("/chat/sessions/" + encodeURIComponent(sessionId), {
-          method: "GET",
-        }).then(
-          function (thread) {
-            render(thread && thread.turns ? thread.turns : []);
-          },
-          function () {
-            // The transcript is a convenience; the session is open either way.
-            render([
-              { role: "agent", text: body.greeting, delivery_id: body.delivery_id },
-            ]);
-          }
-        );
+        return loadThread(body);
       })
       .then(function () {
         setEnabled(true);
@@ -558,6 +552,40 @@
       .then(function () {
         opening = false;
       });
+  }
+
+  /**
+   * Fetch the thread and draw it; on failure, say so and offer to try again.
+   *
+   * The fallback is not cosmetic. `open()` has already drained the customer's mailbox, so
+   * a seeded message exists *only* in this response -- the transcript is the message, not
+   * a convenience view of it. Failing quietly would leave a thread that looks ordinary and
+   * empty while a collection message has been delivered to the session and lost on the way
+   * to the screen; the customer's next turn would then mark it `respondida` in the audit
+   * trail. The notice makes the gap visible and the retry re-fetches the same session, so
+   * a message that is still on the server comes back.
+   */
+  function loadThread(opened) {
+    return request("/chat/sessions/" + encodeURIComponent(sessionId), {
+      method: "GET",
+    }).then(
+      function (thread) {
+        render(thread && thread.turns ? thread.turns : []);
+      },
+      function () {
+        render([{ role: "agent", text: opened.greeting, delivery_id: opened.delivery_id }]);
+        var notice = append("system", STRINGS.partialThread);
+        var retry = el("button", "retry", STRINGS.retryThread);
+        retry.type = "button";
+        retry.addEventListener("click", function () {
+          retry.disabled = true;
+          loadThread(opened).then(function () {
+            input.focus();
+          });
+        });
+        notice.appendChild(retry);
+      }
+    );
   }
 
   /** Draw a thread from scratch: every turn the server has, in order. */
