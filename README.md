@@ -303,6 +303,11 @@ because both are easy to read as stronger claims than they are: `entregue` and `
 `respondida` is observed by the server. And a proactive thread is **seeded, not pushed**:
 with no push transport, the message waits in a mailbox until the customer opens the widget.
 
+```sh
+make seed           # schedule outbound contacts and leave them waiting in the chat
+make serve          # open the widget as one of those customers and the message is there
+```
+
 The WhatsApp Business API and real telephony were replaced by this simulated chat channel
 and a real-time voice channel, deliberately and for a stated reason — the integrations add
 transport, approval queues and a billing relationship, not a single new decision by any

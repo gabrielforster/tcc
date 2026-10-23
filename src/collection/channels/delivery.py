@@ -9,9 +9,9 @@ one means, because a status column is easy to read as a stronger claim than it i
 * `ENVIADA` -- the system handed the message to the channel and recorded it. Measured, and
   the only state that needs no one's cooperation. It does not mean anyone saw it.
 * `ENTREGUE` and `LIDA` -- **reported by the client**, not observed by the server. The
-  widget will report that it rendered the message (`ENTREGUE`) or that it was on screen
-  (`LIDA`) once that path exists. Today the states are only defined: nothing reports them
-  yet, so nothing sets them.
+  widget reports that it rendered the message (`ENTREGUE`) and that it was on screen
+  (`LIDA`), through the delivery endpoint in `api/chat.py`, which accepts a report only
+  from the session that owns the record.
   These are not carrier receipts: nothing here has independent evidence the message
   reached a person, and a client can lie, be scripted, or simply never report -- a closed
   tab sends nothing. So `ENVIADA` is not "delivery failed" and a missing `LIDA` is not

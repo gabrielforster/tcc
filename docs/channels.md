@@ -4,8 +4,8 @@ An agent decides *what* to say. The orchestrator decides *whether* anyone may be
 at all. Neither is supposed to know whether the words end up in a chat bubble, a voice
 note or a synthesised sentence on a call. That claim is the architecture's central one —
 it is what makes "add WhatsApp" a new adapter rather than a second copy of the
-conversation logic — and until this module landed, nothing enforced it. A convention that
-nothing checks erodes the first time someone is in a hurry.
+conversation logic — and a convention that nothing checks erodes the first time someone is
+in a hurry. So it is not left as a convention.
 
 So the seam is written down in `channels/base.py` and tested in `tests/test_channels.py`.
 
@@ -151,8 +151,14 @@ Two mechanical properties keep the record truthful:
 The proactive agent can decide to start a conversation. What it cannot do is interrupt
 anyone: there is **no push transport**. `ChatChannel.seed` puts the composed message in a
 per-customer mailbox, and `open()` drains it into the thread after the greeting, oldest
-first. The demo is "run the detection job, then open the chat" — and the message waits,
-possibly forever, for a customer who never comes back.
+first. That path is wired end to end by `collection seed` (`make seed`), which runs the
+proactive agent over overdue receivables and reports how many contacts were seeded,
+suppressed, declined as belonging to another channel, or escalated for failing their
+compliance check. The demo is `make seed`, then `make serve` and open the widget — and the
+message waits, possibly forever, for a customer who never comes back. The receivables that
+command runs over are a fixture written out in `channels/outbound.py`, not a query: no job
+in this repository reads overdue invoices out of a dataset, because the datasets live under
+`data/` and are never committed.
 
 This is named rather than hidden because the alternative was to claim a delivery the
 system cannot perform. A live-arrival transport — SSE or polling against this same
@@ -182,11 +188,13 @@ bytes.
 **WhatsApp Business API.** What it would add over the simulated chat channel is a vendor's
 transport, a template-approval process and a billing relationship. What it would *not* add
 is a single new decision by any agent. The channel contract is where the risk actually
-lives: if the architecture is genuinely channel-agnostic, a WhatsApp adapter is a few
-hundred lines against a contract already proven by other adapters; if it is not, no amount
-of API integration would reveal that, because with one channel there is nothing to be
-inconsistent with. The simulation tests the property the thesis claims. The integration
-would mostly test Meta's uptime.
+lives, and what is actually proven today is narrower than a second adapter would prove:
+**no agent can import a channel**, enforced by the AST guard above and by that guard's own
+self-test. That is the property a WhatsApp adapter would rely on. Integrating the API would
+not establish it — with one channel there is nothing to be inconsistent with, so the
+integration would mostly test Meta's uptime, while the guard tests the claim the thesis
+makes. A second adapter would be stronger evidence still; the voice channel is where that
+comes from.
 
 **Telephony.** The interesting problems in an automated call are turn-taking,
 interruption, the latency budget and the legal opening. All four exist identically in a
@@ -216,6 +224,7 @@ Named here, and inherited by the article's limitations section:
 | `src/collection/channels/base.py` | `Channel`, `ChannelCapabilities`, `DELIVERY_CHANNELS` |
 | `src/collection/channels/delivery.py` | The status ladder, channel-neutral so the voice channel reuses it |
 | `src/collection/channels/web.py` | `ChatChannel`: voice notes, mailbox, delivery tracking, opt-out |
+| `src/collection/channels/outbound.py` | The join: proactive agent → scheduled contact → mailbox (`make seed`) |
 | `src/collection/channels/session.py` | Sessions, tokens, rate limits |
 | `src/collection/api/chat.py` | The HTTP surface, including the delivery-report endpoint |
 | `tests/test_channels.py` | The contract, the ladder, the seeding rules, and the import guard |

@@ -471,6 +471,51 @@ def voice(
 
 
 @app.command()
+def seed() -> None:
+    """Run the proactive agent over overdue receivables and seed the contacts into the chat.
+
+    The outbound half of the demo: afterwards, `make serve` and opening the widget as one
+    of the customers below shows the scheduled message already waiting in the thread.
+    Nothing here needs a network or an API key -- the template composer writes the
+    message, which is also the arm that CI exercises.
+    """
+    from collection.channels.outbound import run as seed_contacts
+
+    result = seed_contacts()
+
+    table = Table(title="Scheduled contacts, and what the chat channel did with each")
+    table.add_column("customer")
+    table.add_column("outcome")
+    table.add_column("detail")
+    for event, delivery_id in result.seeded:
+        table.add_row(event.customer_id, "[green]seeded[/]", delivery_id)
+    for event in result.other_channel:
+        table.add_row(
+            event.customer_id, "[dim]other channel[/]", str(event.payload.get("channel", ""))
+        )
+    for event in result.suppressed:
+        table.add_row(
+            event.customer_id,
+            "[yellow]suppressed[/]",
+            str(event.payload.get("detail") or event.payload.get("reason") or "opted out"),
+        )
+    for event in result.escalated:
+        table.add_row(event.customer_id, "[red]escalated[/]", str(event.payload.get("detail", "")))
+    console.print(table)
+
+    console.print(
+        f"\n[green]summary[/] {len(result.seeded)} seeded · "
+        f"{len(result.suppressed)} suppressed · {len(result.other_channel)} other channel · "
+        f"{len(result.escalated)} escalated · {result.total} considered"
+    )
+    # Said plainly, because the table above is easy to read as "sent".
+    console.print(
+        "[dim]Seeded, not pushed: there is no push transport, so each message waits in "
+        "the customer's mailbox until the widget is opened.[/]"
+    )
+
+
+@app.command()
 def pipeline() -> None:
     """Run extract + ingest + dictionary + eda + features."""
     extract(source=None)

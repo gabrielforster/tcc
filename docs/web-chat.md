@@ -124,8 +124,9 @@ Beyond typed text, three things the WhatsApp integration was supposed to bring:
   [`docs/channels.md`](./channels.md) is precise about the difference.
 - **Threads the system starts.** `seed()` puts a scheduled contact in the customer's
   mailbox, routed through an orchestrator so opt-out suppression is the orchestrator's
-  rule rather than a second copy of it. `open()` drains the mailbox into the thread after
-  the greeting — and checks opt-out *again* at that moment, because a customer can opt out
+  rule rather than a second copy of it. `make seed` runs that path end to end — proactive
+  agent, rules, composition, compliance check, mailbox — and reports what happened to each
+  contact. `open()` drains the mailbox into the thread after the greeting — and checks opt-out *again* at that moment, because a customer can opt out
   between the seed and the widget opening.
 
 ## Transparency

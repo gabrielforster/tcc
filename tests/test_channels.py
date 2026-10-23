@@ -316,3 +316,57 @@ def test_skips_are_distinguishable_and_empty_text_is_loud(index):
         channel.seed(contact_scheduled(text="  "))
     session, _ = channel.open(token=issue_token("c1"))
     assert len(channel.transcript(session.session_id)) == 1
+
+
+# ---------------------------------------------------------------- the seeding job
+# The proactive agent and the mailbox existed; nothing joined them, so the behaviour the
+# demo claims lived only in the tests above. These cover the join.
+
+
+def _seeded_job(index):
+    from collection.channels.outbound import OPTED_OUT
+    from collection.channels.outbound import run as seed_contacts
+
+    channel = ChatChannel(index=index, opted_out=set(OPTED_OUT))
+    return channel, seed_contacts(channel=channel)
+
+
+def test_the_job_leaves_a_scheduled_message_waiting_for_the_customer(index):
+    channel, result = _seeded_job(index)
+    customers = [event.customer_id for event, _ in result.seeded]
+    assert "cus_a" in customers
+    session, _ = channel.open(token=issue_token("cus_a"))
+    transcript = channel.transcript(session.session_id)
+    assert len(transcript) == 2, "the greeting, then the scheduled contact"
+    assert transcript[-1]["role"] == "agent"
+    assert "Marina" in transcript[-1]["text"]
+
+
+def test_the_job_declines_a_contact_scheduled_for_another_channel(index):
+    channel, result = _seeded_job(index)
+    assert [event.customer_id for event in result.other_channel] == ["cus_c"]
+    session, _ = channel.open(token=issue_token("cus_c"))
+    assert len(channel.transcript(session.session_id)) == 1, "greeting only"
+
+
+def test_the_job_never_seeds_an_opted_out_customer(index):
+    channel, result = _seeded_job(index)
+    assert "cus_optout" in [event.customer_id for event in result.suppressed]
+    assert "cus_optout" not in [event.customer_id for event, _ in result.seeded]
+    session, _ = channel.open(token=issue_token("cus_optout"))
+    assert len(channel.transcript(session.session_id)) == 1, "greeting only"
+
+
+def test_every_detected_receivable_is_accounted_for(index):
+    """No contact may fall between the outcomes: a silent drop is the failure to fear."""
+    from collection.channels.outbound import overdue
+
+    _, result = _seeded_job(index)
+    assert result.total == len(overdue())
+
+
+def test_a_seeded_message_is_tracked_from_the_moment_it_is_scheduled(index):
+    channel, result = _seeded_job(index)
+    event, delivery_id = result.seeded[0]
+    assert channel.delivery.of(delivery_id).status is DeliveryStatus.ENVIADA
+    assert event.type is EventType.CONTACT_SCHEDULED

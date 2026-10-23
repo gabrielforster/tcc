@@ -90,12 +90,14 @@ e conversas iniciadas pelo sistema.
 
 **Por quê.** A integração exige conta comercial, aprovação de *templates* e relação de
 faturamento, e **não acrescenta nenhuma decisão nova a nenhum agente**. O risco técnico
-real está no *contrato de canal*: se a arquitetura é mesmo agnóstica ao canal, um adaptador
-de WhatsApp são poucas centenas de linhas contra um contrato já exercitado por outros
-adaptadores; se não é, integrar a API não revelaria isso, porque com um canal só não há
-nada com que ser inconsistente. A simulação testa a propriedade que a tese afirma; a
-integração testaria sobretudo a disponibilidade da Meta. O contrato é verificado por um
-teste que varre o pacote de agentes e falha se qualquer um deles importar um canal.
+real está no *contrato de canal*. O que está provado hoje é preciso e mais estreito do que
+um segundo adaptador provaria: **nenhum agente consegue importar um canal** — há um teste
+que varre o pacote de agentes com um analisador sintático e falha se qualquer um deles
+importar um canal por qualquer grafia, e esse teste tem o seu próprio teste, que planta
+cada grafia e verifica que o alarme dispara. É dessa propriedade que um futuro adaptador de
+WhatsApp depende, e integrar a API não a estabeleceria: com um canal só não há nada com que
+ser inconsistente. Um segundo adaptador seria evidência mais forte, e é de onde ela virá
+(entrega 15).
 
 **O que falta nos resultados.** Recibos de entrega fim a fim reais: `entregue` e `lida` são
 **informados pelo cliente** (o navegador avisa que renderizou e que exibiu a mensagem), não
@@ -114,9 +116,11 @@ voz em tempo real no navegador, com detecção de fim de turno, interrupção pe
 
 **Por quê.** Os problemas interessantes de uma ligação automatizada são a alternância de
 turnos, a interrupção, o orçamento de latência e a abertura legal. Os quatro existem
-igualmente numa chamada WebRTC; nenhum deles é criado pelo SIP. E o LiveKit leva o mesmo
-agente a um número real por SIP sem alterar o agente — a substituição é **reversível**, e
-dizer isso faz parte da defesa, não é desculpa para ela.
+igualmente numa chamada WebRTC; nenhum deles é criado pelo SIP. O LiveKit documenta levar o
+mesmo agente a um número real por SIP sem alterar o agente, o que torna a substituição
+**reversível em projeto** — mas isso é uma intenção de arquitetura, **não validado** neste
+trabalho: nenhum tronco SIP foi contratado nem testado. Dizer onde a afirmação termina faz
+parte da defesa.
 
 **O que falta nos resultados.** Perda de pacotes de rede real e *codecs* de áudio de
 operadora, e o que eles custam à acurácia do reconhecimento. O módulo de voz mede o que o
@@ -135,8 +139,11 @@ ele aparece no topo do fio quando o widget é aberto.
 **Por quê.** Não há transporte de *push* sem a conta de um provedor — que é exatamente o
 que 2.1 removeu. A alternativa seria afirmar uma entrega que o sistema não realiza. A
 composição, a checagem de conformidade, a supressão por *opt-out* e o rastreamento de
-status são os pedaços difíceis e estão todos construídos; o transporte de chegada ao vivo
-(SSE ou *polling*, contra o mesmo contrato) fica registrado como trabalho futuro.
+status são os pedaços difíceis e estão todos construídos, e o comando `make seed` executa o
+caminho inteiro — agente proativo, regras, composição, conformidade e caixa de entrada —
+relatando quantos contatos foram semeados, suprimidos ou recusados por serem de outro
+canal. O transporte de chegada ao vivo (SSE ou *polling*, contra o mesmo contrato) fica
+registrado como trabalho futuro.
 
 **O que falta nos resultados.** Qualquer métrica de alcance de campanha proativa: um fio
 semeado não é uma mensagem que chegou, e um cliente que nunca abre o widget nunca recebe

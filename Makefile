@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer outreach voice pipeline test lint fmt
+.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer outreach voice seed pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -47,6 +47,9 @@ outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs
 
 voice:            ## sweep what recognition error costs; ARGS="--audio FILE" transcribes one clip
 	uv run collection voice $(ARGS)
+
+seed:             ## schedule outbound contacts and leave them waiting in the chat channel
+	uv run collection seed
 
 pipeline:         ## the whole data pipeline, end to end
 	uv run collection pipeline
