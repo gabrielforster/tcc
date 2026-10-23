@@ -265,17 +265,39 @@ def test_a_seed_whose_session_expired_is_still_waiting_on_the_next_open(index, m
     first, _ = channel.open(token=issue_token("c1"))
     channel.seed(contact_scheduled())
     later = session_module.time.time() + session_module.SESSION_TTL_SECONDS + 60
-    monkeypatch.setattr(session_module.time, "time", lambda: later)
-    with pytest.raises(SessionNotFound):
-        channel.store.get(first.session_id)
-    monkeypatch.undo()
+    with monkeypatch.context() as expired:
+        expired.setattr(session_module.time, "time", lambda: later)
+        with pytest.raises(SessionNotFound):
+            channel.store.get(first.session_id)
     session, _ = channel.open(token=issue_token("c1"))
     assert "Marina" in channel.transcript(session.session_id)[-1]["text"]
 
 
-def test_a_contact_for_another_channel_or_without_text_is_not_seeded(index):
+def test_opting_out_by_any_path_after_a_seed_stops_delivery_on_open(index):
     channel = ChatChannel(index=index)
-    assert channel.seed(contact_scheduled(channel="voice")) is None
-    assert channel.seed(contact_scheduled(text="  ")) is None
+    channel.seed(contact_scheduled("c1"))
+    channel.opted_out.add("c1")  # not via send(): e.g. recorded by another channel
+    session, _ = channel.open(token=issue_token("c1"))
+    assert len(channel.transcript(session.session_id)) == 1
+
+
+def test_every_seeded_message_is_answered_by_the_next_turn(index):
+    channel = ChatChannel(index=index, responder=TemplateResponder())
+    first = channel.seed(contact_scheduled(text="Primeiro aviso."))
+    second = channel.seed(contact_scheduled(text="Segundo aviso."))
+    session, _ = channel.open(token=issue_token("c1"))
+    channel.send(session.session_id, "quais os juros por atraso?")
+    for delivery_id in (first, second, session.greeting_delivery_id):
+        assert channel.delivery.of(delivery_id).status is DeliveryStatus.RESPONDIDA
+
+
+def test_skips_are_distinguishable_and_empty_text_is_loud(index):
+    channel = ChatChannel(index=index)
+    channel.opted_out.add("c2")
+    assert channel.seed(contact_scheduled("c2")) is None
+    assert channel.seed(contact_scheduled("c1", channel="voice")) is None
+    assert [reason for reason, _ in channel.skipped] == ["suppressed", "other_channel"]
+    with pytest.raises(ValueError, match="no message text"):
+        channel.seed(contact_scheduled(text="  "))
     session, _ = channel.open(token=issue_token("c1"))
     assert len(channel.transcript(session.session_id)) == 1

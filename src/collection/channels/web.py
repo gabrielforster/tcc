@@ -89,7 +89,9 @@ class _Mailer(Agent):
     def handle(self, event: Event) -> list[Event]:
         text = str(event.payload.get("message", "")).strip()
         if not text:
-            return []
+            # A producer bug, not a skip: swallowing it would leave a contact_scheduled
+            # in the audit with no trace of why nothing was ever sent.
+            raise ValueError(f"contact_scheduled {event.event_id} carries no message text")
         delivery_id = self.channel.deliver(event.customer_id, text)
         self.channel._enqueue(event.customer_id, PendingMessage(text, delivery_id))
         return [event.caused(EventType.CONTACT_SENT, channel="chat", delivery_id=delivery_id)]
@@ -149,11 +151,15 @@ class ChatChannel:
         # and a scheduled collection contact must not vanish because nobody opened a tab.
         self._mailbox: dict[str, list[PendingMessage]] = {}
         self._mailbox_lock = Lock()
+        #: Events seed() declined on purpose, as (reason, event): "suppressed" for an opt-out,
+        #: "other_channel" for a contact that belongs to a different channel.
+        self.skipped: list[tuple[str, Event]] = []
         #: Every event the channel's own orchestrator runs saw, in order -- including
         #: `contact_sent`, which is how a scheduled contact is shown to have been sent.
         self.audit: list[Event] = []
-        # The agent message each session is currently waiting for an answer to.
-        self._awaiting_reply: dict[str, str] = {}
+        # The agent messages each session is waiting for an answer to: the greeting plus anything
+        # seeded, all answered by the customer's next turn.
+        self._awaiting_reply: dict[str, list[str]] = {}
         # One agent across all sessions: it counts consecutive unclear messages per
         # customer, and a fresh agent per message would reset that counter every turn,
         # so the "three unclear messages in a row" handover could never fire.
@@ -174,8 +180,9 @@ class ChatChannel:
         """Leave a scheduled contact waiting for the customer; return its delivery id.
 
         No push transport: the message sits in the mailbox and the widget finds it on
-        `open()`. Returns `None` when nothing was delivered -- the customer is opted out,
-        the contact is for another channel, or it carries no text.
+        `open()`. Returns `None` when nothing was delivered on purpose -- the customer is
+        opted out or the contact is for another channel (see `skipped` for which). A contact
+        with no text is a producer bug and raises `ValueError`.
 
         The event goes through an `Orchestrator` rather than a check of `opted_out` here,
         because suppression is the orchestrator's rule and a channel that re-implements it
@@ -186,6 +193,8 @@ class ChatChannel:
         orchestrator.submit(event)
         trace = orchestrator.run()
         self.audit.extend(trace.processed + trace.produced + trace.suppressed)
+        self.skipped += [("suppressed", e) for e in trace.suppressed]
+        self.skipped += [("other_channel", e) for e in trace.unrouted]
         for produced in trace.produced:
             if produced.type is EventType.CONTACT_SENT:
                 return str(produced.payload["delivery_id"])
@@ -197,7 +206,15 @@ class ChatChannel:
 
     def _drain(self, customer_id: str) -> list[PendingMessage]:
         with self._mailbox_lock:
-            return self._mailbox.pop(customer_id, [])
+            waiting = self._mailbox.pop(customer_id, [])
+        # Delivery-time opt-out check, deliberately outside the orchestrator. The
+        # orchestrator suppresses at *routing* time, but a customer can opt out after the
+        # seed and before the widget opens, by any path that adds to the shared
+        # `opted_out` set. Only the moment of delivery sees all of them. Do not "tidy" this
+        # away as a duplicate of the orchestrator's rule.
+        if customer_id in self.opted_out:
+            return []
+        return waiting
 
     def _purge_opted_out(self) -> None:
         """Drop waiting messages for anyone who has opted out since they were seeded."""
@@ -210,17 +227,17 @@ class ChatChannel:
         """Start a conversation and return it with the greeting to display.
 
         Anything seeded for this customer follows the greeting in the thread, oldest
-        first. The newest one is what the customer's next turn answers.
+        first. The customer's next turn answers all of them.
         """
         session = self.store.open(token)
         session.record("agent", GREETING)
         # Tracked like any agent message, and its id is handed to the widget so it can
         # report the first message of the thread too.
         session.greeting_delivery_id = self.delivery.record(GREETING).id
-        self._awaiting_reply[session.session_id] = session.greeting_delivery_id
+        self._awaiting_reply[session.session_id] = [session.greeting_delivery_id]
         for pending in self._drain(session.customer_id):
             session.record("agent", pending.text)
-            self._awaiting_reply[session.session_id] = pending.delivery_id
+            self._awaiting_reply[session.session_id].append(pending.delivery_id)
         return session, GREETING
 
     def transcript(self, session_id: str) -> list[dict[str, object]]:
@@ -340,8 +357,7 @@ class ChatChannel:
         `_track_reply`), so a message that still reaches `send` afterwards finds nothing
         to advance. One mechanism, pinned by `test_an_escalated_thread_stops_advancing`.
         """
-        delivery_id = self._awaiting_reply.pop(session.session_id, None)
-        if delivery_id is not None:
+        for delivery_id in self._awaiting_reply.pop(session.session_id, []):
             self.delivery.advance(delivery_id, DeliveryStatus.RESPONDIDA)
 
     def _track_reply(self, session: Session, reply: ChatReply) -> None:
@@ -349,7 +365,7 @@ class ChatChannel:
         record = self.delivery.record(reply.text)
         reply.delivery_id = record.id
         if not reply.escalated:
-            self._awaiting_reply[session.session_id] = record.id
+            self._awaiting_reply[session.session_id] = [record.id]
 
     def _history(self, session: Session) -> Conversation:
         """The session transcript as the agent's view of the thread.
