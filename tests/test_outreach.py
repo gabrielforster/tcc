@@ -9,13 +9,15 @@ so it cannot invent a figure or pick a threatening word, and a failure there mea
 checker is wrong before the composer is.
 """
 
+from dataclasses import replace
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from collection.agents.events import Event, EventType
-from collection.agents.proactive import ProactiveAgent
+from collection.agents.proactive import CHANNEL_BY_STAGE, ProactiveAgent
+from collection.channels import DELIVERY_CHANNELS
 from collection.outreach.brief import MIN_INSTALMENT_BRL, Brief, load_briefs, load_terms
 from collection.outreach.compliance import LENGTH_CAP, check
 from collection.outreach.compose import (
@@ -43,7 +45,7 @@ def brief() -> Brief:
         customer_name="Mariana Souza",
         amount=1250.0,
         days_late=18,
-        channel="whatsapp",
+        channel="chat",
     )
 
 
@@ -324,3 +326,15 @@ def test_distinctness_ignores_messages_that_share_no_stage_and_channel() -> None
 def test_an_unknown_composer_is_refused() -> None:
     with pytest.raises(ValueError, match="Unknown composer"):
         get_composer("telepathy")
+
+
+def test_stages_route_to_delivery_channels_that_exist() -> None:
+    assert set(CHANNEL_BY_STAGE.values()) <= DELIVERY_CHANNELS
+    assert set(LENGTH_CAP) == DELIVERY_CHANNELS
+
+
+def test_an_unknown_channel_does_not_crash_composition() -> None:
+    """The fallback falls back to a key that exists, not to a retired name."""
+    brief = replace(load_briefs()[0], channel="carrier_pigeon")
+    result = check(TemplateComposer().compose(brief).text, brief)
+    assert result.length_cap == LENGTH_CAP["chat"]

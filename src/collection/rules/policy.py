@@ -33,7 +33,7 @@ from enum import StrEnum
 from collection.rules.window import ContactWindow
 
 #: Cost per contact in BRL, from the channel costs observed in the data.
-CHANNEL_COST = {"whatsapp": 0.12, "sms": 0.09, "email": 0.01, "phone": 1.40}
+CHANNEL_COST = {"chat": 0.12, "sms": 0.09, "email": 0.01, "voice": 1.40}
 
 
 class DenialReason(StrEnum):

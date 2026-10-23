@@ -20,6 +20,10 @@ audio?" and not "is this the voice channel?".
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+#: How the system chooses to reach someone. Distinct from the ERP's record of a customer's
+#: contact data (phone number, declared preference), which keeps its own vocabulary.
+DELIVERY_CHANNELS: frozenset[str] = frozenset({"chat", "voice", "sms", "email"})
+
 
 @dataclass(frozen=True)
 class ChannelCapabilities:

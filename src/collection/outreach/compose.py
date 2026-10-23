@@ -155,7 +155,7 @@ class TemplateComposer(Composer):
         from collection.outreach.compliance import LENGTH_CAP
 
         terms = brief.terms
-        narrow = LENGTH_CAP.get(brief.channel, LENGTH_CAP["whatsapp"]) <= SHORT_CHANNEL_CAP
+        narrow = LENGTH_CAP.get(brief.channel, LENGTH_CAP["chat"]) <= SHORT_CHANNEL_CAP
         library = self.short_templates if narrow else self.templates
         template = library.get(brief.stage, library["1-7"])
         text = template.format(

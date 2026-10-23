@@ -350,7 +350,7 @@ def outreach(
     days_late: int = typer.Option(None, help="compose one message for a debt this many days late"),
     amount: float = typer.Option(1250.0, help="amount in BRL, with --days-late"),
     name: str = typer.Option("", help="customer name, with --days-late"),
-    channel: str = typer.Option("whatsapp", help="whatsapp | sms | phone, with --days-late"),
+    channel: str = typer.Option("chat", help="chat | voice | sms | email, with --days-late"),
 ) -> None:
     """Write one outbound message, or evaluate the composers against the labelled briefs."""
     from collection.outreach import evaluate as outreach_eval

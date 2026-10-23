@@ -9,7 +9,7 @@
     "days_late": -3,
     "due_date": "2026-11-02",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "pre-due-alto",
@@ -21,7 +21,7 @@
     "days_late": 0,
     "due_date": "2026-10-19",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-curto",
@@ -33,7 +33,7 @@
     "days_late": 4,
     "due_date": "2026-10-15",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-curto-pequeno",
@@ -57,7 +57,7 @@
     "days_late": 18,
     "due_date": "2026-10-01",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-medio-segunda-tentativa",
@@ -69,7 +69,7 @@
     "days_late": 27,
     "due_date": "2026-09-22",
     "attempt": 2,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-longo",
@@ -81,7 +81,7 @@
     "days_late": 44,
     "due_date": "2026-09-05",
     "attempt": 3,
-    "channel": "phone"
+    "channel": "voice"
   },
   {
     "id": "atraso-longo-sem-nome",
@@ -93,7 +93,7 @@
     "days_late": 52,
     "due_date": "2026-08-28",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "inadimplente-antigo",
@@ -105,7 +105,7 @@
     "days_late": 95,
     "due_date": "2026-07-16",
     "attempt": 2,
-    "channel": "phone"
+    "channel": "voice"
   },
   {
     "id": "inadimplente-antigo-pequeno",
@@ -129,7 +129,7 @@
     "days_late": 12,
     "due_date": "2026-10-07",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-longo-ultima-tentativa",
@@ -141,7 +141,7 @@
     "days_late": 58,
     "due_date": "2026-08-22",
     "attempt": 4,
-    "channel": "phone"
+    "channel": "voice"
   },
   {
     "id": "pre-due-recorrente",
@@ -153,7 +153,7 @@
     "days_late": -1,
     "due_date": "2026-10-20",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-curto-medio",
@@ -165,7 +165,7 @@
     "days_late": 7,
     "due_date": "2026-10-12",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-curto-alto",
@@ -177,7 +177,7 @@
     "days_late": 2,
     "due_date": "2026-10-17",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-longo-medio",
@@ -189,7 +189,7 @@
     "days_late": 35,
     "due_date": "2026-09-14",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "atraso-longo-segunda",
@@ -201,7 +201,7 @@
     "days_late": 49,
     "due_date": "2026-08-31",
     "attempt": 2,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "inadimplente-medio",
@@ -213,7 +213,7 @@
     "days_late": 73,
     "due_date": "2026-08-07",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "inadimplente-alto",
@@ -225,7 +225,7 @@
     "days_late": 140,
     "due_date": "2026-06-01",
     "attempt": 3,
-    "channel": "whatsapp"
+    "channel": "chat"
   },
   {
     "id": "inadimplente-sem-nome",
@@ -237,6 +237,6 @@
     "days_late": 88,
     "due_date": "2026-07-23",
     "attempt": 1,
-    "channel": "whatsapp"
+    "channel": "chat"
   }
 ]
