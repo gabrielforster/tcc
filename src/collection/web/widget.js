@@ -66,6 +66,7 @@
   };
   var RANK = { enviada: 0, entregue: 1, lida: 2, respondida: 3 };
 
+  // Mirrors the question in CONFIRM_PREFIX (src/collection/agents/responsive.py); keep in sync.
   var CONFIRM_MARKER = "Confirma que é isso?";
   var MAX_RECORD_MS = 110000;
   var MIN_RECORD_MS = 600;
