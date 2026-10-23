@@ -117,8 +117,9 @@
     "letter-spacing:.5px;padding:5px 12px;border-radius:10px}",
     ".msg{max-width:84%;padding:10px 12px 7px;font-size:14px;line-height:1.45;",
     "white-space:pre-wrap;word-wrap:break-word}",
-    ".msg.agent{background:#d4ede0;align-self:flex-end;border-radius:14px 14px 4px 14px}",
-    ".msg.customer{background:#fff;align-self:flex-start;border-radius:14px 14px 14px 4px}",
+    // The viewer is the customer, so their own messages sit on the right, as in any chat app.
+    ".msg.customer{background:#d4ede0;align-self:flex-end;border-radius:14px 14px 4px 14px}",
+    ".msg.agent{background:#fff;align-self:flex-start;border-radius:14px 14px 14px 4px}",
     ".msg.system{align-self:center;background:#fdf2c7;border:1px solid #f0d98a;font-size:12px;",
     "border-radius:10px;padding:7px 12px;text-align:center}",
     ".meta{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:4px;",
@@ -128,8 +129,8 @@
     ".tick.lida,.tick.respondida{color:#2e8f6e}",
     ".cite{display:block;margin-top:6px;font-size:11px;color:#4f6b5f;",
     "border-top:1px solid rgba(0,0,0,.08);padding-top:5px}",
-    ".typing{align-self:flex-end;font-size:12px;color:#5a6b63}",
-    ".heard{align-self:flex-start;display:flex;align-items:center;gap:6px;padding-left:4px;",
+    ".typing{align-self:flex-start;font-size:12px;color:#5a6b63}",
+    ".heard{align-self:flex-end;display:flex;align-items:center;gap:6px;padding-right:4px;",
     "font-size:11px;color:#5a6b63}",
     ".confirm{background:#fff8e1;border:2px solid #b7791f;border-radius:10px;padding:10px 12px;",
     "margin:-2px -2px 8px;white-space:pre-wrap}",
@@ -351,6 +352,9 @@
     }
     var body = el("div");
     bubble.appendChild(body);
+    // The backend writes the sources into the text and also returns them as `citations`.
+    // The structured list wins: it is shown once, as the caption, so drop the text's copy.
+    if (citations && citations.length) text = text.replace(/\s*\n\s*Fonte:[^\n]*$/, "");
     body.appendChild(document.createTextNode(text));
     if (citations && citations.length) {
       bubble.appendChild(el("span", "cite", "Fonte: " + citations.join(", ")));
