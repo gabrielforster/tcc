@@ -29,6 +29,7 @@ from collection.agents.conversation import Conversation
 from collection.agents.events import Event, EventType
 from collection.agents.orchestrator import Orchestrator
 from collection.agents.responsive import Responder, ResponsiveAgent
+from collection.channels.base import ChannelCapabilities
 from collection.channels.session import Session, SessionStore, clean_message
 from collection.rag.index import VectorIndex
 
@@ -65,7 +66,17 @@ class ChatReply:
     events: list[str] = field(default_factory=list)
 
 
-class WebChatChannel:
+class ChatChannel:
+    """The chat channel; satisfies `collection.channels.base.Channel` structurally."""
+
+    name = "chat"
+    capabilities = ChannelCapabilities(
+        accepts_audio=True,
+        accepts_text=True,
+        shows_delivery_status=False,
+        realtime=True,
+    )
+
     def __init__(
         self,
         index: VectorIndex,
@@ -80,6 +91,10 @@ class WebChatChannel:
         # customer, and a fresh agent per message would reset that counter every turn,
         # so the "three unclear messages in a row" handover could never fire.
         self.agent = ResponsiveAgent(index=index, responder=responder)
+
+    def deliver(self, customer_id: str, text: str, **meta: object) -> str:
+        """Push a message to a customer. Not built yet: a later task owns outbound chat."""
+        raise NotImplementedError("outbound delivery over chat is not implemented yet")
 
     # ------------------------------------------------------------------ sessions
     def open(self, token: str | None = None) -> tuple[Session, str]:

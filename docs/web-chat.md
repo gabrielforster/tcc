@@ -10,7 +10,7 @@ Every message becomes a `message_received` event submitted to the **orchestrator
 routes it to the responsive agent. The channel never calls the agent directly.
 
 ```
-browser → POST /chat/sessions/{id}/messages → WebChatChannel
+browser → POST /chat/sessions/{id}/messages → ChatChannel
                                                    ↓ message_received
                                               Orchestrator ── opt-out check (before any agent)
                                                    ↓

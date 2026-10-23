@@ -33,7 +33,7 @@ from collection.channels.session import (
     issue_token,
     verify_token,
 )
-from collection.channels.web import GREETING, WebChatChannel
+from collection.channels.web import GREETING, ChatChannel
 from collection.config import settings
 from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
@@ -46,7 +46,7 @@ def index():
 
 @pytest.fixture
 def channel(index):
-    return WebChatChannel(index=index, responder=TemplateResponder())
+    return ChatChannel(index=index, responder=TemplateResponder())
 
 
 @pytest.fixture
@@ -138,7 +138,7 @@ def test_an_unknown_session_is_not_found(client):
 
 def test_an_expired_session_is_not_found(index):
     store = SessionStore()
-    channel = WebChatChannel(index=index, store=store, responder=TemplateResponder())
+    channel = ChatChannel(index=index, store=store, responder=TemplateResponder())
     session, _ = channel.open()
     session.last_seen_at = time.time() - session_module.SESSION_TTL_SECONDS - 1
     with pytest.raises(SessionNotFound, match="expired"):
@@ -161,7 +161,7 @@ def test_a_long_conversation_is_handed_to_a_person(channel):
 
 def test_expired_sessions_are_swept(index):
     store = SessionStore()
-    stale, _ = WebChatChannel(index=index, store=store).open()
+    stale, _ = ChatChannel(index=index, store=store).open()
     stale.last_seen_at = time.time() - session_module.SESSION_TTL_SECONDS - 1
     store.open()  # a write sweeps
     assert len(store) == 1

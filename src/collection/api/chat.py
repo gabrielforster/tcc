@@ -42,7 +42,7 @@ from collection.channels.session import (
     SessionNotFound,
     TokenError,
 )
-from collection.channels.web import WebChatChannel
+from collection.channels.web import ChatChannel
 from collection.config import settings
 from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
@@ -81,17 +81,17 @@ def default_responder() -> Responder:
 class ChatService:
     """Holds the channel, so the index is built once rather than per request."""
 
-    def __init__(self, channel: WebChatChannel | None = None) -> None:
+    def __init__(self, channel: ChatChannel | None = None) -> None:
         self._channel = channel
 
     def load(self) -> None:
         if self._channel is None:
             index = VectorIndex()
             index.add_documents(load_directory(settings.dir_knowledge)).build()
-            self._channel = WebChatChannel(index=index, responder=default_responder())
+            self._channel = ChatChannel(index=index, responder=default_responder())
 
     @property
-    def channel(self) -> WebChatChannel:
+    def channel(self) -> ChatChannel:
         if self._channel is None:
             raise HTTPException(
                 status_code=503, detail="Chat is still starting. Try again in a moment."
