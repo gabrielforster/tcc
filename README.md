@@ -21,8 +21,9 @@ humanos para cada etapa da cobrança, o sistema combina quatro tecnologias:
   a cobrança sem intervenção humana.
 - 📊 **Modelos preditivos de ML** — classificam inadimplentes por propensão ao pagamento
   e preveem inadimplência futura, permitindo priorização e cobrança preventiva.
-- 🎙️ **Serviços de voz** — transcrição de áudios (STT) e telefonia programável (TTS),
-  cobrindo os canais reais usados pelos clientes (ex.: áudios de WhatsApp e ligações).
+- 🎙️ **Serviços de voz** — transcrição de áudios (STT) e síntese de fala (TTS), cobrindo
+  as duas formas como o cliente fala: o áudio enviado no fio da conversa e a chamada de
+  voz em tempo real.
 
 ### Modos de operação
 
@@ -47,8 +48,8 @@ humanos para cada etapa da cobrança, o sistema combina quatro tecnologias:
    └─────────────┘    └─────────────┘      └──────────────┘
           │                   │                    │
    ┌─────────────┐    ┌─────────────┐      ┌──────────────┐
-   │ Transcrição │    │  Telefonia  │      │    Dados     │
-   │   de Áudio  │    │ Programável │      │  Históricos  │
+   │ Transcrição │    │   Canais    │      │    Dados     │
+   │   de Áudio  │    │ chat · voz  │      │  Históricos  │
    └─────────────┘    └─────────────┘      └──────────────┘
 ```
 
@@ -59,6 +60,13 @@ humanos para cada etapa da cobrança, o sistema combina quatro tecnologias:
 > telefonia programável, é capaz de automatizar o processo de cobrança — tanto de forma
 > responsiva quanto proativa — e contribuir para o aumento da eficiência na recuperação
 > de crédito em comparação com abordagens convencionais?
+
+> [!NOTE]
+> A pergunta segue valendo, mas *telefonia programável* e *WhatsApp Business API* foram
+> substituídas por um canal de chat embedável e uma chamada de voz em tempo real sobre
+> WebRTC. O critério, o que a troca custa e o que explicitamente não mudou estão em
+> **Mudanças de escopo** no [`cronograma.md`](./cronograma.md) e em
+> [`docs/channels.md`](./docs/channels.md).
 
 **Hipótese:** ao combinar agentes conversacionais (LLM+RAG), agentes autônomos proativos
 e um módulo preditivo de ML, o sistema **reduz o tempo médio de recuperação de crédito** e
@@ -97,7 +105,7 @@ O projeto é desenvolvido em oito fases sequenciais:
 | 4 | Arquitetura do sistema multiagente |
 | 5 | Módulo responsivo (LLM + RAG) |
 | 6 | Módulo ativo/proativo (agentes autônomos) |
-| 7 | Integração de serviços de voz (STT/TTS, telefonia) |
+| 7 | Integração de serviços de voz (STT/TTS, canal de voz em tempo real) |
 | 8 | Testes, experimentos e avaliação |
 
 ## O artigo

@@ -37,7 +37,12 @@ the templated responder kept as the control arm (see
 ([`docs/voice.md`](./voice.md)); what remains unbuilt is the real-time voice channel.
 
 Below the agents sits a fourth seam: the **channel contract**
-([`docs/channels.md`](./channels.md)). A channel owns transport, identity and the thread;
+([`docs/channels.md`](./channels.md)). It exists because the two integrations the RFC named
+— the WhatsApp Business API and switched telephony — were replaced by a simulated chat
+channel and a real-time voice channel, on the stated ground that they add transport rather
+than a decision, and that the architectural risk lives in the seam instead. The argument,
+and what the substitution costs, is in *Mudanças de escopo* in
+[`cronograma.md`](../cronograma.md). A channel owns transport, identity and the thread;
 it never decides what to say, whom to contact or what the customer said. That used to be a
 convention and is now a `Protocol` plus a test that parses every module under
 `collection.agents` and fails if one of them imports a channel.
