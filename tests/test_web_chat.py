@@ -35,13 +35,6 @@ from collection.channels.session import (
 )
 from collection.channels.web import GREETING, ChatChannel
 from collection.config import settings
-from collection.rag.documents import load_directory
-from collection.rag.index import VectorIndex
-
-
-@pytest.fixture(scope="module")
-def index():
-    return VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
 
 
 @pytest.fixture

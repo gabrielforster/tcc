@@ -74,7 +74,7 @@ class ChatChannel:
         accepts_audio=True,
         accepts_text=True,
         shows_delivery_status=False,
-        realtime=True,
+        realtime=False,
     )
 
     def __init__(

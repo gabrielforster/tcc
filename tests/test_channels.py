@@ -6,20 +6,10 @@ second test reads the agents package and names every file that reaches for a cha
 
 from pathlib import Path
 
-import pytest
-
 from collection.channels import Channel, ChannelCapabilities
 from collection.channels.web import ChatChannel
-from collection.config import settings
-from collection.rag.documents import load_directory
-from collection.rag.index import VectorIndex
 
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "src" / "collection" / "agents"
-
-
-@pytest.fixture(scope="module")
-def index():
-    return VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
 
 
 def test_a_channel_declares_what_it_can_carry():
