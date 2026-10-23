@@ -40,15 +40,15 @@ gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no e
 | 9 | 24/09 | **Arquitetura multiagente.** Quatro camadas definidas, papéis dos três agentes, contrato de eventos, fila de mensagens e regra de prioridade (responsivo > proativo); esqueleto do **orquestrador central** rodando com agentes *stub* | Diagrama + orquestrador roteando evento de ponta a ponta | Seção de arquitetura |
 | 10 | 01/10 | **RAG.** Ingestão (PDF/DOCX/CSV/TXT) de políticas, *scripts* de negociação, tabelas de parcelamento e FAQ; *chunking* (500–1000 tokens, *overlap* 50–100), *embeddings*, indexação vetorial e *retrieval* top-k avaliado por precisão/revocação | Consulta ao índice retornando trechos corretos | Pipeline RAG |
 | 11 | 08/10 | **Agente responsivo (texto).** *System prompt*, classificação de intenção (consulta, 2ª via, negociação, contestação, confirmação de pagamento), resposta ancorada no RAG, critérios de escalação para humano | Conversa completa por texto, latência < 5 s medida | Módulo responsivo |
-| 12 | 15/10 | **Canal + áudio.** Integração com WhatsApp Business API e transcrição de áudio (OGG/OPUS → STT), tratamento de erro (áudio inaudível, curto, *timeout*) | Áudio de WhatsApp respondido corretamente | Integração de voz (offline) |
+| 12 | 15/10 | **Canal + áudio.** Canal de chat simulado no lugar da WhatsApp Business API — a integração exigia conta comercial, aprovação de *templates* e cobrança, e não acrescentaria nenhuma decisão nova aos agentes (ver §2); transcrição de áudio (OGG/OPUS → STT) entregue pelo PR #17, com tratamento de erro (áudio inaudível, curto, *timeout*) | Áudio respondido corretamente no canal de chat | Integração de voz (offline) |
 
 ### Bloco IV — Módulo ativo e telefonia (22/10 a 05/11)
 
 | # | Data | Entrega | Artefato mostrado | Texto |
 |:--|:-----|:----------------------------------------|:------------------|:--------------|
 | 13 | 22/10 | **Detecção + regras.** *Job* periódico de documentos vencidos, consumo do *ranking* preditivo para cobrança preventiva, motor de regras (horário permitido, frequência máxima, canal, *cooldown*, limite de tentativas) | Fila de cobrança populada com prioridade preditiva | Módulo ativo (parte 1) |
-| 14 | 29/10 | **Abordagem multicanal por texto.** *Templates* por estágio de atraso (1–7, 8–30, 31–60, 60+ dias) personalizados por LLM, envio pelo WhatsApp, *tracking* de status (enviada/entregue/lida/respondida), respeito imediato a *opt-out*, transferência ao agente responsivo quando o cliente responde | Escalonamento progressivo executando em ambiente de teste | Módulo ativo (parte 2) |
-| 15 | 05/11 | **Chamada telefônica automatizada.** Número outbound, *webhooks*, fluxo TTS de abertura → STT em tempo real → resposta → encerramento, aviso de gravação e registro completo da chamada | Chamada real gravada e transcrita | Integração de voz (tempo real) |
+| 14 | 29/10 | **Abordagem multicanal por texto.** *Templates* por estágio de atraso (1–7, 8–30, 31–60, 60+ dias) personalizados por LLM, envio pelo **canal de chat simulado**, *tracking* de status (enviada/entregue/lida/respondida, com `entregue`/`lida` informados pelo cliente e não pela operadora), respeito imediato a *opt-out*, transferência ao agente responsivo quando o cliente responde | Escalonamento progressivo executando em ambiente de teste | Módulo ativo (parte 2) |
+| 15 | 05/11 | **Chamada por voz em tempo real (WebRTC/LiveKit).** No lugar da telefonia comutada: fluxo TTS de abertura → STT em tempo real → resposta → encerramento, com *barge-in*, aviso de gravação que não pode ser pulado e registro completo da chamada. O mesmo agente é levado a um número real por SIP, sem alteração no agente (ver §2) | Chamada em tempo real demonstrada no navegador + tabela de tempo de turno | Integração de voz (tempo real) |
 
 ### Bloco V — Avaliação e fechamento (12/11 a 03/12)
 
@@ -61,7 +61,100 @@ gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no e
 
 ---
 
-## 2. Relação com o cronograma do RFC
+## 2. Mudanças de escopo
+
+Três entregas deste cronograma mudaram de forma depois de aprovadas. Elas estão reunidas
+aqui, com data, o que foi substituído, por quê e o que deixa de existir nos resultados —
+para que o leitor encontre as substituições em um lugar só, e não as descubra espalhadas
+pelo texto.
+
+A decisão foi registrada em **22/10/2026**, antes de a implementação ser integrada, e o
+argumento completo está em `docs/channels.md`.
+
+**O critério.** A pergunta de pesquisa é se uma arquitetura multiagente com LLM, RAG e um
+modelo preditivo consegue conduzir a cobrança de forma autônoma, segura e dentro das
+restrições legais. Isso é respondido pelo que os **agentes decidem**, não por qual API
+comercial transporta os bytes. Uma integração só entra no escopo se acrescentar uma decisão
+nova a algum agente; se acrescenta apenas transporte, fila de aprovação e contrato de
+faturamento, ela é substituível sem perda para a tese. As três mudanças abaixo seguem esse
+critério, e cada uma lista o que de fato se perde com ela.
+
+### 2.1 WhatsApp Business API → canal de chat simulado
+
+*Entrega 12 (15/10) e metade da entrega 14 (29/10).*
+
+**O que foi substituído.** A integração com a WhatsApp Business API, com *webhooks*,
+*templates* aprovados pela Meta e conta comercial, por um canal de chat embedável — o
+mesmo widget já existente, agora com balões, áudios no fio da conversa, status de entrega
+e conversas iniciadas pelo sistema.
+
+**Por quê.** A integração exige conta comercial, aprovação de *templates* e relação de
+faturamento, e **não acrescenta nenhuma decisão nova a nenhum agente**. O risco técnico
+real está no *contrato de canal*: se a arquitetura é mesmo agnóstica ao canal, um adaptador
+de WhatsApp são poucas centenas de linhas contra um contrato já exercitado por outros
+adaptadores; se não é, integrar a API não revelaria isso, porque com um canal só não há
+nada com que ser inconsistente. A simulação testa a propriedade que a tese afirma; a
+integração testaria sobretudo a disponibilidade da Meta. O contrato é verificado por um
+teste que varre o pacote de agentes e falha se qualquer um deles importar um canal.
+
+**O que falta nos resultados.** Recibos de entrega fim a fim reais: `entregue` e `lida` são
+**informados pelo cliente** (o navegador avisa que renderizou e que exibiu a mensagem), não
+confirmados pela operadora. Um navegador pode mentir ou simplesmente nunca avisar, e nada é
+inferido por temporizador — um recibo simulado seria um número com cara de medido. Só
+`respondida` é observada pelo servidor. Também ficam de fora as restrições de redação
+impostas pela aprovação de *templates* da Meta.
+
+### 2.2 Telefonia comutada → chamada por voz em tempo real (WebRTC/LiveKit)
+
+*Entrega 15 (05/11).*
+
+**O que foi substituído.** Número *outbound*, tronco SIP e operadora, por uma chamada de
+voz em tempo real no navegador, com detecção de fim de turno, interrupção pelo cliente
+(*barge-in*) e aviso de gravação.
+
+**Por quê.** Os problemas interessantes de uma ligação automatizada são a alternância de
+turnos, a interrupção, o orçamento de latência e a abertura legal. Os quatro existem
+igualmente numa chamada WebRTC; nenhum deles é criado pelo SIP. E o LiveKit leva o mesmo
+agente a um número real por SIP sem alterar o agente — a substituição é **reversível**, e
+dizer isso faz parte da defesa, não é desculpa para ela.
+
+**O que falta nos resultados.** Perda de pacotes de rede real e *codecs* de áudio de
+operadora, e o que eles custam à acurácia do reconhecimento. O módulo de voz mede o que o
+erro de reconhecimento custa ao restante do sistema (`docs/voice.md`), o que dá uma forma
+honesta de discutir áudio degradado de telefonia — mas é uma varredura sobre um modelo de
+erro, não uma medição de uma linha telefônica.
+
+### 2.3 Entrega proativa por *push* → conversa semeada
+
+*Entrega 14 (29/10).*
+
+**O que foi substituído.** O envio ativo de uma mensagem que chega ao cliente, por uma
+mensagem que fica **esperando**: o agente proativo deposita o contato na caixa do cliente e
+ele aparece no topo do fio quando o widget é aberto.
+
+**Por quê.** Não há transporte de *push* sem a conta de um provedor — que é exatamente o
+que 2.1 removeu. A alternativa seria afirmar uma entrega que o sistema não realiza. A
+composição, a checagem de conformidade, a supressão por *opt-out* e o rastreamento de
+status são os pedaços difíceis e estão todos construídos; o transporte de chegada ao vivo
+(SSE ou *polling*, contra o mesmo contrato) fica registrado como trabalho futuro.
+
+**O que falta nos resultados.** Qualquer métrica de alcance de campanha proativa: um fio
+semeado não é uma mensagem que chegou, e um cliente que nunca abre o widget nunca recebe
+nada. O *opt-out* é verificado duas vezes por causa disso — no agendamento e de novo no
+momento da entrega, porque o cliente pode se descadastrar entre um e outro.
+
+### 2.4 O que não mudou
+
+A anotação é tão importante quanto as substituições. O vocabulário de dados do ERP
+(`whatsapp`, `phone`, `email`, `sms` em `preferred_channel` e no histórico de contatos)
+**não foi renomeado**: aquilo é um fato sobre o cliente e sobre contatos que de fato
+aconteceram, e reescrevê-lo para combinar com o sistema corromperia a base com que o modelo
+preditivo é treinado. Os canais de entrega do sistema (`chat`, `voice`, `sms`, `email`) são
+um vocabulário separado, por decisão.
+
+---
+
+## 3. Relação com o cronograma do RFC
 
 O RFC (Tabela 3) previa 24 semanas em 8 fases; este cronograma distribui as mesmas 8 fases nos
 19 encontros, sobrepondo blocos que podem correr em paralelo (arquitetura durante o fim do módulo
@@ -76,24 +169,24 @@ e defesa.
 | 4 — Arquitetura multiagente | 24/09 |
 | 5 — Módulo responsivo (RAG + LLM) | 01/10, 08/10, 15/10 |
 | 6 — Módulo ativo/proativo | 22/10, 29/10 |
-| 7 — Integração de voz | 15/10 (STT offline), 05/11 (telefonia) |
+| 7 — Integração de voz | 15/10 (STT offline), 05/11 (voz em tempo real, WebRTC) |
 | 8 — Testes, experimentos e avaliação | 12/11, 19/11 |
 | Redação final e defesa | 26/11, 03/12 |
 
 ---
 
-## 3. Riscos e plano de contingência
+## 4. Riscos e plano de contingência
 
 | Risco | Impacto | Contingência |
 |---|---|---|
 | Volume ou qualidade insuficiente dos dados históricos | Bloqueia as entregas 6–8 | Antecipar a extração (13/08) e, se necessário, usar base pública de *credit scoring* para validar o pipeline, mantendo a base real apenas para o modelo final |
-| Aprovação de *templates* na Meta / conta de telefonia | Atrasa 29/10 e 05/11 | Iniciar cadastro já em 15/10; ambiente *sandbox* do provedor como plano B da demonstração |
-| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Reduzir o escopo da chamada para roteiro guiado (menos turnos livres) e registrar a limitação |
+| Aprovação de *templates* na Meta / conta de telefonia | Atrasava 29/10 e 05/11 | **Risco materializado.** Resolvido pelas substituições de §2: canal de chat simulado e chamada por voz em tempo real, ambas atrás do mesmo contrato de canal |
+| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida; se o total for ruim, a tabela honesta ainda é melhor resultado que uma lisonjeira |
 | Experimento operacional com amostra pequena | Enfraquece a entrega 17 | Relatar tamanho de efeito e intervalo de confiança; complementar com métricas técnicas e comparação de custo por contato |
 | Custo de APIs de LLM, STT/TTS e telefonia | Afeta 08/10 em diante | Cache de respostas, modelo menor para tarefas simples, Whisper local como alternativa |
 
 **Escopo mínimo garantido** (se algo precisar cair): os módulos responsivo e preditivo mais o
-fluxo proativo por texto são obrigatórios; a chamada telefônica em tempo real é a primeira
+fluxo proativo por texto são obrigatórios; a chamada por voz em tempo real é a primeira
 candidata a virar prova de conceito reduzida, com a limitação documentada no artigo.
 
 ---

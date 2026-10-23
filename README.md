@@ -193,6 +193,8 @@ values — writing `docs/interpretability-<source>-<task>.md`.
 | `GET /health` | Which models are loaded |
 | `POST /chat/sessions` | Open a chat conversation (see the web chat channel below) |
 | `POST /chat/sessions/{id}/messages` | Send one customer message and get the agent's reply |
+| `POST /chat/sessions/{id}/audio` | Send one voice note; the agent transcribes it |
+| `POST /chat/sessions/{id}/deliveries/{id}` | The widget reporting `entregue` or `lida` |
 | `GET /chat/widget.js` | The embeddable widget |
 
 The ranking is the operational output, not the probability: the active module works down a
@@ -291,7 +293,22 @@ It is a **channel adapter**: every message becomes a `message_received` event ha
 orchestrator, never a direct call to the agent. The chat therefore inherits responsive
 priority, the audit trail and the opt-out enforced before any agent runs — and the next
 channel is another adapter over the same contract rather than a second copy of the
-conversation logic.
+conversation logic. That contract is now explicit and tested, not a convention: see
+[`docs/channels.md`](./docs/channels.md).
+
+The thread carries voice notes, delivery status (`enviada / entregue / lida / respondida`)
+and conversations the proactive agent starts. Two things that document states plainly,
+because both are easy to read as stronger claims than they are: `entregue` and `lida` are
+**reported by the browser, not by a carrier**, and nothing is guessed on a timer — only
+`respondida` is observed by the server. And a proactive thread is **seeded, not pushed**:
+with no push transport, the message waits in a mailbox until the customer opens the widget.
+
+The WhatsApp Business API and real telephony were replaced by this simulated chat channel
+and a real-time voice channel, deliberately and for a stated reason — the integrations add
+transport, approval queues and a billing relationship, not a single new decision by any
+agent, while the channel contract is where the architectural risk actually lives. The
+argument and what it costs are in [`docs/channels.md`](./docs/channels.md), and in
+Portuguese under *Mudanças de escopo* in [`cronograma.md`](./cronograma.md).
 
 Identity never comes from the browser. The host application's backend mints a signed token
 with `issue_token(customer_id)`; without one the session is anonymous, which still answers
@@ -312,9 +329,10 @@ through a pull request; `master` is never committed to directly.
 
 📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados, o
 módulo preditivo, a arquitetura multiagente, o RAG e o módulo responsivo — agora com
-geração por LLM e medição de fidelidade — estão prontos, e o agente já é acessível por um
-widget de chat embedável. O próximo passo é a transcrição de áudio (OGG/OPUS → STT) e o
-canal de WhatsApp.
+geração por LLM e medição de fidelidade — estão prontos, e o agente é acessível por um
+widget de chat embedável que já recebe áudios, rastreia status de entrega e abre conversas
+iniciadas pelo sistema, atrás de um contrato de canal explícito. O próximo passo é o canal
+de voz em tempo real (WebRTC/LiveKit).
 
 ---
 

@@ -2,7 +2,9 @@
 
 A chat widget that drops into any page with one `<script>` tag and talks to the responsive
 agent. It is the first real channel the system has — until now the agent could only be
-reached from a Python process.
+reached from a Python process — and it is now one implementation of an explicit contract:
+what any channel owes the system, and what it must never decide, is in
+[`docs/channels.md`](./channels.md).
 
 ## It is an adapter, not a second agent
 
@@ -105,6 +107,27 @@ break on the first real site with a global `button { }` rule — which is why
 a knowledge base; treating it as markup would hand whoever can influence either one a
 script tag on the host's page.
 
+## What the thread carries
+
+Beyond typed text, three things the WhatsApp integration was supposed to bring:
+
+- **Voice notes.** Hold the microphone button and the clip is uploaded to
+  `POST /chat/sessions/{id}/audio`. The channel probes and decodes it, then hands the
+  orchestrator an `audio_received` event pointing at the file — it does **not** transcribe.
+  Recognition, the `MIN_CONFIDENCE` escalation and the read-back of a spoken figure all
+  stay in the agent, where [`docs/voice.md`](./voice.md) argues they belong.
+- **Delivery status.** Each agent message carries a delivery id; the widget reports
+  `entregue` when it renders the bubble and `lida` when the bubble is actually on screen,
+  and the server marks `respondida` when the customer's next turn arrives. Only the
+  owning session may report on a record, and a report that would move a message *down* the
+  ladder is refused. They are claims from a client, not receipts from a carrier —
+  [`docs/channels.md`](./channels.md) is precise about the difference.
+- **Threads the system starts.** `seed()` puts a scheduled contact in the customer's
+  mailbox, routed through an orchestrator so opt-out suppression is the orchestrator's
+  rule rather than a second copy of it. `open()` drains the mailbox into the thread after
+  the greeting — and checks opt-out *again* at that moment, because a customer can opt out
+  between the seed and the widget opening.
+
 ## Transparency
 
 The thread opens by saying it is automated, before the customer types anything. An
@@ -143,6 +166,15 @@ typed it.
 **Sessions are in-memory.** They do not survive a restart and do not span processes. Redis
 is already in `docker-compose.yml` and `SessionStore` is the seam it would replace.
 
-**No delivery guarantees.** HTTP request/response only — no typing indicators from the
-server, no push, no read receipts. WebSockets or SSE would change the transport without
-touching the channel.
+**~~No delivery guarantees.~~** Half resolved, and the half that remains is the important
+one. There *are* read receipts now — `enviada / entregue / lida / respondida`, with the
+widget reporting the middle two and the server observing the last — but `entregue` and
+`lida` are **client-reported claims, not carrier receipts**: a browser can lie, be
+scripted, or simply never report, and nothing is inferred on a timer. See
+[`docs/channels.md`](./channels.md) for what each rung does and does not prove.
+
+**There is still no push.** HTTP request/response only, and no typing indicator from the
+server. A thread the proactive agent starts is **seeded, not delivered**: the message sits
+in a per-customer mailbox and appears after the greeting when the widget next opens, so a
+customer who never opens it never receives it. SSE or polling against the same channel
+contract is named future work.
