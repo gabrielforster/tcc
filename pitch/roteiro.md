@@ -48,7 +48,8 @@ O primeiro é o **agente responsivo**, que usa LLM com RAG para atender o client
 O segundo é o **agente proativo**, que detecta pendências e inicia a cobrança sozinho.
 E o terceiro é o **agente preditivo**, de machine learning, que classifica os clientes e define a
 prioridade de contato. Esses agentes se apoiam em duas camadas: uma **camada de voz e serviços**
-— transcrição de áudio, telefonia, WhatsApp e base vetorial — e uma **camada de dados com auditoria**,
+— transcrição de áudio, síntese de fala, canais de contato e base vetorial — e uma **camada de dados
+com auditoria**,
 que garante rastreabilidade de cada decisão tomada pelo sistema."
 
 ## Slide 5 — Como funciona · Responsivo  ·  ~35 s
@@ -67,7 +68,7 @@ o risco de alucinação."
 "Já no **modo proativo**, o sistema age **antes do vencimento**. O modelo de machine learning usa
 o histórico de dados para estimar a **propensão de pagamento** e o **risco de inadimplência**, e
 gera um **ranking de prioridade**. Com esse ranking, o agente proativo aborda os clientes certos,
-no momento certo, pelo canal certo — uma mensagem de WhatsApp ou uma ligação com voz sintetizada.
+no momento certo, pelo canal certo — uma mensagem no chat ou uma chamada de voz com fala sintetizada.
 E se não houver resposta, ele **reagenda automaticamente** o contato, respeitando uma política de
 backoff."
 
@@ -75,8 +76,8 @@ backoff."
 
 "E onde está a inovação? Não está em nenhuma dessas tecnologias **isoladamente** — está em **juntá-las**.
 Primeiro: os três modos — responsivo, proativo e preditivo — funcionam **orquestrados** em um único
-sistema, e não como três ferramentas soltas. Segundo: **voz de verdade**, cobrindo tanto o áudio de
-WhatsApp quanto a telefonia. Terceiro: **respostas ancoradas** por RAG. E quarto, igualmente importante:
+sistema, e não como três ferramentas soltas. Segundo: **voz de verdade**, cobrindo tanto o áudio enviado
+no fio da conversa quanto a chamada de voz em tempo real. Terceiro: **respostas ancoradas** por RAG. E quarto, igualmente importante:
 **conformidade por design** — o sistema respeita o Código de Defesa do Consumidor, a LGPD e os limites
 legais de horário e frequência de contato."
 
