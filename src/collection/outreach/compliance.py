@@ -75,7 +75,7 @@ FORBIDDEN_TERMS = (
 )
 
 #: Longest message that still reads as one bubble, by channel.
-LENGTH_CAP = {"whatsapp": 480, "sms": 160, "phone": 480, "email": 1200}
+LENGTH_CAP = {"chat": 480, "sms": 160, "voice": 480, "email": 1200}
 
 _DISCOUNT = re.compile(r"(\d[\d.,]*)\s*%\s*(?:de\s+)?desconto", re.IGNORECASE)
 _INSTALMENTS = re.compile(r"(?:em\s+até\s+|em\s+|até\s+)?(\d{1,3})\s*(?:x|vezes|parcelas)", re.I)
@@ -189,7 +189,7 @@ def check(message: OutboundMessage | str, brief: Brief) -> Compliance:
         missing_disclosures=missing,
         over_authority=_over_authority(text, brief),
         length=len(text),
-        length_cap=LENGTH_CAP.get(channel, LENGTH_CAP["whatsapp"]),
+        length_cap=LENGTH_CAP.get(channel, LENGTH_CAP["chat"]),
     )
 
 

@@ -24,7 +24,7 @@ Run `collection demo` to watch a mix of events routed end to end.
         │                         │                          │
         ▼                         ▼                          ▼
 ┌────────────────┐      ┌──────────────────┐      ┌────────────────────┐
-│  STT · channel │      │ telephony · tmpl │      │  features · model  │
+│  STT · channel │      │  channel · tmpl  │      │  features · model  │
 └────────────────┘      └──────────────────┘      └────────────────────┘
 ```
 
@@ -33,16 +33,22 @@ be reviewed and tested before the agents existed — and each stub was then repl
 without the orchestrator changing, which is the property that layer was built for. Generation is
 real too: the responsive agent answers through an LLM held to the retrieved passages, with
 the templated responder kept as the control arm (see
-[`docs/llm-responder.md`](./llm-responder.md)). What remains unbuilt is voice — speech to
-text and the telephony integration.
+[`docs/llm-responder.md`](./llm-responder.md)). Voice notes are real too
+([`docs/voice.md`](./voice.md)); what remains unbuilt is the real-time voice channel.
 
-The system also has its first channel. The embeddable web chat
-([`docs/web-chat.md`](./web-chat.md)) is an *adapter*: it owns transport and identity and
-submits `message_received` events to the orchestrator, never calling an agent directly. So
-the chat inherits the priority rule, the cascade guard, the audit trail and the opt-out
-check for free, and WhatsApp becomes another adapter over this same contract rather than a
-second copy of the conversation logic. Conversations carry a thread: the channel puts the
-transcript on the event, and the agent resolves follow-ups against it
+Below the agents sits a fourth seam: the **channel contract**
+([`docs/channels.md`](./channels.md)). A channel owns transport, identity and the thread;
+it never decides what to say, whom to contact or what the customer said. That used to be a
+convention and is now a `Protocol` plus a test that parses every module under
+`collection.agents` and fails if one of them imports a channel.
+
+The embeddable web chat ([`docs/web-chat.md`](./web-chat.md)) is the first implementation:
+it submits `message_received` and `audio_received` events to the orchestrator, never
+calling an agent directly, so it inherits the priority rule, the cascade guard, the audit
+trail and the opt-out check for free. It carries voice notes, delivery status and threads
+the proactive agent starts — the last of these *seeded* rather than pushed, since there is
+no push transport. Conversations carry a thread: the channel puts the transcript on the
+event, and the agent resolves follow-ups against it
 ([`docs/multi-turn.md`](./multi-turn.md)).
 
 ## The event contract
@@ -60,7 +66,7 @@ the LGPD requires and the evaluation needs as evidence.
 | `overdue_detected` | A receivable passed its due date | proactive |
 | `risk_detected` | The predictive module flagged a not-yet-due receivable | proactive |
 | `contact_scheduled` | The rules engine cleared a contact, and the message was written and checked | proactive |
-| `contact_sent` | A message or call went out — no producer yet, no provider is integrated | proactive |
+| `contact_sent` | A message went out — produced by the chat channel when it seeds a scheduled contact | proactive |
 | `reply_sent` | The system answered the customer | proactive |
 | `suppressed` | A contact was blocked by a rule | proactive |
 

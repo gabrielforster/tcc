@@ -22,6 +22,7 @@ from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
 from collection.voice.audio import (
     MAX_DURATION_S,
+    MIN_DURATION_S,
     AudioClip,
     AudioError,
     accept,
@@ -355,3 +356,39 @@ def test_an_opt_out_spoken_aloud_is_honoured_like_one_typed(index):
     )
     produced = agent.handle(_audio_event())
     assert produced[0].type is EventType.OPT_OUT_REQUESTED
+
+
+def _live_webm(path, seconds):
+    """A WebM streamed the way MediaRecorder writes it: no duration in the header."""
+    import subprocess
+
+    with path.open("wb") as handle:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"sine=d={seconds}", "-c:a", "libopus"]
+            + ["-f", "webm", "-live", "1", "pipe:1"],
+            stdout=handle,
+            check=True,
+        )
+    return path
+
+
+@needs_ffmpeg
+def test_a_streamed_webm_without_a_header_duration_is_measured(tmp_path):
+    """Chrome's MediaRecorder writes WebM with no duration; it must not read as 0 seconds."""
+    path = _live_webm(tmp_path / "live.webm", 2)
+    clip = probe(path)
+    assert 1.5 < clip.duration_s < 2.5
+
+
+@needs_ffmpeg
+def test_a_streamed_webm_over_the_maximum_is_still_refused(tmp_path):
+    path = _live_webm(tmp_path / "long.webm", MAX_DURATION_S + 10)
+    with pytest.raises(AudioError, match="longer than"):
+        accept(path)
+
+
+@needs_ffmpeg
+def test_a_streamed_webm_under_the_minimum_is_still_refused(tmp_path):
+    path = _live_webm(tmp_path / "short.webm", MIN_DURATION_S / 2)
+    with pytest.raises(AudioError, match="not a message"):
+        accept(path)

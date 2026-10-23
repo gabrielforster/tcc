@@ -13,7 +13,9 @@ import pytest
 
 from collection.agents.events import Event, EventType
 from collection.agents.proactive import ProactiveAgent
+from collection.channels import DELIVERY_CHANNELS
 from collection.rules.policy import (
+    CHANNEL_COST,
     ContactHistory,
     ContactPolicy,
     DenialReason,
@@ -154,15 +156,15 @@ def test_the_response_rate_curve_matches_the_measured_data():
 
 def test_expected_value_falls_with_each_attempt():
     policy = ContactPolicy()
-    first = policy.expected_value(1, "whatsapp", 1000.0)
-    sixth = policy.expected_value(6, "whatsapp", 1000.0)
+    first = policy.expected_value(1, "chat", 1000.0)
+    sixth = policy.expected_value(6, "chat", 1000.0)
     assert first > sixth
 
 
 def test_an_expensive_channel_needs_a_larger_debt_to_be_worth_it():
     policy = ContactPolicy()
-    assert policy.expected_value(1, "phone", 5.0) < 0
-    assert policy.expected_value(1, "whatsapp", 5.0) > 0
+    assert policy.expected_value(1, "voice", 5.0) < 0
+    assert policy.expected_value(1, "chat", 5.0) > 0
 
 
 # -------------------------------------------------------------------- the agent
@@ -180,7 +182,7 @@ def test_an_allowed_contact_is_scheduled_with_a_channel_for_its_stage():
     produced = agent.handle(_event(days_late=12))[0]
     assert produced.type is EventType.CONTACT_SCHEDULED
     assert produced.payload["delinquency_stage"] == "8-30"
-    assert produced.payload["channel"] == "whatsapp"
+    assert produced.payload["channel"] == "chat"
     assert produced.payload["attempt_number"] == 1
 
 
@@ -188,7 +190,7 @@ def test_a_deeply_overdue_receivable_escalates_to_the_phone():
     agent = ProactiveAgent(clock=local)
     produced = agent.handle(_event(days_late=45))[0]
     assert produced.payload["delinquency_stage"] == "31-60"
-    assert produced.payload["channel"] == "phone"
+    assert produced.payload["channel"] == "voice"
 
 
 def test_a_blocked_contact_produces_a_record_rather_than_silence():
@@ -219,3 +221,10 @@ def test_every_produced_event_keeps_the_causal_link():
     agent = ProactiveAgent(clock=local)
     event = _event()
     assert agent.handle(event)[0].caused_by == event.event_id
+
+
+def test_every_delivery_channel_has_a_cost():
+    # `ContactPolicy` falls back to chat's price for a channel it does not know, so a
+    # missing key would not fail: a voice contact would be costed at R$0.12 instead of
+    # R$1.40 and the cost-per-contact comparison would be silently wrong.
+    assert set(CHANNEL_COST) == DELIVERY_CHANNELS

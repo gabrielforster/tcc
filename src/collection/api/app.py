@@ -80,6 +80,21 @@ def create_app(
             # Building the retrieval index costs a second or two. Paying it at startup
             # keeps it off the first customer's latency, which is the one measured.
             chat.load()
+            if settings.chat_seed_demo:
+                # The demo's outbound half, run against *this* channel. A mailbox is an
+                # in-memory dict, so seeding from another process would fill a mailbox
+                # nobody serves; doing it here is what makes "open the widget and the
+                # message is waiting" true rather than a claim.
+                from collection.channels.outbound import run as seed_contacts
+                from collection.channels.outbound import summary_lines
+
+                for line in summary_lines(seed_contacts(channel=chat.channel)):
+                    # Printed rather than logged: uvicorn configures its own loggers and
+                    # leaves the root logger alone, so an INFO record from this module
+                    # would be dropped exactly where it is supposed to be visible.
+                    # Flushed, because stdout is block-buffered when the server's output
+                    # is piped -- which is precisely when someone is reading the log.
+                    print(line, flush=True)
         yield
 
     app = FastAPI(

@@ -1,6 +1,6 @@
 """Request and response bodies for the scoring API."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -66,6 +66,7 @@ class SessionResponse(BaseModel):
     session_id: str
     greeting: str
     identified: bool = Field(description="false when the visitor is anonymous")
+    delivery_id: str | None = Field(default=None, description="delivery id of the greeting")
 
 
 class MessageRequest(BaseModel):
@@ -84,6 +85,39 @@ class MessageResponse(BaseModel):
     latency_ms: float = 0.0
     responder: str = ""
     events: list[str] = Field(default_factory=list)
+    delivery_id: str | None = Field(
+        default=None, description="id to report entregue/lida against; client-reported"
+    )
+
+
+class AudioMessageResponse(MessageResponse):
+    """A voice note's reply: the message fields plus what the agent heard.
+
+    The widget shows `transcript` so the customer can see what was understood, and
+    `needs_confirmation` tells it the reply opens with a figure read back for a yes or no.
+    """
+
+    transcript: str | None = None
+    transcription_confidence: float = 0.0
+    needs_confirmation: bool = False
+
+
+class DeliveryReport(BaseModel):
+    """What the widget says happened to a message. Only the client-reportable rungs.
+
+    `enviada` is the server's own record and `respondida` is set when the customer replies,
+    so neither can be reported; anything else fails validation with a 422.
+    """
+
+    status: Literal["entregue", "lida"]
+
+
+class DeliveryResponse(BaseModel):
+    delivery_id: str
+    status: str = Field(description="the status on record after this report")
+    applied: bool = Field(
+        description="false when the report arrived late and the record was already further on"
+    )
 
 
 class TranscriptTurn(BaseModel):
@@ -91,6 +125,8 @@ class TranscriptTurn(BaseModel):
     text: str
     at: float
     intent: str | None = None
+    #: Agent turns only: what the widget reports `entregue` and `lida` against.
+    delivery_id: str | None = None
 
 
 class TranscriptResponse(BaseModel):

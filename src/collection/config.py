@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # own domains.
     chat_enabled: bool = True
     chat_allowed_origins: str = "*"
+    # Demo only, and off by default: seed the proactive agent's scheduled contacts into
+    # the chat channel this process is serving, so the thread is waiting when the widget
+    # opens. It is a setting rather than an argument because `collection serve` starts
+    # uvicorn by import string, so the flag has to reach the app through the environment.
+    # Never enable it in a deployment: it fabricates contacts for fixture customers.
+    chat_seed_demo: bool = False
 
     # Generation. The key is read from the environment like any other secret and is never
     # committed; without it the LLM responder refuses and the template arm still runs.

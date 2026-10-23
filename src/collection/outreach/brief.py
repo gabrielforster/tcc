@@ -94,7 +94,7 @@ class Brief:
     invoice_id: str | None = None
     due_date: date | None = None
     attempt: int = 1
-    channel: str = "whatsapp"
+    channel: str = "chat"
     #: Who is collecting. Named in every message: an unidentified collector is the first
     #: thing the CDC's transparency duty rules out.
     creditor: str = "Simplifica"
@@ -161,7 +161,7 @@ def load_briefs(path: Path | None = None) -> list[Brief]:
                 invoice_id=item.get("invoice_id"),
                 due_date=date.fromisoformat(due) if due else None,
                 attempt=int(item.get("attempt", 1)),
-                channel=item.get("channel", "whatsapp"),
+                channel=item.get("channel", "chat"),
             )
         )
     return briefs

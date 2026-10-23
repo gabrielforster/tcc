@@ -33,11 +33,11 @@ from collection.rules.policy import ContactHistory, ContactPolicy
 
 #: Channel by delinquency stage. Cheap and unobtrusive first, costly and direct last.
 CHANNEL_BY_STAGE = {
-    "pre_due": "whatsapp",
-    "1-7": "whatsapp",
-    "8-30": "whatsapp",
-    "31-60": "phone",
-    "60+": "phone",
+    "pre_due": "chat",
+    "1-7": "chat",
+    "8-30": "chat",
+    "31-60": "voice",
+    "60+": "voice",
 }
 
 HistoryLookup = Callable[[str, str | None], ContactHistory]
@@ -82,7 +82,7 @@ class ProactiveAgent(Agent):
 
         days_late = int(event.payload.get("days_late", 0))
         stage = delinquency_stage(days_late)
-        channel = CHANNEL_BY_STAGE.get(stage, "whatsapp")
+        channel = CHANNEL_BY_STAGE.get(stage, "chat")
         attempt = history.attempts + 1
         amount = float(event.payload.get("amount", 0.0))
 

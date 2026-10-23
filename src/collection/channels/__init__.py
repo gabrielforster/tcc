@@ -5,3 +5,7 @@ the thread together across turns — and nothing else. What to say is the agent'
 may be contacted is the orchestrator's. Keeping that line sharp is what makes the next
 channel an adapter rather than a rewrite.
 """
+
+from collection.channels.base import DELIVERY_CHANNELS, Channel, ChannelCapabilities
+
+__all__ = ["DELIVERY_CHANNELS", "Channel", "ChannelCapabilities"]

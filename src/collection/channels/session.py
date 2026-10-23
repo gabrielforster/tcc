@@ -125,6 +125,11 @@ class Turn:
     at: float = field(default_factory=time.time)
     intent: str | None = None
     escalated: bool = False
+    #: The delivery record this turn is tracked by, for agent turns. It is on the turn
+    #: rather than only on the reply because the widget draws the thread from the
+    #: transcript when a session opens, and a bubble drawn with no delivery id would
+    #: silently stop reporting that it was rendered and read.
+    delivery_id: str | None = None
 
 
 @dataclass
@@ -136,6 +141,8 @@ class Session:
     last_seen_at: float = field(default_factory=time.time)
     transcript: list[Turn] = field(default_factory=list)
     escalated: bool = False
+    #: Delivery id of the greeting, so the widget can report on the first message.
+    greeting_delivery_id: str | None = None
     _hits: deque[float] = field(default_factory=deque, repr=False)
 
     @property

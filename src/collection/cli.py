@@ -147,11 +147,30 @@ def serve(
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(8000),
     reload: bool = typer.Option(False, help="reload on code changes"),
+    seed_demo: bool = typer.Option(
+        False, help="seed the proactive agent's contacts into this server's chat channel"
+    ),
 ) -> None:
-    """Serve the scoring API (POST /score)."""
+    """Serve the scoring API (POST /score), and the chat channel when it is enabled.
+
+    With `--seed-demo` the server runs the outbound path at startup against the channel it
+    is about to serve, so opening the widget as one of the fixture customers shows the
+    scheduled message already waiting. The outcome is printed to the server log.
+    """
+    import os
+
     import uvicorn
 
     from collection.api.app import available_models
+
+    if seed_demo:
+        # uvicorn is started by import string (so `--reload` can re-import the app in a
+        # child process), which means the flag cannot be passed as an argument and has to
+        # travel in the environment, where a `--reload` child inherits it. Without
+        # `--reload` the app is imported into *this* process, where `settings` was built
+        # before the environment changed, so the live object is set too.
+        os.environ["CHAT_SEED_DEMO"] = "1"
+        settings.chat_seed_demo = True
 
     models = available_models()
     if not models:
@@ -161,6 +180,11 @@ def serve(
     if settings.chat_enabled:
         console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
         console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")
+        if seed_demo:
+            console.print(
+                "[green]seed[/] scheduled contacts are seeded into this server's channel "
+                "at startup; the demo page identifies itself as the seeded customer"
+            )
     uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
 
 
@@ -350,7 +374,7 @@ def outreach(
     days_late: int = typer.Option(None, help="compose one message for a debt this many days late"),
     amount: float = typer.Option(1250.0, help="amount in BRL, with --days-late"),
     name: str = typer.Option("", help="customer name, with --days-late"),
-    channel: str = typer.Option("whatsapp", help="whatsapp | sms | phone, with --days-late"),
+    channel: str = typer.Option("chat", help="chat | voice | sms | email, with --days-late"),
 ) -> None:
     """Write one outbound message, or evaluate the composers against the labelled briefs."""
     from collection.outreach import evaluate as outreach_eval
@@ -468,6 +492,55 @@ def voice(
     if control.wer > 0 or control.intent_agreement < 1.0 or control.figure_survival < 1.0:
         console.print("[red]the control arm did not reproduce the reference transcripts[/]")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def seed() -> None:
+    """Report what the outbound path decides for each overdue receivable.
+
+    It runs the whole path in this process -- proactive agent, rules engine, composition,
+    compliance check, mailbox -- and prints the outcome. The mailbox it fills belongs to
+    this command and dies with it, so this does **not** leave a message for a separate
+    `collection serve` to deliver: a mailbox is an in-memory dict. The live demo is
+    `collection serve --seed-demo`, where the server seeds the channel it is serving.
+
+    Nothing here needs a network or an API key -- the template composer writes the
+    message, which is also the arm that CI exercises.
+    """
+    from collection.channels.outbound import run as seed_contacts
+
+    result = seed_contacts()
+
+    table = Table(title="Scheduled contacts, and what the chat channel did with each")
+    table.add_column("customer")
+    table.add_column("outcome")
+    table.add_column("detail")
+    for event, delivery_id in result.seeded:
+        table.add_row(event.customer_id, "[green]seeded[/]", delivery_id)
+    for event in result.other_channel:
+        table.add_row(
+            event.customer_id, "[dim]other channel[/]", str(event.payload.get("channel", ""))
+        )
+    for event in result.suppressed:
+        table.add_row(
+            event.customer_id,
+            "[yellow]suppressed[/]",
+            str(event.payload.get("detail") or event.payload.get("reason") or "opted out"),
+        )
+    for event in result.escalated:
+        table.add_row(event.customer_id, "[red]escalated[/]", str(event.payload.get("detail", "")))
+    console.print(table)
+
+    console.print(
+        f"\n[green]summary[/] {len(result.seeded)} seeded · "
+        f"{len(result.suppressed)} suppressed · {len(result.other_channel)} other channel · "
+        f"{len(result.escalated)} escalated · {result.total} considered"
+    )
+    # Said plainly, because the table above is easy to read as "sent".
+    console.print(
+        "[dim]Seeded, not pushed: there is no push transport, so each message waits in "
+        "the customer's mailbox until the widget is opened.[/]"
+    )
 
 
 @app.command()
