@@ -291,6 +291,21 @@ def test_every_seeded_message_is_answered_by_the_next_turn(index):
         assert channel.delivery.of(delivery_id).status is DeliveryStatus.RESPONDIDA
 
 
+def test_a_delivered_contact_is_not_recorded_as_a_skip(index):
+    channel = ChatChannel(index=index)
+    assert channel.seed(contact_scheduled("c1")) is not None
+    assert channel.skipped == []
+    assert EventType.CONTACT_SENT in [e.type for e in channel.audit]
+
+
+def test_a_wrong_channel_contact_is_in_the_audit_and_in_skipped(index):
+    channel = ChatChannel(index=index)
+    scheduled = contact_scheduled("c1", channel="voice")
+    channel.seed(scheduled)
+    assert scheduled in channel.audit
+    assert channel.skipped == [("other_channel", scheduled)]
+
+
 def test_skips_are_distinguishable_and_empty_text_is_loud(index):
     channel = ChatChannel(index=index)
     channel.opted_out.add("c2")

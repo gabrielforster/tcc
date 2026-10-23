@@ -192,9 +192,12 @@ class ChatChannel:
         orchestrator = Orchestrator(agents=[_Mailer(self)], opted_out=self.opted_out)
         orchestrator.submit(event)
         trace = orchestrator.run()
-        self.audit.extend(trace.processed + trace.produced + trace.suppressed)
+        # `contact_sent` is already in `produced`; it also lands in `unrouted` because no agent
+        # here handles it, so only the submitted event itself can be a wrong-channel skip.
+        declined = [e for e in trace.unrouted if e.event_id == event.event_id]
+        self.audit.extend(trace.processed + trace.produced + trace.suppressed + declined)
         self.skipped += [("suppressed", e) for e in trace.suppressed]
-        self.skipped += [("other_channel", e) for e in trace.unrouted]
+        self.skipped += [("other_channel", e) for e in declined]
         for produced in trace.produced:
             if produced.type is EventType.CONTACT_SENT:
                 return str(produced.payload["delivery_id"])
