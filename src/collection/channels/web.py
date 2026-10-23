@@ -174,7 +174,9 @@ class ChatChannel:
         for what each does and does not prove. A proactive message sent here is not tied
         to a session, so a reply in some later thread does not mark it `RESPONDIDA`.
         """
-        return self.delivery.record(text).id
+        # Owned by the customer id, not a session: a seeded message exists before any
+        # session does. `open()` re-owns it to the session that picks it up.
+        return self.delivery.record(text, owner=customer_id).id
 
     def seed(self, event: Event) -> str | None:
         """Leave a scheduled contact waiting for the customer; return its delivery id.
@@ -236,10 +238,11 @@ class ChatChannel:
         session.record("agent", GREETING)
         # Tracked like any agent message, and its id is handed to the widget so it can
         # report the first message of the thread too.
-        session.greeting_delivery_id = self.delivery.record(GREETING).id
+        session.greeting_delivery_id = self.delivery.record(GREETING, owner=session.session_id).id
         self._awaiting_reply[session.session_id] = [session.greeting_delivery_id]
         for pending in self._drain(session.customer_id):
             session.record("agent", pending.text)
+            self.delivery.reassign(pending.delivery_id, session.session_id)
             self._awaiting_reply[session.session_id].append(pending.delivery_id)
         return session, GREETING
 
@@ -365,7 +368,7 @@ class ChatChannel:
 
     def _track_reply(self, session: Session, reply: ChatReply) -> None:
         """Record the agent's message and, unless it ends the thread, await an answer."""
-        record = self.delivery.record(reply.text)
+        record = self.delivery.record(reply.text, owner=session.session_id)
         reply.delivery_id = record.id
         if not reply.escalated:
             self._awaiting_reply[session.session_id] = [record.id]

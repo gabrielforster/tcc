@@ -181,7 +181,7 @@ def create_router(service: ChatService) -> APIRouter:
         `respondida`. That is an ordinary race (the reply and the report travel
         independently), so it answers 200 with `applied: false` and the status on record.
         Any other step backwards, such as `entregue` after `lida`, contradicts the record and
-        is a 409. An unknown delivery id is a 404 and is never created.
+        is a 409. An unknown delivery id, or one that belongs to another session, is a 404.
         """
         try:
             service.channel.store.get(session_id)
@@ -189,6 +189,11 @@ def create_router(service: ChatService) -> APIRouter:
             raise _http_error(error) from error
         status = DeliveryStatus(report.status)
         try:
+            owner = service.channel.delivery.of(delivery_id).owner
+            # Another session's message is reported as absent, not forbidden: the caller
+            # learns nothing about ids that are not theirs. `None` is unowned and allowed.
+            if owner is not None and owner != session_id:
+                raise KeyError(delivery_id)
             record = service.channel.delivery.advance(delivery_id, status)
         except KeyError:
             raise HTTPException(status_code=404, detail="unknown delivery id") from None

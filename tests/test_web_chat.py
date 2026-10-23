@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from collection.agents.events import Event, EventType
 from collection.agents.responsive import TemplateResponder
 from collection.api.app import ModelRegistry, create_app
 from collection.api.chat import ChatService
@@ -525,3 +526,43 @@ def test_a_report_for_an_unknown_delivery_is_not_found(client, channel):
 def test_a_report_for_an_unknown_session_is_not_found(client):
     opened = open_session(client)
     assert report(client, "nope", opened["delivery_id"], "entregue").status_code == 404
+
+
+def test_a_session_cannot_report_on_another_sessions_delivery(client, channel):
+    a = open_session(client)
+    b = open_session(client)
+    assert report(client, b["session_id"], a["delivery_id"], "entregue").status_code == 404
+    assert channel.delivery.of(a["delivery_id"]).status.value == "enviada"
+
+
+def test_a_session_can_report_on_its_own_delivery(client):
+    a = open_session(client)
+    open_session(client)
+    assert report(client, a["session_id"], a["delivery_id"], "entregue").status_code == 200
+
+
+def test_a_reply_is_owned_by_the_session_that_received_it(client):
+    a = open_session(client)
+    b = open_session(client)
+    reply = say(client, a["session_id"], "quais sao os juros?").json()
+    assert report(client, b["session_id"], reply["delivery_id"], "entregue").status_code == 404
+    assert report(client, a["session_id"], reply["delivery_id"], "entregue").status_code == 200
+
+
+def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
+    channel = ChatChannel(index=index, responder=TemplateResponder())
+    delivery_id = channel.seed(
+        Event(
+            type=EventType.CONTACT_SCHEDULED,
+            customer_id="c1",
+            invoice_id="inv_1",
+            payload={"channel": "chat", "message": "Olá, temos uma fatura em aberto."},
+        )
+    )
+    assert channel.delivery.of(delivery_id).owner == "c1"
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        other = open_session(http)
+        mine = open_session(http, token=issue_token("c1"))
+        assert report(http, other["session_id"], delivery_id, "entregue").status_code == 404
+        assert report(http, mine["session_id"], delivery_id, "entregue").status_code == 200

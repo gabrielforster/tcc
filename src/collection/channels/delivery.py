@@ -89,6 +89,8 @@ class DeliveryRecord:
     id: str
     status: DeliveryStatus
     at: float
+    #: Opaque: whatever string the recording channel uses to say who may report on this record.
+    owner: str | None = None
 
 
 class DeliveryLog:
@@ -99,10 +101,13 @@ class DeliveryLog:
         self._records: dict[str, DeliveryRecord] = {}
         self._lock = Lock()
 
-    def record(self, text: str) -> DeliveryRecord:
+    def record(self, text: str, owner: str | None = None) -> DeliveryRecord:
         """Register a message as sent. The text is not kept: the log tracks status only."""
         record = DeliveryRecord(
-            id=f"dlv_{secrets.token_hex(8)}", status=DeliveryStatus.ENVIADA, at=self._clock()
+            id=f"dlv_{secrets.token_hex(8)}",
+            status=DeliveryStatus.ENVIADA,
+            at=self._clock(),
+            owner=owner,
         )
         with self._lock:
             self._records[record.id] = record
@@ -119,7 +124,19 @@ class DeliveryLog:
                 raise BackwardsStatus(delivery_id, current.status, status)
             if status is current.status:
                 return current
-            updated = DeliveryRecord(id=delivery_id, status=status, at=self._clock())
+            updated = DeliveryRecord(
+                id=delivery_id, status=status, at=self._clock(), owner=current.owner
+            )
+            self._records[delivery_id] = updated
+            return updated
+
+    def reassign(self, delivery_id: str, owner: str | None) -> DeliveryRecord:
+        """Hand a record to a new owner; raise `KeyError` for an id this log never issued."""
+        with self._lock:
+            current = self._records[delivery_id]
+            updated = DeliveryRecord(
+                id=delivery_id, status=current.status, at=current.at, owner=owner
+            )
             self._records[delivery_id] = updated
             return updated
 
