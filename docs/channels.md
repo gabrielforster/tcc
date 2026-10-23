@@ -241,6 +241,17 @@ channel, carries the same agent over SIP to a real number without changing the a
 the substitution is **reversible**, and saying so is part of the defence rather than an
 excuse for it.
 
+The design the voice channel is being built against is approved and drawn:
+
+<img src="./images/voice-channel-mockup.png" width="300" alt="The voice call screen: a notice that the call is transcribed and recorded, a pulsing orb while the customer speaks, the live transcript, a turn-time strip, and mute, hang-up and transfer-to-a-person controls">
+
+Nothing behind that screen exists yet — it is the target for the real-time voice channel,
+not a running interface. The three numbers in the turn-time strip are **placeholders drawn
+by a designer**, not measurements; the measured version is one of the two findings the
+voice channel owes. What the drawing does fix is the shape of the legal opening (a notice
+that cannot be skipped), that the customer can always reach a person, and that the
+transcript is visible rather than implied.
+
 ### What is honestly lost
 
 Named here, and inherited by the article's limitations section:
