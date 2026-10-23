@@ -25,7 +25,9 @@ the proactive ones that arrive through a different channel entirely.
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
 
+from collection.agents.base import Agent
 from collection.agents.conversation import Conversation
 from collection.agents.events import Event, EventType
 from collection.agents.orchestrator import Orchestrator
@@ -54,6 +56,43 @@ GREETING = (
     "Posso ajudar com a sua pendência, parcelamento ou segunda via. "
     "Se precisar, transfiro para uma pessoa da equipe."
 )
+
+
+@dataclass(frozen=True)
+class PendingMessage:
+    """An outbound message waiting in a customer's mailbox for the widget to open."""
+
+    text: str
+    delivery_id: str
+
+
+class _Mailer(Agent):
+    """Puts a scheduled contact into the mailbox and says that it did.
+
+    A channel-side agent, not one of `collection.agents`: it exists so `seed` can go
+    through the orchestrator (which owns opt-out suppression) instead of testing
+    `opted_out` itself. The orchestrator only routes events to agents, so delivery has to
+    be an agent's job. It lives here because it needs the mailbox, and the agents package
+    must not import a channel.
+    """
+
+    name = "chat_mailer"
+    handles = frozenset({EventType.CONTACT_SCHEDULED})
+
+    def __init__(self, channel: "ChatChannel") -> None:
+        self.channel = channel
+
+    def accepts(self, event: Event) -> bool:
+        # Another channel's contact is not ours to put in a chat mailbox.
+        return super().accepts(event) and event.payload.get("channel", "chat") == "chat"
+
+    def handle(self, event: Event) -> list[Event]:
+        text = str(event.payload.get("message", "")).strip()
+        if not text:
+            return []
+        delivery_id = self.channel.deliver(event.customer_id, text)
+        self.channel._enqueue(event.customer_id, PendingMessage(text, delivery_id))
+        return [event.caused(EventType.CONTACT_SENT, channel="chat", delivery_id=delivery_id)]
 
 
 @dataclass
@@ -105,6 +144,14 @@ class ChatChannel:
         self.store = store or SessionStore()
         self.opted_out = opted_out if opted_out is not None else set()
         self.delivery = DeliveryLog()
+        # Outbound messages waiting for a customer to open the widget, keyed by customer.
+        # Deliberately not on a `Session`: sessions expire after 30 minutes and are swept,
+        # and a scheduled collection contact must not vanish because nobody opened a tab.
+        self._mailbox: dict[str, list[PendingMessage]] = {}
+        self._mailbox_lock = Lock()
+        #: Every event the channel's own orchestrator runs saw, in order -- including
+        #: `contact_sent`, which is how a scheduled contact is shown to have been sent.
+        self.audit: list[Event] = []
         # The agent message each session is currently waiting for an answer to.
         self._awaiting_reply: dict[str, str] = {}
         # One agent across all sessions: it counts consecutive unclear messages per
@@ -123,15 +170,57 @@ class ChatChannel:
         """
         return self.delivery.record(text).id
 
+    def seed(self, event: Event) -> str | None:
+        """Leave a scheduled contact waiting for the customer; return its delivery id.
+
+        No push transport: the message sits in the mailbox and the widget finds it on
+        `open()`. Returns `None` when nothing was delivered -- the customer is opted out,
+        the contact is for another channel, or it carries no text.
+
+        The event goes through an `Orchestrator` rather than a check of `opted_out` here,
+        because suppression is the orchestrator's rule and a channel that re-implements it
+        can come to disagree with it. A suppressed event is recorded on the orchestrator's
+        trace, which is copied to `audit`.
+        """
+        orchestrator = Orchestrator(agents=[_Mailer(self)], opted_out=self.opted_out)
+        orchestrator.submit(event)
+        trace = orchestrator.run()
+        self.audit.extend(trace.processed + trace.produced + trace.suppressed)
+        for produced in trace.produced:
+            if produced.type is EventType.CONTACT_SENT:
+                return str(produced.payload["delivery_id"])
+        return None
+
+    def _enqueue(self, customer_id: str, message: PendingMessage) -> None:
+        with self._mailbox_lock:
+            self._mailbox.setdefault(customer_id, []).append(message)
+
+    def _drain(self, customer_id: str) -> list[PendingMessage]:
+        with self._mailbox_lock:
+            return self._mailbox.pop(customer_id, [])
+
+    def _purge_opted_out(self) -> None:
+        """Drop waiting messages for anyone who has opted out since they were seeded."""
+        with self._mailbox_lock:
+            for customer_id in self.opted_out & self._mailbox.keys():
+                del self._mailbox[customer_id]
+
     # ------------------------------------------------------------------ sessions
     def open(self, token: str | None = None) -> tuple[Session, str]:
-        """Start a conversation and return it with the greeting to display."""
+        """Start a conversation and return it with the greeting to display.
+
+        Anything seeded for this customer follows the greeting in the thread, oldest
+        first. The newest one is what the customer's next turn answers.
+        """
         session = self.store.open(token)
         session.record("agent", GREETING)
         # Tracked like any agent message, and its id is handed to the widget so it can
         # report the first message of the thread too.
         session.greeting_delivery_id = self.delivery.record(GREETING).id
         self._awaiting_reply[session.session_id] = session.greeting_delivery_id
+        for pending in self._drain(session.customer_id):
+            session.record("agent", pending.text)
+            self._awaiting_reply[session.session_id] = pending.delivery_id
         return session, GREETING
 
     def transcript(self, session_id: str) -> list[dict[str, object]]:
@@ -172,6 +261,7 @@ class ChatChannel:
         # The orchestrator records opt-outs on the set it was handed, so the channel's
         # own set is already updated; this keeps that dependency explicit.
         self.opted_out |= orchestrator.opted_out
+        self._purge_opted_out()
 
         reply = self._render(session_id, trace.produced)
         # The intent is only known after the agent has run, so the customer's turn is
@@ -223,6 +313,7 @@ class ChatChannel:
         )
         trace = orchestrator.run()
         self.opted_out |= orchestrator.opted_out
+        self._purge_opted_out()
 
         reply = self._render(session_id, trace.produced)
         # The session record is what was said, not what was displayed: once the agent has
