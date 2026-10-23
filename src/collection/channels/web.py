@@ -31,6 +31,7 @@ from collection.agents.events import Event, EventType
 from collection.agents.orchestrator import Orchestrator
 from collection.agents.responsive import Responder, ResponsiveAgent
 from collection.channels.base import ChannelCapabilities
+from collection.channels.delivery import DeliveryLog, DeliveryStatus
 from collection.channels.session import Session, SessionStore, clean_message
 from collection.rag.index import VectorIndex
 from collection.voice import audio
@@ -77,6 +78,8 @@ class ChatReply:
     transcription_confidence: float = 0.0
     #: True when the reply opens by reading a spoken figure back for the customer to confirm.
     needs_confirmation: bool = False
+    #: Tracks the agent message in this reply; the widget reports `entregue`/`lida` against it.
+    delivery_id: str | None = None
 
 
 class ChatChannel:
@@ -86,7 +89,7 @@ class ChatChannel:
     capabilities = ChannelCapabilities(
         accepts_audio=True,
         accepts_text=True,
-        shows_delivery_status=False,
+        shows_delivery_status=True,
         realtime=False,
     )
 
@@ -101,20 +104,31 @@ class ChatChannel:
         self.index = index
         self.store = store or SessionStore()
         self.opted_out = opted_out if opted_out is not None else set()
+        self.delivery = DeliveryLog()
+        # The agent message each session is currently waiting for an answer to.
+        self._awaiting_reply: dict[str, str] = {}
         # One agent across all sessions: it counts consecutive unclear messages per
         # customer, and a fresh agent per message would reset that counter every turn,
         # so the "three unclear messages in a row" handover could never fire.
         self.agent = ResponsiveAgent(index=index, responder=responder, transcriber=transcriber)
 
     def deliver(self, customer_id: str, text: str, **meta: object) -> str:
-        """Push a message to a customer. Not built yet: a later task owns outbound chat."""
-        raise NotImplementedError("outbound delivery over chat is not implemented yet")
+        """Record an outbound message and return the delivery id to track it by.
+
+        Chat is store-and-forward: the widget picks the message up when it next polls, so
+        this records `ENVIADA` and nothing more. Later rungs come from the widget reporting
+        back (`ENTREGUE`, `LIDA`) or the customer replying (`RESPONDIDA`); see `delivery.py`
+        for what each does and does not prove. A proactive message sent here is not tied
+        to a session, so a reply in some later thread does not mark it `RESPONDIDA`.
+        """
+        return self.delivery.record(text).id
 
     # ------------------------------------------------------------------ sessions
     def open(self, token: str | None = None) -> tuple[Session, str]:
         """Start a conversation and return it with the greeting to display."""
         session = self.store.open(token)
         session.record("agent", GREETING)
+        self._awaiting_reply[session.session_id] = self.delivery.record(GREETING).id
         return session, GREETING
 
     def transcript(self, session_id: str) -> list[dict[str, object]]:
@@ -132,6 +146,7 @@ class ChatChannel:
         text = clean_message(raw)
         history = self._history(session)
         customer_turn = session.record("customer", text)
+        self._mark_answered(session)
 
         orchestrator = Orchestrator(agents=[self.agent], opted_out=self.opted_out)
         orchestrator.submit(
@@ -163,6 +178,7 @@ class ChatChannel:
         session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
         if reply.escalated:
             session.escalated = True
+        self._track_reply(session, reply)
         return reply
 
     def send_audio(self, session_id: str, path: Path) -> ChatReply:
@@ -187,6 +203,7 @@ class ChatChannel:
         audio.accept(path)
         history = self._history(session)
         customer_turn = session.record("customer", VOICE_NOTE_PLACEHOLDER)
+        self._mark_answered(session)
 
         orchestrator = Orchestrator(agents=[self.agent], opted_out=self.opted_out)
         orchestrator.submit(
@@ -218,7 +235,27 @@ class ChatChannel:
         session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
         if reply.escalated:
             session.escalated = True
+        self._track_reply(session, reply)
         return reply
+
+    def _mark_answered(self, session: Session) -> None:
+        """The customer's turn arrived: the agent message before it was answered.
+
+        Skipped once the thread has escalated. Handover ends the conversation and the
+        widget stops taking input, so a message that still reaches `send` is not an answer
+        to anything the system is waiting on; counting it would report a reply from a
+        thread a person now owns.
+        """
+        delivery_id = self._awaiting_reply.pop(session.session_id, None)
+        if delivery_id is not None and not session.escalated:
+            self.delivery.advance(delivery_id, DeliveryStatus.RESPONDIDA)
+
+    def _track_reply(self, session: Session, reply: ChatReply) -> None:
+        """Record the agent's message and, unless it ends the thread, await an answer."""
+        record = self.delivery.record(reply.text)
+        reply.delivery_id = record.id
+        if not reply.escalated:
+            self._awaiting_reply[session.session_id] = record.id
 
     def _history(self, session: Session) -> Conversation:
         """The session transcript as the agent's view of the thread.

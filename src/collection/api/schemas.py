@@ -84,6 +84,9 @@ class MessageResponse(BaseModel):
     latency_ms: float = 0.0
     responder: str = ""
     events: list[str] = Field(default_factory=list)
+    delivery_id: str | None = Field(
+        default=None, description="id to report entregue/lida against; client-reported"
+    )
 
 
 class AudioMessageResponse(MessageResponse):
