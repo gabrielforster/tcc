@@ -24,6 +24,7 @@ the proactive ones that arrive through a different channel entirely.
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from collection.agents.conversation import Conversation
 from collection.agents.events import Event, EventType
@@ -32,12 +33,18 @@ from collection.agents.responsive import Responder, ResponsiveAgent
 from collection.channels.base import ChannelCapabilities
 from collection.channels.session import Session, SessionStore, clean_message
 from collection.rag.index import VectorIndex
+from collection.voice import audio
+from collection.voice.transcribe import Transcriber
 
 #: Shown when the conversation is handed over. The widget stops accepting input after it.
 HANDOVER_NOTICE = (
     "Vou encaminhar o seu atendimento para uma pessoa da equipe. "
     "Em breve alguém entra em contato por aqui."
 )
+#: Stands in for the customer's turn until the agent has heard the clip. The channel does
+#: not transcribe, so at the moment the turn is recorded nobody knows what was said; the
+#: turn is rewritten with the transcript once the agent has produced one.
+VOICE_NOTE_PLACEHOLDER = "[mensagem de voz]"
 #: Shown once, at the top of the thread. Transparency about who the customer is talking
 #: to is not decoration: an automated collection contact that passes itself off as a
 #: person is the kind of thing CDC art. 42 exists to prevent.
@@ -64,6 +71,12 @@ class ChatReply:
     responder: str = ""
     #: Event types produced by this turn, for the audit trail the paper describes.
     events: list[str] = field(default_factory=list)
+    #: What the agent heard, for a voice note; `None` for typed text. Carried out of the
+    #: `reply_sent` payload because the agent -- not the channel -- owns recognition.
+    transcript: str | None = None
+    transcription_confidence: float = 0.0
+    #: True when the reply opens by reading a spoken figure back for the customer to confirm.
+    needs_confirmation: bool = False
 
 
 class ChatChannel:
@@ -83,6 +96,7 @@ class ChatChannel:
         responder: Responder | None = None,
         store: SessionStore | None = None,
         opted_out: set[str] | None = None,
+        transcriber: Transcriber | None = None,
     ) -> None:
         self.index = index
         self.store = store or SessionStore()
@@ -90,7 +104,7 @@ class ChatChannel:
         # One agent across all sessions: it counts consecutive unclear messages per
         # customer, and a fresh agent per message would reset that counter every turn,
         # so the "three unclear messages in a row" handover could never fire.
-        self.agent = ResponsiveAgent(index=index, responder=responder)
+        self.agent = ResponsiveAgent(index=index, responder=responder, transcriber=transcriber)
 
     def deliver(self, customer_id: str, text: str, **meta: object) -> str:
         """Push a message to a customer. Not built yet: a later task owns outbound chat."""
@@ -151,6 +165,57 @@ class ChatChannel:
             session.escalated = True
         return reply
 
+    def send_audio(self, session_id: str, path: Path) -> ChatReply:
+        """Route one voice note through the orchestrator, exactly as `send` routes text.
+
+        The channel does not transcribe. It hands the orchestrator an `audio_received`
+        event that points at the file, and `ResponsiveAgent` does the recognition. That is
+        deliberate: three decisions hang off the `Transcription` object -- the
+        `MIN_CONFIDENCE` escalation, the read-back of a spoken figure, and the transcript
+        fields on `reply_sent`. A channel that recognised speech and emitted plain text
+        would silently switch all three off.
+
+        What the channel *does* own is refusing a clip before anything is spent on it.
+        `audio.accept` raises `AudioError` for a file that is not audio, too short or too
+        long, and it is called here rather than left to the agent because the agent turns
+        an `AudioError` into an escalation. "The decoder refused the file" is a bad
+        request the caller can fix; "the agent could not understand it" is a conversation
+        a person should pick up. They are different outcomes and must not look alike.
+        """
+        session = self.store.get(session_id)
+        session.check_rate()
+        audio.accept(path)
+        history = self._history(session)
+        customer_turn = session.record("customer", VOICE_NOTE_PLACEHOLDER)
+
+        orchestrator = Orchestrator(agents=[self.agent], opted_out=self.opted_out)
+        orchestrator.submit(
+            Event(
+                type=EventType.AUDIO_RECEIVED,
+                customer_id=session.customer_id,
+                payload={
+                    "audio_path": str(path),
+                    "channel": "web",
+                    "session_id": session_id,
+                    "history": history,
+                },
+            )
+        )
+        trace = orchestrator.run()
+        self.opted_out |= orchestrator.opted_out
+
+        reply = self._render(session_id, trace.produced)
+        # The session record is what was said, not what was displayed: once the agent has
+        # heard the clip, the transcript replaces the placeholder, so the thread a later
+        # turn resolves a follow-up against reads like a conversation.
+        if reply.transcript:
+            customer_turn.text = reply.transcript
+        customer_turn.intent = reply.intent
+        session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
+        if reply.escalated:
+            session.escalated = True
+        return reply
+
     def _history(self, session: Session) -> Conversation:
         """The session transcript as the agent's view of the thread.
 
@@ -195,6 +260,13 @@ class ChatChannel:
                 reply.confidence = float(event.payload.get("confidence", 0.0))
                 reply.citations = list(event.payload.get("citations", []))
                 reply.latency_ms = float(event.payload.get("latency_ms", 0.0))
+                transcript = event.payload.get("transcript")
+                if transcript is not None:
+                    reply.transcript = str(transcript)
+                    reply.transcription_confidence = float(
+                        event.payload.get("transcription_confidence", 0.0)
+                    )
+                    reply.needs_confirmation = bool(event.payload.get("needs_confirmation", False))
                 return reply
 
         for event in produced:
@@ -203,6 +275,10 @@ class ChatChannel:
                 reply.escalation_reason = event.payload.get("reason")
                 reply.intent = event.payload.get("intent")
                 reply.confidence = float(event.payload.get("confidence", 0.0))
+                # An escalated voice note still carries what the system thought it heard.
+                transcript = event.payload.get("transcript")
+                if transcript:
+                    reply.transcript = str(transcript)
                 return reply
 
         # Nothing produced: no agent handled the event. Handing over is the safe reading,

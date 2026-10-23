@@ -86,6 +86,18 @@ class MessageResponse(BaseModel):
     events: list[str] = Field(default_factory=list)
 
 
+class AudioMessageResponse(MessageResponse):
+    """A voice note's reply: the message fields plus what the agent heard.
+
+    The widget shows `transcript` so the customer can see what was understood, and
+    `needs_confirmation` tells it the reply opens with a figure read back for a yes or no.
+    """
+
+    transcript: str | None = None
+    transcription_confidence: float = 0.0
+    needs_confirmation: bool = False
+
+
 class TranscriptTurn(BaseModel):
     role: str
     text: str

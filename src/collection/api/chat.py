@@ -12,6 +12,7 @@ thing distinguishing "try again in a moment" from "start over" is the number it 
 * `404` the session is unknown or expired -- open a new one and keep the transcript;
 * `409` the thread hit its turn cap and a person has it -- stop sending;
 * `422` the message was empty or too long -- the widget can say so without a round trip;
+  also a voice note the decoder refused (not audio, too short, too long);
 * `429` rate limited -- back off, do not reopen the session.
 
 The index is built once at startup. It is the same `VectorIndex` the CLI uses, so the
@@ -19,15 +20,17 @@ answers served here are the answers the evaluation measured.
 """
 
 import os
+import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from collection.agents.responsive import Responder, get_responder
 from collection.api.schemas import (
+    AudioMessageResponse,
     MessageRequest,
     MessageResponse,
     SessionRequest,
@@ -46,6 +49,8 @@ from collection.channels.web import ChatChannel
 from collection.config import settings
 from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
+from collection.voice.audio import AudioError
+from collection.voice.transcribe import TranscriptionError
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
@@ -55,7 +60,16 @@ _STATUS = {
     ConversationEnded: 409,
     InvalidMessage: 422,
     RateLimited: 429,
+    # A clip the decoder refused is a request the caller can fix, like an empty message.
+    AudioError: 422,
+    # Recognition itself failed (no backend, no scripted transcript): not the caller's
+    # fault and not a crash, so it is reported as unavailable rather than as a 500.
+    TranscriptionError: 503,
 }
+
+#: Upload ceiling. A two-minute OPUS note is well under a megabyte; this only stops a
+#: caller streaming something enormous into a temp file before the length check runs.
+MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 
 
 def _http_error(error: Exception) -> HTTPException:
@@ -125,6 +139,26 @@ def create_router(service: ChatService) -> APIRouter:
         except Exception as error:
             raise _http_error(error) from error
         return MessageResponse(**vars(reply))
+
+    @router.post("/sessions/{session_id}/audio", response_model=AudioMessageResponse)
+    def send_audio(session_id: str, file: UploadFile) -> AudioMessageResponse:
+        """Accept a voice note.
+
+        The client's file name is kept, directories stripped: `audio.accept` judges the
+        container by its suffix, and the scripted recogniser keys its transcripts on the stem.
+        """
+        name = Path(file.filename or "").name or "upload"
+        try:
+            with tempfile.TemporaryDirectory(prefix="voice-") as directory:
+                path = Path(directory) / name
+                data = file.file.read(MAX_UPLOAD_BYTES + 1)
+                if len(data) > MAX_UPLOAD_BYTES:
+                    raise AudioError(f"upload is larger than {MAX_UPLOAD_BYTES} bytes")
+                path.write_bytes(data)
+                reply = service.channel.send_audio(session_id, path)
+        except Exception as error:
+            raise _http_error(error) from error
+        return AudioMessageResponse(**vars(reply))
 
     @router.get("/sessions/{session_id}", response_model=TranscriptResponse)
     def transcript(session_id: str) -> TranscriptResponse:

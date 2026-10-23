@@ -12,6 +12,7 @@ _orchestrator` is the guard on that.
 """
 
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,6 +36,8 @@ from collection.channels.session import (
 )
 from collection.channels.web import GREETING, ChatChannel
 from collection.config import settings
+from collection.voice.audio import AudioError, ffmpeg_available
+from collection.voice.transcribe import ScriptedTranscriber
 
 
 @pytest.fixture
@@ -320,3 +323,113 @@ def test_the_customer_turn_is_labelled_with_its_intent(client):
     transcript = client.get(f"/chat/sessions/{body['session_id']}").json()
     customer = [turn for turn in transcript["turns"] if turn["role"] == "customer"][0]
     assert customer["intent"] == "negotiation"
+
+
+# ----------------------------------------------------------------- voice notes
+FIXTURE_OGG = Path(__file__).parent / "fixtures" / "voice-note.ogg"
+needs_ffmpeg = pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg is not installed")
+SPOKEN = "quero a segunda via do boleto"
+SPOKEN_FIGURE = "consigo pagar mil duzentos e cinquenta reais a vista"
+
+
+def hearing(index, transcript=SPOKEN, confidence=1.0):
+    """A channel whose recogniser is the scripted control arm, never a real model."""
+    return ChatChannel(
+        index=index,
+        responder=TemplateResponder(),
+        transcriber=ScriptedTranscriber(
+            transcripts={"voice-note": transcript}, confidence=confidence
+        ),
+    )
+
+
+@pytest.fixture
+def voice_session(index):
+    channel = hearing(index)
+    session, _ = channel.open()
+    return channel, session.session_id
+
+
+@needs_ffmpeg
+def test_a_voice_note_is_answered_like_a_typed_message(voice_session):
+    channel, sid = voice_session
+    reply = channel.send_audio(sid, FIXTURE_OGG)
+    assert reply.transcript == SPOKEN
+    assert not reply.escalated
+    assert reply.transcription_confidence == 1.0
+    assert reply.events == ["reply_sent"]
+
+
+@needs_ffmpeg
+def test_a_spoken_figure_is_read_back_in_the_thread(index):
+    channel = hearing(index, SPOKEN_FIGURE)
+    session, _ = channel.open()
+    reply = channel.send_audio(session.session_id, FIXTURE_OGG)
+    assert reply.needs_confirmation
+    assert reply.text.startswith(f'Entendi: "{SPOKEN_FIGURE}"')
+
+
+@needs_ffmpeg
+def test_the_channel_hands_the_clip_to_the_agent_instead_of_transcribing_it(voice_session):
+    """The recogniser is called by the agent, so its confidence gate still applies."""
+    channel, sid = voice_session
+    channel.send_audio(sid, FIXTURE_OGG)
+    assert channel.agent.transcriber.calls == ["voice-note.ogg"]
+
+
+@needs_ffmpeg
+def test_a_low_confidence_clip_is_escalated_not_answered(index):
+    channel = hearing(index, confidence=0.1)
+    session, _ = channel.open()
+    reply = channel.send_audio(session.session_id, FIXTURE_OGG)
+    assert reply.escalated and reply.escalation_reason == "audio_unintelligible"
+    assert reply.transcript == SPOKEN
+    assert not reply.needs_confirmation
+
+
+def test_audio_the_decoder_refuses_does_not_reach_the_model(voice_session, tmp_path):
+    channel, sid = voice_session
+    junk = tmp_path / "x.ogg"
+    junk.write_bytes(b"not audio")
+    with pytest.raises(AudioError):
+        channel.send_audio(sid, junk)
+    assert channel.agent.transcriber.calls == []
+    # Nothing was recorded: a refused file is not a turn of the conversation.
+    assert [turn["role"] for turn in channel.transcript(sid)] == ["agent"]
+
+
+@needs_ffmpeg
+def test_the_transcript_is_what_lands_in_the_session_record(voice_session):
+    channel, sid = voice_session
+    channel.send_audio(sid, FIXTURE_OGG)
+    assert channel.transcript(sid)[-2]["text"] == SPOKEN
+
+
+@needs_ffmpeg
+def test_a_voice_note_over_http_returns_what_was_heard(client, channel, index):
+    channel.agent.transcriber = ScriptedTranscriber(transcripts={"voice-note": SPOKEN_FIGURE})
+    sid = open_session(client)["session_id"]
+    response = client.post(
+        f"/chat/sessions/{sid}/audio",
+        files={"file": ("voice-note.ogg", FIXTURE_OGG.read_bytes(), "audio/ogg")},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["transcript"] == SPOKEN_FIGURE
+    assert body["needs_confirmation"] is True
+
+
+def test_an_upload_that_is_not_audio_is_a_4xx_not_a_500(client):
+    sid = open_session(client)["session_id"]
+    response = client.post(
+        f"/chat/sessions/{sid}/audio",
+        files={"file": ("voice-note.ogg", b"not audio", "audio/ogg")},
+    )
+    assert response.status_code == 422
+
+
+def test_a_voice_note_for_an_unknown_session_is_a_404(client):
+    response = client.post(
+        "/chat/sessions/nope/audio", files={"file": ("a.ogg", b"x", "audio/ogg")}
+    )
+    assert response.status_code == 404
