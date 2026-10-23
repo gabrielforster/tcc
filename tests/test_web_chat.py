@@ -457,3 +457,9 @@ def test_a_voice_note_for_an_unknown_session_is_a_404(client):
         "/chat/sessions/nope/audio", files={"file": ("a.ogg", b"x", "audio/ogg")}
     )
     assert response.status_code == 404
+
+
+def test_the_session_response_carries_the_greetings_delivery_id(client, channel):
+    body = open_session(client)
+    assert body["delivery_id"]
+    assert channel.delivery.of(body["delivery_id"]).status.value == "enviada"

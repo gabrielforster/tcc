@@ -9,7 +9,9 @@ one means, because a status column is easy to read as a stronger claim than it i
 * `ENVIADA` -- the system handed the message to the channel and recorded it. Measured, and
   the only state that needs no one's cooperation. It does not mean anyone saw it.
 * `ENTREGUE` and `LIDA` -- **reported by the client**, not observed by the server. The
-  widget tells us it rendered the message (`ENTREGUE`) or that it was on screen (`LIDA`).
+  widget will report that it rendered the message (`ENTREGUE`) or that it was on screen
+  (`LIDA`) once that path exists. Today the states are only defined: nothing reports them
+  yet, so nothing sets them.
   These are not carrier receipts: nothing here has independent evidence the message
   reached a person, and a client can lie, be scripted, or simply never report -- a closed
   tab sends nothing. So `ENVIADA` is not "delivery failed" and a missing `LIDA` is not
@@ -107,7 +109,10 @@ class DeliveryLog:
         return record
 
     def advance(self, delivery_id: str, status: DeliveryStatus) -> DeliveryRecord:
-        """Move a message up the ladder; raise `ValueError` on a step backwards."""
+        """Move a message up the ladder; raise `BackwardsStatus` (a `ValueError`) on a step back.
+
+        Catch `BackwardsStatus` for the late-report case; it carries both statuses.
+        """
         with self._lock:
             current = self._records[delivery_id]
             if _RANK[status] < _RANK[current.status]:
