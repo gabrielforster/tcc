@@ -73,6 +73,21 @@ _STATUS = {
 #: Upload ceiling. A two-minute OPUS note is well under a megabyte; this only stops a
 #: caller streaming something enormous into a temp file before the length check runs.
 MAX_UPLOAD_BYTES = 16 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 64 * 1024
+
+
+def _read_capped(file: UploadFile) -> bytes:
+    """Read the upload in chunks, refusing with 413 as soon as it passes the ceiling."""
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := file.file.read(UPLOAD_CHUNK_BYTES):
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413, detail=f"upload is larger than {MAX_UPLOAD_BYTES} bytes"
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _http_error(error: Exception) -> HTTPException:
@@ -155,15 +170,16 @@ def create_router(service: ChatService) -> APIRouter:
         """
         name = Path(file.filename or "").name or "upload"
         try:
+            # Resolve the session and spend a rate-limit hit *before* touching the body.
+            # Session creation needs no auth, so anything read first is reachable by a
+            # caller who invented the id and is not yet limited.
+            session = service.channel.store.get(session_id)
+            session.check_rate()
+            data = _read_capped(file)
             with tempfile.TemporaryDirectory(prefix="voice-") as directory:
                 path = Path(directory) / name
-                data = file.file.read(MAX_UPLOAD_BYTES + 1)
-                if len(data) > MAX_UPLOAD_BYTES:
-                    raise HTTPException(
-                        status_code=413, detail=f"upload is larger than {MAX_UPLOAD_BYTES} bytes"
-                    )
                 path.write_bytes(data)
-                reply = service.channel.send_audio(session_id, path)
+                reply = service.channel.send_audio(session_id, path, rate_checked=True)
         # Only the errors this layer knows how to explain. Anything else -- an OSError
         # writing the temp file, a bug in rendering -- is ours, not the caller's, and
         # should surface as a 500 rather than a tidy 400.

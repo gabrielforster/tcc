@@ -461,6 +461,36 @@ def test_a_voice_note_for_an_unknown_session_is_a_404(client):
     assert response.status_code == 404
 
 
+def test_an_unknown_session_is_rejected_before_the_body_is_read(client, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the upload was touched for a session that does not exist")
+
+    monkeypatch.setattr("collection.api.chat._read_capped", forbidden)
+    monkeypatch.setattr("collection.api.chat.tempfile.TemporaryDirectory", forbidden)
+    response = client.post(
+        "/chat/sessions/invented/audio", files={"file": ("a.ogg", b"x", "audio/ogg")}
+    )
+    assert response.status_code == 404
+
+
+def test_the_rate_limit_applies_to_the_audio_route_before_the_body_is_read(
+    client, channel, monkeypatch
+):
+    sid = open_session(client)["session_id"]
+    session = channel.store.get(sid)
+    for _ in range(RATE_LIMIT_PER_MINUTE):
+        session.check_rate()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the upload was read for a rate-limited session")
+
+    monkeypatch.setattr("collection.api.chat._read_capped", forbidden)
+    response = client.post(
+        f"/chat/sessions/{sid}/audio", files={"file": ("a.ogg", b"x", "audio/ogg")}
+    )
+    assert response.status_code == 429
+
+
 def test_the_session_response_carries_the_greetings_delivery_id(client, channel):
     body = open_session(client)
     assert body["delivery_id"]

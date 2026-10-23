@@ -112,7 +112,7 @@ script tag on the host's page.
 Beyond typed text, three things the WhatsApp integration was supposed to bring:
 
 - **Voice notes.** Hold the microphone button and the clip is uploaded to
-  `POST /chat/sessions/{id}/audio`. The channel probes and decodes it, then hands the
+  `POST /chat/sessions/{id}/audio`. The channel probes it, then hands the
   orchestrator an `audio_received` event pointing at the file — it does **not** transcribe.
   Recognition, the `MIN_CONFIDENCE` escalation and the read-back of a spoken figure all
   stay in the agent, where [`docs/voice.md`](./voice.md) argues they belong.

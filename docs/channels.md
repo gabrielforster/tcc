@@ -46,7 +46,7 @@ instead of around it. It bends the rule in the direction of the rule.
 
 `test_no_agent_or_orchestrator_imports_a_channel` parses every module under
 `collection.agents` with `ast` and fails if any of them imports `collection.channels` by
-any spelling — `import`, `from`, aliased, or nested inside a function. A grep would have
+any import statement — `import`, `from`, aliased, or nested inside a function. A grep would have
 been shorter and would have matched this paragraph.
 
 The guard is itself guarded: `test_the_scanner_flags_every_way_of_importing_a_channel`

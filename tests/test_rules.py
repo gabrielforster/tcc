@@ -13,7 +13,9 @@ import pytest
 
 from collection.agents.events import Event, EventType
 from collection.agents.proactive import ProactiveAgent
+from collection.channels import DELIVERY_CHANNELS
 from collection.rules.policy import (
+    CHANNEL_COST,
     ContactHistory,
     ContactPolicy,
     DenialReason,
@@ -219,3 +221,10 @@ def test_every_produced_event_keeps_the_causal_link():
     agent = ProactiveAgent(clock=local)
     event = _event()
     assert agent.handle(event)[0].caused_by == event.event_id
+
+
+def test_every_delivery_channel_has_a_cost():
+    # `ContactPolicy` falls back to chat's price for a channel it does not know, so a
+    # missing key would not fail: a voice contact would be costed at R$0.12 instead of
+    # R$1.40 and the cost-per-contact comparison would be silently wrong.
+    assert set(CHANNEL_COST) == DELIVERY_CHANNELS

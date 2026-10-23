@@ -93,7 +93,7 @@ faturamento, e **não acrescenta nenhuma decisão nova a nenhum agente**. O risc
 real está no *contrato de canal*. O que está provado hoje é preciso e mais estreito do que
 um segundo adaptador provaria: **nenhum agente consegue importar um canal** — há um teste
 que varre o pacote de agentes com um analisador sintático e falha se qualquer um deles
-importar um canal por qualquer grafia, e esse teste tem o seu próprio teste, que planta
+importar um canal por qualquer declaração de import, e esse teste tem o seu próprio teste, que planta
 cada grafia e verifica que o alarme dispara. É dessa propriedade que um futuro adaptador de
 WhatsApp depende, e integrar a API não a estabeleceria: com um canal só não há nada com que
 ser inconsistente. Um segundo adaptador seria evidência mais forte, e é de onde ela virá

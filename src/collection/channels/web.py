@@ -303,7 +303,7 @@ class ChatChannel:
         self._track_reply(session, reply)
         return reply
 
-    def send_audio(self, session_id: str, path: Path) -> ChatReply:
+    def send_audio(self, session_id: str, path: Path, *, rate_checked: bool = False) -> ChatReply:
         """Route one voice note through the orchestrator, exactly as `send` routes text.
 
         The channel does not transcribe. It hands the orchestrator an `audio_received`
@@ -319,9 +319,14 @@ class ChatChannel:
         an `AudioError` into an escalation. "The decoder refused the file" is a bad
         request the caller can fix; "the agent could not understand it" is a conversation
         a person should pick up. They are different outcomes and must not look alike.
+
+        `rate_checked` is for a caller that already spent the rate-limit hit before
+        reading the upload (the HTTP route does, so an unknown or limited session never
+        costs a read); without it the hit is spent here and counted once either way.
         """
         session = self.store.get(session_id)
-        session.check_rate()
+        if not rate_checked:
+            session.check_rate()
         audio.accept(path)
         history = self._history(session)
         customer_turn = session.record("customer", VOICE_NOTE_PLACEHOLDER)
