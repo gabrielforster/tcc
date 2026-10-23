@@ -66,6 +66,7 @@ class SessionResponse(BaseModel):
     session_id: str
     greeting: str
     identified: bool = Field(description="false when the visitor is anonymous")
+    delivery_id: str | None = Field(default=None, description="delivery id of the greeting")
 
 
 class MessageRequest(BaseModel):

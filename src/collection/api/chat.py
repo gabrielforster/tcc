@@ -127,7 +127,10 @@ def create_router(service: ChatService) -> APIRouter:
         except Exception as error:
             raise _http_error(error) from error
         return SessionResponse(
-            session_id=session.session_id, greeting=greeting, identified=session.identified
+            session_id=session.session_id,
+            greeting=greeting,
+            identified=session.identified,
+            delivery_id=session.greeting_delivery_id,
         )
 
     @router.post("/sessions/{session_id}/messages", response_model=MessageResponse)

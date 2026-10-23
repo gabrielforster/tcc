@@ -11,7 +11,7 @@ import pytest
 
 from collection.agents.responsive import TemplateResponder
 from collection.channels import Channel, ChannelCapabilities
-from collection.channels.delivery import DeliveryLog, DeliveryStatus
+from collection.channels.delivery import BackwardsStatus, DeliveryLog, DeliveryStatus
 from collection.channels.web import ChatChannel
 
 SRC_DIR = Path(__file__).resolve().parent.parent / "src"
@@ -123,8 +123,11 @@ def test_status_only_moves_forward():
     rec = log.record("oi")
     assert rec.status is DeliveryStatus.ENVIADA
     log.advance(rec.id, DeliveryStatus.LIDA)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as caught:
         log.advance(rec.id, DeliveryStatus.ENTREGUE)
+    assert isinstance(caught.value, BackwardsStatus)
+    assert caught.value.current is DeliveryStatus.LIDA
+    assert caught.value.attempted is DeliveryStatus.ENTREGUE
     assert log.of(rec.id).status is DeliveryStatus.LIDA
 
 
@@ -170,3 +173,9 @@ def test_deliver_records_an_outbound_message(index):
     assert channel.delivery.of(delivery_id).status is DeliveryStatus.ENVIADA
     assert channel.capabilities.shows_delivery_status
     assert not channel.capabilities.realtime
+
+
+def test_the_greeting_is_trackable(index):
+    channel = ChatChannel(index=index)
+    session, _ = channel.open()
+    assert channel.delivery.of(session.greeting_delivery_id).status is DeliveryStatus.ENVIADA

@@ -23,10 +23,12 @@ one means, because a status column is easy to read as a stronger claim than it i
   they understood or agreed.
 
 The ladder is monotonic. A status never moves backwards, and trying to raises
-`ValueError`: a late `ENTREGUE` report arriving after `LIDA` is a client bug or a replay,
-and silently accepting it would let the record contradict itself. Repeating the current
-status is a harmless no-op, since clients retry. Rungs may be skipped -- a client that
-reports only `LIDA`, or a customer who replies before any report arrives, is normal.
+`BackwardsStatus` (a `ValueError` that carries the current and attempted status, so a
+caller can tell a late report from a nonsense one): a late `ENTREGUE` report arriving
+after `LIDA` is a client bug or a replay, and silently accepting it would let the record
+contradict itself. Repeating the current status is a harmless no-op, since clients
+retry. Rungs may be skipped -- a client that reports only `LIDA`, or a customer who
+replies before any report arrives, is normal.
 
 An unknown delivery id raises `KeyError` rather than creating a record: a status update
 for a message nobody sent is a bug in the caller, and conjuring the record would turn it
@@ -52,6 +54,23 @@ class DeliveryStatus(StrEnum):
     ENTREGUE = "entregue"
     LIDA = "lida"
     RESPONDIDA = "respondida"
+
+
+class BackwardsStatus(ValueError):
+    """An attempt to move a message down the ladder.
+
+    Carries both statuses. A late `ENTREGUE` after the customer already replied is a normal
+    race and the caller may treat it as benign; a report that contradicts the record in
+    any other way is not. Telling them apart is the caller's decision, so the facts are here.
+    """
+
+    def __init__(self, delivery_id: str, current: "DeliveryStatus", attempted: "DeliveryStatus"):
+        super().__init__(
+            f"{delivery_id} is already {current.value}; it cannot go back to {attempted.value}"
+        )
+        self.delivery_id = delivery_id
+        self.current = current
+        self.attempted = attempted
 
 
 _RANK = {status: rank for rank, status in enumerate(DeliveryStatus)}
@@ -92,10 +111,7 @@ class DeliveryLog:
         with self._lock:
             current = self._records[delivery_id]
             if _RANK[status] < _RANK[current.status]:
-                raise ValueError(
-                    f"{delivery_id} is already {current.status.value}; "
-                    f"it cannot go back to {status.value}"
-                )
+                raise BackwardsStatus(delivery_id, current.status, status)
             if status is current.status:
                 return current
             updated = DeliveryRecord(id=delivery_id, status=status, at=self._clock())

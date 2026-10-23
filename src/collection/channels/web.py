@@ -128,7 +128,10 @@ class ChatChannel:
         """Start a conversation and return it with the greeting to display."""
         session = self.store.open(token)
         session.record("agent", GREETING)
-        self._awaiting_reply[session.session_id] = self.delivery.record(GREETING).id
+        # Tracked like any agent message, and its id is handed to the widget so it can
+        # report the first message of the thread too.
+        session.greeting_delivery_id = self.delivery.record(GREETING).id
+        self._awaiting_reply[session.session_id] = session.greeting_delivery_id
         return session, GREETING
 
     def transcript(self, session_id: str) -> list[dict[str, object]]:
@@ -241,13 +244,13 @@ class ChatChannel:
     def _mark_answered(self, session: Session) -> None:
         """The customer's turn arrived: the agent message before it was answered.
 
-        Skipped once the thread has escalated. Handover ends the conversation and the
-        widget stops taking input, so a message that still reaches `send` is not an answer
-        to anything the system is waiting on; counting it would report a reply from a
-        thread a person now owns.
+        There is deliberately no `escalated` check here. Handover ends the thread, and the
+        mechanism is that an escalated reply is never registered as awaiting (see
+        `_track_reply`), so a message that still reaches `send` afterwards finds nothing
+        to advance. One mechanism, pinned by `test_an_escalated_thread_stops_advancing`.
         """
         delivery_id = self._awaiting_reply.pop(session.session_id, None)
-        if delivery_id is not None and not session.escalated:
+        if delivery_id is not None:
             self.delivery.advance(delivery_id, DeliveryStatus.RESPONDIDA)
 
     def _track_reply(self, session: Session, reply: ChatReply) -> None:

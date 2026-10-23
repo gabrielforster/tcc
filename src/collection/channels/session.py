@@ -136,6 +136,8 @@ class Session:
     last_seen_at: float = field(default_factory=time.time)
     transcript: list[Turn] = field(default_factory=list)
     escalated: bool = False
+    #: Delivery id of the greeting, so the widget can report on the first message.
+    greeting_delivery_id: str | None = None
     _hits: deque[float] = field(default_factory=deque, repr=False)
 
     @property
