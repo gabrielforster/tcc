@@ -34,7 +34,7 @@ from collection.channels.session import (
     issue_token,
     verify_token,
 )
-from collection.channels.web import GREETING, ChatChannel
+from collection.channels.web import GREETING, VOICE_NOTE_PLACEHOLDER, ChatChannel
 from collection.config import settings
 from collection.voice.audio import AudioError, ffmpeg_available
 from collection.voice.transcribe import ScriptedTranscriber
@@ -369,6 +369,15 @@ def test_a_spoken_figure_is_read_back_in_the_thread(index):
     assert reply.text.startswith(f'Entendi: "{SPOKEN_FIGURE}"')
 
 
+def test_the_same_figure_typed_is_not_read_back(index):
+    """Negative control: reading back answers recognition risk, not the word "reais"."""
+    channel = hearing(index, SPOKEN_FIGURE)
+    session, _ = channel.open()
+    reply = channel.send(session.session_id, SPOKEN_FIGURE)
+    assert not reply.needs_confirmation
+    assert not reply.text.startswith("Entendi:")
+
+
 @needs_ffmpeg
 def test_the_channel_hands_the_clip_to_the_agent_instead_of_transcribing_it(voice_session):
     """The recogniser is called by the agent, so its confidence gate still applies."""
@@ -385,11 +394,15 @@ def test_a_low_confidence_clip_is_escalated_not_answered(index):
     assert reply.escalated and reply.escalation_reason == "audio_unintelligible"
     assert reply.transcript == SPOKEN
     assert not reply.needs_confirmation
+    # The guess is not recorded as something the customer said.
+    assert channel.transcript(session.session_id)[-2]["text"] == VOICE_NOTE_PLACEHOLDER
 
 
 def test_audio_the_decoder_refuses_does_not_reach_the_model(voice_session, tmp_path):
     channel, sid = voice_session
-    junk = tmp_path / "x.ogg"
+    # `.txt`: refused on the suffix, before ffprobe is needed, so this means the same
+    # thing on a machine with no ffmpeg.
+    junk = tmp_path / "x.txt"
     junk.write_bytes(b"not audio")
     with pytest.raises(AudioError):
         channel.send_audio(sid, junk)
@@ -423,9 +436,20 @@ def test_an_upload_that_is_not_audio_is_a_4xx_not_a_500(client):
     sid = open_session(client)["session_id"]
     response = client.post(
         f"/chat/sessions/{sid}/audio",
-        files={"file": ("voice-note.ogg", b"not audio", "audio/ogg")},
+        files={"file": ("voice-note.txt", b"not audio", "text/plain")},
     )
     assert response.status_code == 422
+    assert "unsupported container" in response.json()["detail"]
+
+
+def test_an_oversize_upload_is_a_413(client, monkeypatch):
+    monkeypatch.setattr("collection.api.chat.MAX_UPLOAD_BYTES", 8)
+    sid = open_session(client)["session_id"]
+    response = client.post(
+        f"/chat/sessions/{sid}/audio",
+        files={"file": ("voice-note.ogg", b"123456789", "audio/ogg")},
+    )
+    assert response.status_code == 413
 
 
 def test_a_voice_note_for_an_unknown_session_is_a_404(client):

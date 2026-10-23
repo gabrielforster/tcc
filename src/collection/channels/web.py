@@ -207,8 +207,12 @@ class ChatChannel:
         reply = self._render(session_id, trace.produced)
         # The session record is what was said, not what was displayed: once the agent has
         # heard the clip, the transcript replaces the placeholder, so the thread a later
-        # turn resolves a follow-up against reads like a conversation.
-        if reply.transcript:
+        # turn resolves a follow-up against reads like a conversation. The exception is a
+        # clip the agent rejected as unintelligible: its transcript is a low-confidence
+        # guess, and writing it into the session record would make a guess read as
+        # something the customer said. That record is the audit trail of what they said,
+        # so the placeholder stays; the guess is still on the reply and the escalation.
+        if reply.transcript and reply.escalation_reason != "audio_unintelligible":
             customer_turn.text = reply.transcript
         customer_turn.intent = reply.intent
         session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)

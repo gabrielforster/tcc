@@ -50,7 +50,6 @@ from collection.config import settings
 from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
 from collection.voice.audio import AudioError
-from collection.voice.transcribe import TranscriptionError
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
@@ -61,10 +60,9 @@ _STATUS = {
     InvalidMessage: 422,
     RateLimited: 429,
     # A clip the decoder refused is a request the caller can fix, like an empty message.
+    # `TranscriptionError` is deliberately absent: the agent turns it into an escalation,
+    # so it never reaches this layer.
     AudioError: 422,
-    # Recognition itself failed (no backend, no scripted transcript): not the caller's
-    # fault and not a crash, so it is reported as unavailable rather than as a 500.
-    TranscriptionError: 503,
 }
 
 #: Upload ceiling. A two-minute OPUS note is well under a megabyte; this only stops a
@@ -153,10 +151,15 @@ def create_router(service: ChatService) -> APIRouter:
                 path = Path(directory) / name
                 data = file.file.read(MAX_UPLOAD_BYTES + 1)
                 if len(data) > MAX_UPLOAD_BYTES:
-                    raise AudioError(f"upload is larger than {MAX_UPLOAD_BYTES} bytes")
+                    raise HTTPException(
+                        status_code=413, detail=f"upload is larger than {MAX_UPLOAD_BYTES} bytes"
+                    )
                 path.write_bytes(data)
                 reply = service.channel.send_audio(session_id, path)
-        except Exception as error:
+        # Only the errors this layer knows how to explain. Anything else -- an OSError
+        # writing the temp file, a bug in rendering -- is ours, not the caller's, and
+        # should surface as a 500 rather than a tidy 400.
+        except tuple(_STATUS) as error:
             raise _http_error(error) from error
         return AudioMessageResponse(**vars(reply))
 
