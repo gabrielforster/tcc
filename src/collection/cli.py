@@ -147,11 +147,30 @@ def serve(
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(8000),
     reload: bool = typer.Option(False, help="reload on code changes"),
+    seed_demo: bool = typer.Option(
+        False, help="seed the proactive agent's contacts into this server's chat channel"
+    ),
 ) -> None:
-    """Serve the scoring API (POST /score)."""
+    """Serve the scoring API (POST /score), and the chat channel when it is enabled.
+
+    With `--seed-demo` the server runs the outbound path at startup against the channel it
+    is about to serve, so opening the widget as one of the fixture customers shows the
+    scheduled message already waiting. The outcome is printed to the server log.
+    """
+    import os
+
     import uvicorn
 
     from collection.api.app import available_models
+
+    if seed_demo:
+        # uvicorn is started by import string (so `--reload` can re-import the app in a
+        # child process), which means the flag cannot be passed as an argument and has to
+        # travel in the environment, where a `--reload` child inherits it. Without
+        # `--reload` the app is imported into *this* process, where `settings` was built
+        # before the environment changed, so the live object is set too.
+        os.environ["CHAT_SEED_DEMO"] = "1"
+        settings.chat_seed_demo = True
 
     models = available_models()
     if not models:
@@ -161,6 +180,11 @@ def serve(
     if settings.chat_enabled:
         console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
         console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")
+        if seed_demo:
+            console.print(
+                "[green]seed[/] scheduled contacts are seeded into this server's channel "
+                "at startup; open the widget as cus_a or cus_b"
+            )
     uvicorn.run("collection.api.app:app", host=host, port=port, reload=reload)
 
 
@@ -472,10 +496,14 @@ def voice(
 
 @app.command()
 def seed() -> None:
-    """Run the proactive agent over overdue receivables and seed the contacts into the chat.
+    """Report what the outbound path decides for each overdue receivable.
 
-    The outbound half of the demo: afterwards, `make serve` and opening the widget as one
-    of the customers below shows the scheduled message already waiting in the thread.
+    It runs the whole path in this process -- proactive agent, rules engine, composition,
+    compliance check, mailbox -- and prints the outcome. The mailbox it fills belongs to
+    this command and dies with it, so this does **not** leave a message for a separate
+    `collection serve` to deliver: a mailbox is an in-memory dict. The live demo is
+    `collection serve --seed-demo`, where the server seeds the channel it is serving.
+
     Nothing here needs a network or an API key -- the template composer writes the
     message, which is also the arm that CI exercises.
     """

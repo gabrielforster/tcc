@@ -566,3 +566,42 @@ def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
         mine = open_session(http, token=issue_token("c1"))
         assert report(http, other["session_id"], delivery_id, "entregue").status_code == 404
         assert report(http, mine["session_id"], delivery_id, "entregue").status_code == 200
+
+
+# ------------------------------------------------------- the one-process seeding demo
+# `collection seed` and `collection serve` are different processes and the mailbox is an
+# in-memory dict, so the seeded message only reaches a widget when the server seeds the
+# channel it is itself serving. These pin that it does, and that it stays off by default.
+
+
+def test_the_server_seeds_its_own_channel_when_the_demo_flag_is_set(channel, monkeypatch):
+    from collection.channels.outbound import SEED_DEMO_CUSTOMER
+
+    monkeypatch.setattr(settings, "chat_seed_demo", True)
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        session = open_session(http, token=issue_token(SEED_DEMO_CUSTOMER))
+        transcript = http.get(f"/chat/sessions/{session['session_id']}").json()["turns"]
+    assert len(transcript) == 2, "the greeting, then the contact seeded at startup"
+    assert transcript[-1]["role"] == "agent"
+
+
+def test_the_demo_page_identifies_itself_only_while_seeding(channel, monkeypatch):
+    """Otherwise the page is anonymous, and an anonymous session has an empty mailbox."""
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        # The page documents `data-token` in a code sample, so the live script tag is
+        # what the assertion has to look at.
+        assert 'data-api="" data-token=' not in http.get("/chat/demo").text
+    monkeypatch.setattr(settings, "chat_seed_demo", True)
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        assert 'data-api="" data-token=' in http.get("/chat/demo").text
+
+
+def test_nothing_is_seeded_by_default(channel):
+    app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
+    with TestClient(app) as http:
+        session = open_session(http, token=issue_token("cus_a"))
+        transcript = http.get(f"/chat/sessions/{session['session_id']}").json()["turns"]
+    assert len(transcript) == 1, "greeting only"

@@ -124,10 +124,18 @@ Beyond typed text, three things the WhatsApp integration was supposed to bring:
   [`docs/channels.md`](./channels.md) is precise about the difference.
 - **Threads the system starts.** `seed()` puts a scheduled contact in the customer's
   mailbox, routed through an orchestrator so opt-out suppression is the orchestrator's
-  rule rather than a second copy of it. `make seed` runs that path end to end — proactive
-  agent, rules, composition, compliance check, mailbox — and reports what happened to each
-  contact. `open()` drains the mailbox into the thread after the greeting — and checks opt-out *again* at that moment, because a customer can opt out
+  rule rather than a second copy of it. `open()` drains the mailbox into the thread after
+  the greeting — and checks opt-out *again* at that moment, because a customer can opt out
   between the seed and the widget opening.
+
+  Two commands exercise this, and they are not the same thing. `make seed` runs the whole
+  path in one process — proactive agent, rules, composition, compliance check, mailbox —
+  and **prints what happened to each receivable**; the mailbox it fills is its own and
+  disappears with the process. `make serve ARGS="--seed-demo"` runs that same path at
+  startup against the channel the server is about to serve, so the scheduled message is
+  genuinely waiting when the widget opens. The demo page identifies itself as the seeded
+  customer in that mode, since an anonymous session has a random id and so an empty
+  mailbox.
 
 ## Transparency
 

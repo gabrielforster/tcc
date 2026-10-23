@@ -38,6 +38,10 @@ from collection.rag.index import VectorIndex
 #: it is run.
 DEMO_CLOCK = datetime(2026, 9, 10, 10, 30, tzinfo=ZoneInfo("America/Sao_Paulo"))
 
+#: The fixture customer the demo page identifies itself as, so the message seeded for them
+#: is the one waiting when the widget opens.
+SEED_DEMO_CUSTOMER = "cus_a"
+
 #: Customers who asked not to be contacted. One of them is overdue below, on purpose.
 OPTED_OUT = frozenset({"cus_optout"})
 
@@ -47,7 +51,7 @@ def overdue() -> list[Event]:
     return [
         Event(
             type=EventType.OVERDUE_DETECTED,
-            customer_id="cus_a",
+            customer_id=SEED_DEMO_CUSTOMER,
             invoice_id="inv_1",
             payload={"days_late": 12, "amount": 1250.0, "customer_name": "Marina"},
         ),
@@ -102,15 +106,22 @@ class SeedResult:
 def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -> SeedResult:
     """Run the proactive agent over overdue receivables and seed what it schedules.
 
-    Returns the channel's own view of what it accepted and declined. The channel is
-    returned to the caller through the object it was given, so a CLI can open a session on
-    the same channel afterwards and see the thread.
+    Seeds into `channel` when one is given -- which is how the live demo works: the API
+    hands over the channel it is already serving, so the mailbox the job fills is the
+    mailbox the widget drains. A mailbox is an in-memory dict, so a run against a channel
+    of its own leaves nothing behind for another process; `collection seed` is a report of
+    what the path does, and `collection serve --seed-demo` is the demo of it.
     """
     if channel is None:
         index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
-        # The channel and the orchestrator below share one opted-out set, so an opt-out
-        # recorded in a chat thread suppresses a contact scheduled in the same process.
-        channel = ChatChannel(index=index, opted_out=set(OPTED_OUT))
+        channel = ChatChannel(index=index)
+
+    # The fixture names a customer who has opted out, and the whole point of including
+    # them is to watch the contact be suppressed. A channel that had never heard of them
+    # would contact them instead, which would make the demo a demonstration of the bug.
+    # The channel and the orchestrator below then share one set, so an opt-out typed into
+    # a chat thread also suppresses a contact scheduled later in the same process.
+    channel.opted_out |= set(OPTED_OUT)
 
     agent = ProactiveAgent(clock=lambda: DEMO_CLOCK)
     orchestrator = Orchestrator(agents=[agent], opted_out=channel.opted_out)
@@ -137,3 +148,22 @@ def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -
         else:
             result.suppressed.append(event)
     return result
+
+
+def summary_lines(result: SeedResult) -> list[str]:
+    """The run's outcome as plain text, for a log that has no table in it.
+
+    Shared with the CLI so the server's startup line and `collection seed` cannot drift
+    into reporting the same run differently.
+    """
+    lines = [
+        f"seed: {len(result.seeded)} seeded, {len(result.suppressed)} suppressed, "
+        f"{len(result.other_channel)} for another channel, {len(result.escalated)} escalated "
+        f"({result.total} receivables considered)"
+    ]
+    lines += [f"seed:   {event.customer_id} -> waiting ({dlv})" for event, dlv in result.seeded]
+    lines.append(
+        "seed: seeded, not pushed -- each message waits in the customer's mailbox until "
+        "the widget is opened."
+    )
+    return lines

@@ -151,13 +151,29 @@ Two mechanical properties keep the record truthful:
 The proactive agent can decide to start a conversation. What it cannot do is interrupt
 anyone: there is **no push transport**. `ChatChannel.seed` puts the composed message in a
 per-customer mailbox, and `open()` drains it into the thread after the greeting, oldest
-first. That path is wired end to end by `collection seed` (`make seed`), which runs the
-proactive agent over overdue receivables and reports how many contacts were seeded,
-suppressed, declined as belonging to another channel, or escalated for failing their
-compliance check. The demo is `make seed`, then `make serve` and open the widget — and the
-message waits, possibly forever, for a customer who never comes back. The receivables that
-command runs over are a fixture written out in `channels/outbound.py`, not a query: no job
-in this repository reads overdue invoices out of a dataset, because the datasets live under
+first.
+
+`channels/outbound.py` is that path, run end to end: the proactive agent over overdue
+receivables, the rules engine, composition, the compliance check, and the mailbox. Two
+commands use it, and the difference between them is the mailbox's own nature.
+
+```sh
+make seed                        # the report: runs the path and prints the outcome per receivable
+make serve ARGS="--seed-demo"    # the demo: the server seeds the channel it is serving
+```
+
+**A mailbox is an in-memory dict.** `make seed` therefore fills a mailbox that belongs to
+its own process and vanishes with it — it is a report of what the path decides, not a way
+to leave a message for a server to serve later. `serve --seed-demo` seeds the channel the
+API itself holds, which is what makes "open the widget and the message is waiting" true
+rather than a claim; in that mode the demo page is served carrying a token for the seeded
+customer, since an anonymous session has a random id and so an empty mailbox. Nothing is
+persisted either way: a restart loses the thread, exactly as it loses the sessions.
+
+And the message still waits, possibly forever, for a customer who never comes back.
+
+The receivables are a fixture written out in `channels/outbound.py`, not a query: no job in
+this repository reads overdue invoices out of a dataset, because the datasets live under
 `data/` and are never committed.
 
 This is named rather than hidden because the alternative was to claim a delivery the
@@ -224,7 +240,7 @@ Named here, and inherited by the article's limitations section:
 | `src/collection/channels/base.py` | `Channel`, `ChannelCapabilities`, `DELIVERY_CHANNELS` |
 | `src/collection/channels/delivery.py` | The status ladder, channel-neutral so the voice channel reuses it |
 | `src/collection/channels/web.py` | `ChatChannel`: voice notes, mailbox, delivery tracking, opt-out |
-| `src/collection/channels/outbound.py` | The join: proactive agent → scheduled contact → mailbox (`make seed`) |
+| `src/collection/channels/outbound.py` | The join: proactive agent → scheduled contact → mailbox |
 | `src/collection/channels/session.py` | Sessions, tokens, rate limits |
 | `src/collection/api/chat.py` | The HTTP surface, including the delivery-report endpoint |
 | `tests/test_channels.py` | The contract, the ladder, the seeding rules, and the import guard |

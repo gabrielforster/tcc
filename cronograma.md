@@ -139,10 +139,12 @@ ele aparece no topo do fio quando o widget é aberto.
 **Por quê.** Não há transporte de *push* sem a conta de um provedor — que é exatamente o
 que 2.1 removeu. A alternativa seria afirmar uma entrega que o sistema não realiza. A
 composição, a checagem de conformidade, a supressão por *opt-out* e o rastreamento de
-status são os pedaços difíceis e estão todos construídos, e o comando `make seed` executa o
-caminho inteiro — agente proativo, regras, composição, conformidade e caixa de entrada —
-relatando quantos contatos foram semeados, suprimidos ou recusados por serem de outro
-canal. O transporte de chegada ao vivo (SSE ou *polling*, contra o mesmo contrato) fica
+status são os pedaços difíceis e estão todos construídos. O comando `make seed` executa o
+caminho inteiro — agente proativo, regras, composição, conformidade e caixa de entrada — e
+relata quantos contatos foram semeados, suprimidos ou recusados por serem de outro canal;
+a demonstração ao vivo é `make serve ARGS="--seed-demo"`, em que o próprio servidor semeia
+o canal que ele atende, porque a caixa de entrada vive em memória e não atravessa
+processos. O transporte de chegada ao vivo (SSE ou *polling*, contra o mesmo contrato) fica
 registrado como trabalho futuro.
 
 **O que falta nos resultados.** Qualquer métrica de alcance de campanha proativa: um fio

@@ -48,7 +48,7 @@ outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs
 voice:            ## sweep what recognition error costs; ARGS="--audio FILE" transcribes one clip
 	uv run collection voice $(ARGS)
 
-seed:             ## schedule outbound contacts and leave them waiting in the chat channel
+seed:             ## report what the outbound path decides (serve --seed-demo is the live demo)
 	uv run collection seed
 
 pipeline:         ## the whole data pipeline, end to end

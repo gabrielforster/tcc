@@ -41,12 +41,14 @@ from collection.api.schemas import (
     TranscriptTurn,
 )
 from collection.channels.delivery import BackwardsStatus, DeliveryStatus
+from collection.channels.outbound import SEED_DEMO_CUSTOMER
 from collection.channels.session import (
     ConversationEnded,
     InvalidMessage,
     RateLimited,
     SessionNotFound,
     TokenError,
+    issue_token,
 )
 from collection.channels.web import ChatChannel
 from collection.config import settings
@@ -236,6 +238,18 @@ def create_router(service: ChatService) -> APIRouter:
     @router.get("/demo", include_in_schema=False, response_class=HTMLResponse)
     def demo() -> HTMLResponse:
         """A host page that embeds the widget, for seeing it work end to end."""
-        return HTMLResponse((WEB_DIR / "demo.html").read_text(encoding="utf-8"))
+        html = (WEB_DIR / "demo.html").read_text(encoding="utf-8")
+        if settings.chat_seed_demo:
+            # A seeded message is addressed to a customer, and this page is otherwise
+            # anonymous -- an anonymous session gets a random id and so an empty mailbox.
+            # In demo mode the page is therefore served carrying a token for the fixture
+            # customer whose contact was seeded at startup. The rule still holds: the
+            # token is minted on the server, and the browser cannot mint one itself.
+            html = html.replace(
+                'data-api=""',
+                f'data-api="" data-token="{issue_token(SEED_DEMO_CUSTOMER)}"',
+                1,
+            )
+        return HTMLResponse(html)
 
     return router

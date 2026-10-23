@@ -304,9 +304,13 @@ because both are easy to read as stronger claims than they are: `entregue` and `
 with no push transport, the message waits in a mailbox until the customer opens the widget.
 
 ```sh
-make seed           # schedule outbound contacts and leave them waiting in the chat
-make serve          # open the widget as one of those customers and the message is there
+make seed                        # report what the outbound path decides, receivable by receivable
+make serve ARGS="--seed-demo"    # the live demo: the server seeds the channel it serves
 ```
+
+The two are not interchangeable. A mailbox is in memory, so `make seed` fills one that
+dies with the command; only `--seed-demo` leaves a message waiting in a thread a browser
+can open, because then it is the same channel object.
 
 The WhatsApp Business API and real telephony were replaced by this simulated chat channel
 and a real-time voice channel, deliberately and for a stated reason — the integrations add
