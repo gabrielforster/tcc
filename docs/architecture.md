@@ -86,6 +86,16 @@ has to be asked for by name, which is what keeps it auditable. The reasoning, an
 holes the guard deliberately does not cover, are written out in
 `src/collection/db/session.py`.
 
+**The pseudonym is scoped too.** The guard decides what a query may return; it says
+nothing about what two tenants' anonymized tables look like side by side. Keys become
+HMAC-SHA256 pseudonyms, and under one global key the same debtor carries the same token
+everywhere — which in collections is the common case, since a person owes more than one
+creditor. Anyone holding both tenants' exports could then line their customers up without
+learning a single name, and nothing in the database would have been queried wrongly. So
+the key is derived per tenant from `ANONYMIZATION_SALT` (`src/collection/crypto.py`), and
+a pseudonym means "this tenant's customer 7" rather than "customer 7". The salt itself is
+never a key: the chat token signature derives its own, so neither use can forge the other.
+
 ## The event contract
 
 Every interaction is an immutable `Event`. Agents never mutate what they receive; they emit

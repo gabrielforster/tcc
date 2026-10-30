@@ -38,6 +38,18 @@ def score_customers(scope: TenantScope, task: str) -> int:
     )
 
     by_pseudonym = {c.pseudonym: c for c in scope.all(Customer)}
+    scored = {str(key) for key in per_customer.index}
+    # One pseudonym that names no row is ordinary: a customer can be removed between an
+    # ingest and a scoring run, and the loop below skips it. None of them matching is a
+    # different thing -- the stored frames and the rows were pseudonymized under different
+    # keys -- and skipping that quietly writes no scores and reports success.
+    if scored and by_pseudonym and not scored & by_pseudonym.keys():
+        raise LookupError(
+            "None of the scored pseudonyms names one of this tenant's customers: the "
+            "stored frames and the rows were anonymized under different keys. Re-run "
+            "`collection ingest` to rewrite both."
+        )
+
     for old in scope.all(CustomerScore, CustomerScore.platform_model_id == model.id):
         scope.session.delete(old)
     scope.session.flush()
