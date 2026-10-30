@@ -7,17 +7,24 @@ in the contact queue.
 The ranking, not the probability, is the operational output. The active module works down
 a finite queue every day, so what matters is the ordering -- which is also why the models
 are selected on average precision.
+
+The models are the platform's, so the registry asks the record which version of each is
+current and fetches its weights from object storage. It never looks in a directory: a
+replica started on a machine that has never trained anything serves the same model as any
+other. If the record or the bucket cannot be reached at startup the registry comes up
+empty and says so, and `/score` answers 404 for every task, as it does when nothing has
+been trained; one dependency being down must not stop the chat from serving.
 """
 
-from collections.abc import AsyncIterator
+import logging
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
-import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import SQLAlchemyError
 
 from collection.api.chat import ChatService, create_router
 from collection.api.schemas import (
@@ -28,29 +35,37 @@ from collection.api.schemas import (
     ScoreResponse,
 )
 from collection.config import settings
+from collection.db.session import unit_of_work
+from collection.models.store import load_bundle
+from collection.storage.objects import ObjectStoreError
+
+logger = logging.getLogger(__name__)
 
 TASKS = ("propensity", "default")
 #: Columns carried through to the response but never fed to the model.
 PASSTHROUGH = ("invoice_id", "customer_id")
 
 
-def _model_path(task: str) -> Path:
-    return settings.dir_processed / f"model_{task}.joblib"
-
-
-def available_models() -> list[str]:
-    return [task for task in TASKS if _model_path(task).exists()]
+def load_published() -> dict[str, dict[str, Any]]:
+    """The latest published bundle of each task, from the record and the platform prefix."""
+    try:
+        with unit_of_work(platform=True) as session:
+            bundles = {task: load_bundle(session, task) for task in TASKS}
+    except (SQLAlchemyError, ObjectStoreError) as exc:
+        logger.warning("no models loaded: the record or object storage is unreachable: %s", exc)
+        return {}
+    return {task: bundle for task, bundle in bundles.items() if bundle is not None}
 
 
 class ModelRegistry:
-    """Loads the serialized champions once, at startup."""
+    """Loads the published champions once, at startup."""
 
-    def __init__(self) -> None:
+    def __init__(self, loader: Callable[[], dict[str, dict[str, Any]]] = load_published) -> None:
+        self._loader = loader
         self._bundles: dict[str, dict[str, Any]] = {}
 
     def load(self) -> None:
-        for task in available_models():
-            self._bundles[task] = joblib.load(_model_path(task))
+        self._bundles = dict(self._loader())
 
     def get(self, task: str) -> dict[str, Any]:
         if task not in self._bundles:

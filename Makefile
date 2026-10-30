@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer outreach voice seed migrate pipeline test lint fmt
+.PHONY: setup up down extract ingest dictionary eda features train score explain serve demo rag answer outreach voice seed migrate pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -9,10 +9,10 @@ up:               ## start Postgres (pgvector), Redis and MinIO
 down:
 	docker compose down
 
-extract:          ## extract the raw dataset from the configured source
+extract:          ## store the raw dataset in object storage (COLLECTION_TENANT=<slug>)
 	uv run collection extract
 
-ingest:           ## anonymize + validate + write to data/interim
+ingest:           ## extract + anonymize + validate; needs COLLECTION_TENANT=<slug>
 	uv run collection ingest
 
 dictionary:       ## regenerate docs/data-dictionary.md from the domain schema
@@ -24,8 +24,11 @@ eda:              ## descriptive statistics and charts under docs/eda/
 features:         ## feature engineering + chronological 70/15/15 split
 	uv run collection features
 
-train:            ## train candidates, pick a champion, score it once on test
+train:            ## train candidates, publish the champion as a platform model version
 	uv run collection train
+
+score:            ## score the tenant's customers against the latest platform model
+	uv run collection score
 
 explain:          ## permutation importance and SHAP for the champion
 	uv run collection explain

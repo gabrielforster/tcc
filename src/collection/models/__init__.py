@@ -1,3 +1,3 @@
-from collection.models.train import evaluate_task, train_task
+from collection.models.train import FittedTask, TrainedModel, fit_task, train
 
-__all__ = ["evaluate_task", "train_task"]
+__all__ = ["FittedTask", "TrainedModel", "fit_task", "train"]

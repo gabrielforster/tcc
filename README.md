@@ -139,8 +139,8 @@ make test lint
 
 | Output | Contents |
 |---|---|
-| `data/raw/` | Raw dataset from the configured source (personal data; never committed) |
-| `data/interim/` | Anonymized dataset (LGPD) — the starting point for analysis |
+| `data/raw/` | Only for sources that read local files (e.g. Home Credit CSVs). Pipeline output no longer goes here: raw and anonymized frames are objects under the tenant prefix |
+| `data/interim/` | Unused by the pipeline; kept for a developer who asks for a file |
 | `data/processed/` | Chronological 70/15/15 splits and the serialized preprocessor, per task |
 | `docs/data-dictionary.md` | Dictionary generated from the domain schema |
 | `docs/eda-<source>.md` + `docs/eda/<source>/*.png` | Exploratory report and charts, one set per data source |

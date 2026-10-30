@@ -15,12 +15,11 @@ period, the way the system runs in production.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from collection.config import settings
-from collection.data.ingest import load_interim
 from collection.domain.schema import (
     DEFAULT_THRESHOLD_DAYS,
     PROPENSITY_WINDOW_DAYS,
@@ -149,12 +148,15 @@ def _contact_history(
 
 
 # ----------------------------------------------------------------------- features
-def build_features(task: str = "propensity") -> pd.DataFrame:
-    """Assemble the feature table for one of the two predictive tasks."""
+def build_features(task: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Assemble the feature table for one of the two predictive tasks.
+
+    `tables` are the anonymized frames, handed in rather than read from a path: where
+    they come from (a tenant's object storage, a test) is the caller's decision.
+    """
     if task not in TASKS:
         raise ValueError(f"task must be one of {TASKS}")
 
-    tables = load_interim()
     customers, invoices = tables["customers"], tables["invoices"].copy()
     if invoices.empty:
         raise ValueError(
@@ -236,9 +238,11 @@ def build_features(task: str = "propensity") -> pd.DataFrame:
     return output
 
 
-def build_splits(task: str = "propensity", ratios: tuple[float, float] = (0.70, 0.15)) -> Splits:
+def build_splits(
+    task: str, tables: dict[str, pd.DataFrame], ratios: tuple[float, float] = (0.70, 0.15)
+) -> Splits:
     """Chronological 70/15/15 split: train on the past, test on the future."""
-    features = build_features(task)
+    features = build_features(task, tables)
     target = TARGET_TASK_1 if task == "propensity" else TARGET_TASK_2
     n = len(features)
     train_end = int(n * ratios[0])
@@ -252,16 +256,17 @@ def build_splits(task: str = "propensity", ratios: tuple[float, float] = (0.70, 
     )
 
 
-def save_splits(task: str = "propensity") -> dict[str, str]:
-    settings.prepare_directories()
-    splits = build_splits(task)
+def save_splits(task: str, tables: dict[str, pd.DataFrame], directory: Path) -> dict[str, str]:
+    """Write the three splits as parquet into `directory`, for a developer who asks for files."""
+    directory.mkdir(parents=True, exist_ok=True)
+    splits = build_splits(task, tables)
     paths = {}
     for name, df in [
         ("train", splits.train),
         ("validation", splits.validation),
         ("test", splits.test),
     ]:
-        path = settings.dir_processed / f"{task}_{name}.parquet"
+        path = directory / f"{task}_{name}.parquet"
         df.to_parquet(path, index=False)
         paths[name] = str(path)
     return paths

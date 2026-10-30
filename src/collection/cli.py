@@ -1,10 +1,17 @@
 """Command line interface for the data pipeline."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Annotated
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from collection.config import settings
+from collection.db.repository import TenantScope
+from collection.db.session import unit_of_work
 
 app = typer.Typer(help="Multi-agent debt collection system pipeline.", no_args_is_help=True)
 console = Console()
@@ -13,17 +20,45 @@ db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 
 
+TenantOption = Annotated[
+    str,
+    typer.Option(
+        "--tenant",
+        envvar="COLLECTION_TENANT",
+        help="Slug of the tenant whose data the pipeline works on (or COLLECTION_TENANT).",
+    ),
+]
+
+
+@contextmanager
+def _tenant_scope(slug: str) -> Iterator[TenantScope]:
+    """A scope on the tenant named by `slug`, committed when the command succeeds."""
+    from sqlalchemy import select
+
+    from collection.db.models import Tenant
+
+    with unit_of_work(platform=True) as lookup:
+        tenant_id = lookup.scalar(select(Tenant.id).where(Tenant.slug == slug))
+    if tenant_id is None:
+        console.print(f"[red]No tenant with slug {slug!r}.[/]")
+        raise typer.Exit(code=1)
+    with unit_of_work(tenant_id) as session:
+        yield TenantScope(session, tenant_id)
+
+
 @app.command()
 def extract(
+    tenant: TenantOption,
     source: str = typer.Option(
         None,
         help="synthetic | home-credit | bank-marketing | erp (defaults to DATA_SOURCE in .env)",
     ),
 ) -> None:
-    """Extract the raw dataset from the configured source into data/raw."""
+    """Extract the raw dataset from the configured source into the tenant's object storage."""
     from collection.data.ingest import extract as _extract
 
-    dataset = _extract(source)
+    with _tenant_scope(tenant) as scope:
+        dataset = _extract(scope, source)
     table = Table(title=f"Raw dataset ({source or settings.data_source})")
     table.add_column("table")
     table.add_column("rows", justify="right")
@@ -32,16 +67,25 @@ def extract(
         covered = "[green]yes[/]" if name in dataset.provides else "[dim]-[/]"
         table.add_row(name, f"{len(df):,}", covered)
     console.print(table)
-    console.print(f"[green]Written to[/] {settings.dir_raw}")
+    console.print(f"[green]Stored under[/] tenants/<id>/raw/ for {tenant}")
 
 
 @app.command()
-def ingest() -> None:
-    """Anonymize (LGPD), validate the schema and write the dataset to data/interim."""
+def ingest(
+    tenant: TenantOption,
+    source: str = typer.Option(None, help="defaults to DATA_SOURCE in .env"),
+) -> None:
+    """Extract, anonymize (LGPD), validate, and write the tenant's rows and objects."""
     from collection.data.ingest import ingest as _ingest
 
-    for name, path in _ingest().items():
-        console.print(f"[green]ok[/] {name} -> {path}")
+    with _tenant_scope(tenant) as scope:
+        report = _ingest(scope, source)
+    console.print(
+        f"[green]ok[/] {report.source}: {report.customers} customers, "
+        f"{report.receivables} receivables"
+    )
+    for key in (*report.raw_keys, *report.interim_keys):
+        console.print(f"  {key}")
 
 
 @app.command()
@@ -53,52 +97,69 @@ def dictionary() -> None:
 
 
 @app.command()
-def eda() -> None:
-    """Generate docs/eda.md and the charts under docs/eda/."""
+def eda(tenant: TenantOption) -> None:
+    """Generate docs/eda.md and the charts under docs/eda/ from the tenant's data."""
     from collection.eda.report import generate_report
 
-    console.print(f"[green]ok[/] {generate_report()}")
+    with _tenant_scope(tenant) as scope:
+        console.print(f"[green]ok[/] {generate_report(scope)}")
 
 
 @app.command()
 def features(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            help="also write the splits and the preprocessor as files into this directory"
+        ),
+    ] = None,
 ) -> None:
-    """Build features, the chronological 70/15/15 split and the preprocessor."""
+    """Build features and the chronological 70/15/15 split; files only if `--out` is given."""
+    from collection.data.ingest import load_interim
     from collection.features.build import build_splits, save_splits
     from collection.features.preprocess import fit_and_save
 
     tasks = ["propensity", "default"] if task == "both" else [task]
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
     for t in tasks:
         try:
-            splits = build_splits(t)
+            splits = build_splits(t, tables)
         except ValueError as error:
             # Expected when the ingested source carries no receivables; a traceback here
             # would suggest a bug rather than a source that covers a different table.
             console.print(f"[yellow]skipped[/] {error}")
             raise typer.Exit(code=1) from None
-        save_splits(t)
-        preprocessor_path = fit_and_save(splits)
         console.print(f"\n[bold]Task: {t}[/] (target `{splits.target}`)")
         console.print(splits.summary().to_string(index=False))
-        console.print(f"[green]preprocessor[/] -> {preprocessor_path}")
+        if out is not None:
+            save_splits(t, tables, out)
+            console.print(f"[green]preprocessor[/] -> {fit_and_save(splits, out)}")
 
 
 @app.command()
 def train(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
     tune: bool = typer.Option(True, help="run the randomised hyperparameter search"),
 ) -> None:
-    """Train the candidate models, pick a champion and score it once on the test split."""
-    import joblib
-
+    """Train the platform model on the tenant's data, record a new version, score it once."""
+    from collection.data.ingest import load_interim, source_metadata
     from collection.models import report as model_report
-    from collection.models.train import train_task
+    from collection.models.train import train as _train
+    from collection.storage.objects import ObjectStore
+
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
+        source = source_metadata(scope)["source"]
 
     tasks = ["propensity", "default"] if task == "both" else [task]
     for t in tasks:
         console.print(f"\n[bold]Training: {t}[/]")
-        result = train_task(t, tune=tune)
+        trained = _train(t, tables, source=source, tune=tune)
+        result = trained.fitted.result
         console.print(result.comparison_table().to_string(index=False))
         console.print(f"\n[green]champion[/] {result.champion} (threshold {result.threshold:.2f})")
         console.print(
@@ -106,43 +167,73 @@ def train(
             f"roc_auc={result.test.roc_auc:.4f} f1={result.test.f1:.4f} "
             f"(majority baseline average_precision={result.test_baseline['average_precision']:.4f})"
         )
-
-        from collection.features.build import build_splits
-
-        splits = build_splits(t)
-        bundle = joblib.load(settings.dir_processed / f"model_{t}.joblib")
-        x_test = splits.test.drop(columns=[splits.target])
+        console.print(f"[green]model[/] {trained.row.artifact_key} (version {trained.row.version})")
         curve = model_report.curves(
-            bundle["pipeline"], x_test, splits.test[splits.target], result.source, t
+            trained.fitted.pipeline,
+            trained.fitted.x_test,
+            trained.fitted.y_test,
+            name=f"{t}-v{trained.row.version}-curves.png",
+            store=ObjectStore(),
         )
         console.print(f"[green]report[/] -> {model_report.write(result, curve)}")
 
 
 @app.command()
 def explain(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
 ) -> None:
-    """Permutation importance and SHAP values for the trained champion."""
-    import joblib
-
+    """Permutation importance and SHAP values for the latest platform model."""
+    from collection.data.ingest import load_interim
     from collection.features.build import build_splits
     from collection.models.explain import explain as _explain
     from collection.models.explain import write_report
+    from collection.models.store import latest_model, read_bundle
+    from collection.storage.objects import ObjectStore
 
     tasks = ["propensity", "default"] if task == "both" else [task]
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
+    with unit_of_work(platform=True) as platform:
+        models = {t: latest_model(platform, t) for t in tasks}
     for t in tasks:
-        path = settings.dir_processed / f"model_{t}.joblib"
-        if not path.exists():
+        row = models[t]
+        if row is None:
             console.print(f"[yellow]skipped[/] no model for '{t}'. Run `collection train` first.")
             continue
-        bundle = joblib.load(path)
-        splits = build_splits(t)
+        bundle = read_bundle(row)
+        splits = build_splits(t, tables)
         x_test = splits.test[bundle["features"]]
         y_test = splits.test[splits.target].to_numpy()
-        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']})")
-        explanation = _explain(bundle["pipeline"], x_test, y_test, t, bundle["source"])
+        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']}, version {row.version})")
+        explanation = _explain(
+            bundle["pipeline"],
+            x_test,
+            y_test,
+            t,
+            bundle["source"],
+            store=ObjectStore(),
+            version=row.version,
+        )
         console.print(explanation.permutation.head(10).to_string(index=False))
         console.print(f"[green]report[/] -> {write_report(explanation)}")
+
+
+@app.command()
+def score(
+    tenant: TenantOption,
+    task: str = typer.Option("propensity", help="propensity | default"),
+) -> None:
+    """Score the tenant's customers against the platform's latest model."""
+    from collection.models.scoring import score_customers
+
+    with _tenant_scope(tenant) as scope:
+        try:
+            written = score_customers(scope, task)
+        except LookupError as error:
+            console.print(f"[yellow]skipped[/] {error}")
+            raise typer.Exit(code=1) from None
+    console.print(f"[green]ok[/] {written} customers scored ({task})")
 
 
 @app.command()
@@ -569,13 +660,12 @@ def db_downgrade(revision: str = typer.Argument("-1", help="Target revision.")) 
 
 
 @app.command()
-def pipeline() -> None:
-    """Run extract + ingest + dictionary + eda + features."""
-    extract(source=None)
-    ingest()
+def pipeline(tenant: TenantOption) -> None:
+    """Run ingest (which extracts) + dictionary + eda + features for the tenant."""
+    ingest(tenant=tenant, source=None)
     dictionary()
-    eda()
-    features(task="both")
+    eda(tenant=tenant)
+    features(tenant=tenant, task="both", out=None)
 
 
 if __name__ == "__main__":

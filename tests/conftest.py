@@ -8,8 +8,13 @@ for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_var, _THREADS)
 os.environ.setdefault("N_JOBS", _THREADS)
 
+import uuid  # noqa: E402
+
+import boto3  # noqa: E402
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
+from botocore.config import Config  # noqa: E402
+from botocore.exceptions import ClientError  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -67,3 +72,41 @@ def db(db_engine):
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture(scope="session")
+def monkeypatch_session():
+    with pytest.MonkeyPatch.context() as patch:
+        yield patch
+
+
+@pytest.fixture(scope="session")
+def bucket(monkeypatch_session):
+    name = f"collection-test-{uuid.uuid4().hex[:12]}"
+    client = boto3.client(
+        "s3",
+        endpoint_url=settings.s3_endpoint_url,
+        aws_access_key_id=settings.s3_access_key,
+        aws_secret_access_key=settings.s3_secret_key,
+        region_name="us-east-1",
+        config=Config(connect_timeout=3, retries={"max_attempts": 1}),
+    )
+    try:
+        client.list_buckets()
+    except Exception as exc:
+        message = f"MinIO is unreachable at {settings.s3_endpoint_url}: {exc}"
+        if os.environ.get("COLLECTION_REQUIRE_DB") == "1":
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message)
+    # A store built without `bucket=` must not reach the configured bucket either.
+    monkeypatch_session.setattr(settings, "s3_bucket", name)
+    yield name
+    try:
+        for page in client.get_paginator("list_objects_v2").paginate(Bucket=name):
+            for item in page.get("Contents", []):
+                client.delete_object(Bucket=name, Key=item["Key"])
+        client.delete_bucket(Bucket=name)
+    except ClientError as exc:
+        # Never created if no test got as far as a first use; anything else is real.
+        if exc.response.get("Error", {}).get("Code") != "NoSuchBucket":
+            raise

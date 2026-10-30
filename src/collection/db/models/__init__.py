@@ -19,6 +19,7 @@ from collection.db.models.knowledge import (
     KnowledgeDocument,
     KnowledgeVersion,
 )
+from collection.db.models.platform_model import CustomerScore, PlatformModel
 from collection.db.models.stored_object import StoredObject
 from collection.db.models.tenant import InvalidTransition, Tenant, TenantState, advance
 
@@ -27,12 +28,14 @@ __all__ = [
     "Conversation",
     "ConversationState",
     "Customer",
+    "CustomerScore",
     "Delivery",
     "InternalUser",
     "InvalidTransition",
     "KnowledgeChunk",
     "KnowledgeDocument",
     "KnowledgeVersion",
+    "PlatformModel",
     "Receivable",
     "ReceivableStatus",
     "StoredObject",
