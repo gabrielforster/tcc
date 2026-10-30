@@ -113,7 +113,7 @@ def _serving(db: Session, slug: str = "t", state: TenantState = TenantState.ACTI
 def test_a_transcript_survives_a_new_store_over_the_same_database(db):
     channel, scope = _serving(db)
     session, greeting = channel.open()
-    channel.send(session.session_id, QUESTION)
+    reply = channel.send(session.session_id, QUESTION)
 
     # A second stack over the same rows, which is all a restarted process is.
     second = _channel(_scope(db, scope.session.get(Tenant, scope.tenant_id)))
@@ -122,7 +122,7 @@ def test_a_transcript_survives_a_new_store_over_the_same_database(db):
     assert [turn["role"] for turn in turns] == ["agent", "customer", "agent"]
     assert turns[0]["text"] == greeting == GREETING
     assert turns[1]["text"] == QUESTION
-    assert turns[2]["text"] == channel.transcript(session.session_id)[2]["text"]
+    assert turns[2]["text"] == reply.text
     # The delivery ids come back too: a widget redrawing the thread must still be able to
     # report on every agent bubble it draws.
     assert turns[0]["delivery_id"] == session.greeting_delivery_id
