@@ -5,7 +5,6 @@ here are about the contract: that the ranking is ordered, that the tuned thresho
 0.5) decides, and that a malformed payload is rejected loudly rather than scored wrongly.
 """
 
-import joblib
 import numpy as np
 import pandas as pd
 import pytest
@@ -38,33 +37,25 @@ class _RankingModel(ClassifierMixin, BaseEstimator):
         return np.column_stack([1 - positive, positive])
 
 
-@pytest.fixture
-def bundle_path(tmp_path, monkeypatch):
-    from collection.api import app as app_module
-
+def _stub_bundle() -> dict:
     pipeline = Pipeline(
         [("preprocess", FunctionTransformer(_select_features)), ("model", _RankingModel())]
     )
     pipeline.fit(pd.DataFrame({"amount": [100.0, 900.0], "hist_late_rate": [0.1, 0.5]}), [0, 1])
-    joblib.dump(
-        {
-            "pipeline": pipeline,
-            "threshold": 0.30,
-            "target": "target_payment_propensity",
-            "task": "propensity",
-            "source": "test",
-            "champion": "ranking_stub",
-            "features": FEATURES,
-        },
-        tmp_path / "model_propensity.joblib",
-    )
-    monkeypatch.setattr(app_module.settings, "dir_processed", tmp_path)
-    return tmp_path
+    return {
+        "pipeline": pipeline,
+        "threshold": 0.30,
+        "target": "target_payment_propensity",
+        "task": "propensity",
+        "source": "test",
+        "champion": "ranking_stub",
+        "features": FEATURES,
+    }
 
 
 @pytest.fixture
-def client(bundle_path):
-    registry = ModelRegistry()
+def client():
+    registry = ModelRegistry(loader=lambda: {"propensity": _stub_bundle()})
     with TestClient(create_app(registry)) as test_client:
         yield test_client
 
@@ -155,10 +146,8 @@ def test_passthrough_identifiers_are_optional(client):
     assert response.json()["results"][0]["invoice_id"] is None
 
 
-def test_a_real_bundle_round_trips_through_the_registry(tmp_path, monkeypatch):
+def test_a_real_bundle_round_trips_through_the_registry():
     """Guards the bundle contract the training step writes."""
-    from collection.api import app as app_module
-
     pipeline = Pipeline(
         [
             ("preprocess", FunctionTransformer(_select_features)),
@@ -166,20 +155,16 @@ def test_a_real_bundle_round_trips_through_the_registry(tmp_path, monkeypatch):
         ]
     )
     pipeline.fit(pd.DataFrame({"amount": [1.0, 2.0], "hist_late_rate": [0.0, 1.0]}), [0, 1])
-    joblib.dump(
-        {
-            "pipeline": pipeline,
-            "threshold": 0.5,
-            "target": "t",
-            "task": "default",
-            "source": "test",
-            "champion": "dummy",
-            "features": FEATURES,
-        },
-        tmp_path / "model_default.joblib",
-    )
-    monkeypatch.setattr(app_module.settings, "dir_processed", tmp_path)
-    registry = ModelRegistry()
+    bundle = {
+        "pipeline": pipeline,
+        "threshold": 0.5,
+        "target": "t",
+        "task": "default",
+        "source": "test",
+        "champion": "dummy",
+        "features": FEATURES,
+    }
+    registry = ModelRegistry(loader=lambda: {"default": bundle})
     with TestClient(create_app(registry)) as client:
         body = client.post(
             "/score",
@@ -188,3 +173,59 @@ def test_a_real_bundle_round_trips_through_the_registry(tmp_path, monkeypatch):
     assert body["scored"] == 1
     assert 0.0 <= body["results"][0]["probability"] <= 1.0
     assert isinstance(pd.DataFrame(body["results"]), pd.DataFrame)
+
+
+def test_an_unreachable_record_leaves_the_registry_empty_instead_of_failing(monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    from collection.api import app as app_module
+
+    def unreachable(*args, **kwargs):
+        raise OperationalError("select 1", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(app_module, "unit_of_work", unreachable)
+    registry = ModelRegistry()
+    with TestClient(create_app(registry)) as client:
+        assert client.get("/health").json() == {"status": "degraded", "models": []}
+        response = client.get("/models/propensity")
+    assert response.status_code == 503
+    assert "connection refused" in response.json()["detail"]
+
+
+def test_a_degraded_registry_recovers_on_the_next_request_after_the_outage(monkeypatch):
+    from collection.api.app import Loaded
+
+    outcomes = [
+        Loaded(problems={"propensity": "OperationalError: connection refused"}),
+        Loaded(bundles={"propensity": _stub_bundle()}),
+    ]
+    registry = ModelRegistry(loader=lambda: outcomes.pop(0))
+    monkeypatch.setattr(ModelRegistry, "RETRY_SECONDS", 0.0)
+    with TestClient(create_app(registry)) as client:
+        assert client.get("/health").json()["status"] == "degraded"
+        assert client.get("/models/propensity").status_code == 200
+        assert client.get("/health").json() == {"status": "ok", "models": ["propensity"]}
+
+
+def test_one_unreadable_artifact_does_not_discard_the_others(monkeypatch):
+    from collection.api import app as app_module
+
+    class _Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def load_bundle(session, task):
+        if task == "default":
+            raise AttributeError("incompatible pickle")
+        return _stub_bundle()
+
+    monkeypatch.setattr(app_module, "unit_of_work", lambda **kw: _Session())
+    monkeypatch.setattr(app_module, "load_bundle", load_bundle)
+
+    loaded = app_module.load_published()
+
+    assert set(loaded.bundles) == {"propensity"}
+    assert "incompatible pickle" in loaded.problems["default"]

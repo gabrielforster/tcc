@@ -35,7 +35,7 @@ from collection.agents.conversation import (
 )
 from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
-from collection.rag.index import Retrieved, VectorIndex
+from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved, VectorIndex
 from collection.voice.audio import AudioError
 from collection.voice.transcribe import (
     MIN_CONFIDENCE,
@@ -55,9 +55,6 @@ SMALL_TALK_REPLY = "Olá! Posso ajudar com a sua pendência, um parcelamento ou 
 CONFIRM_PREFIX = 'Entendi: "{transcript}". Confirma que é isso?'
 #: Consecutive unclear messages before handing over.
 UNCLEAR_LIMIT = 3
-#: Retrieved passages below this similarity are not worth quoting back.
-MIN_RELEVANCE = 0.05
-TOP_K = 3
 
 
 @dataclass
@@ -383,6 +380,14 @@ class ResponsiveAgent(Agent):
                 intent=reply.classification.intent.value,
                 confidence=reply.classification.confidence,
                 citations=reply.answer.citations,
+                # The passages themselves, not only the documents they came from: a
+                # channel that keeps a retrieval record has to write the chunk and the
+                # version that were read, and nothing downstream can reconstruct those
+                # from a citation. The responder's name travels for the same reason the
+                # answer carries it -- a templated fallback must not be reported as the
+                # model's work.
+                passages=reply.passages,
+                responder=reply.answer.responder,
                 latency_ms=round(reply.latency_ms, 2),
                 **spoken,
             )

@@ -13,8 +13,13 @@ complementary views are produced:
 SHAP is computed with `TreeExplainer` for tree ensembles and the model-agnostic explainer
 otherwise, on a sample of the test split, because the exact computation is expensive and
 the ranking stabilises well before the full split is used.
+
+The charts are objects in the platform store, named after the model version they explain,
+so they sit beside the weights they describe and survive the machine that drew them. The
+Markdown report is a document a developer asked for and goes to `docs/`.
 """
 
+import io
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +33,7 @@ import seaborn as sns  # noqa: E402
 from sklearn.inspection import permutation_importance  # noqa: E402
 
 from collection.config import settings  # noqa: E402
+from collection.storage.objects import ObjectStore  # noqa: E402
 
 sns.set_theme(style="whitegrid", palette="deep")
 
@@ -42,7 +48,7 @@ class Explanation:
     source: str
     permutation: pd.DataFrame
     shap_importance: pd.DataFrame | None
-    charts: list[Path]
+    charts: list[str]
 
     def top_features(self, n: int = 10) -> list[str]:
         return self.permutation.head(n)["feature"].tolist()
@@ -116,7 +122,7 @@ def shap_table(pipeline, x: pd.DataFrame) -> tuple[pd.DataFrame | None, np.ndarr
     return frame.sort_values("mean_abs_shap", ascending=False).reset_index(drop=True), values
 
 
-def _chart_permutation(table: pd.DataFrame, source: str, task: str) -> Path:
+def _chart_permutation(table: pd.DataFrame, store: ObjectStore, prefix: str) -> str:
     top = table.head(15).iloc[::-1]
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.barh(top["feature"], top["importance"], xerr=top["std"], color="#4C72B0")
@@ -124,33 +130,43 @@ def _chart_permutation(table: pd.DataFrame, source: str, task: str) -> Path:
         title="Permutation importance (drop in average precision)",
         xlabel="decrease in average precision when shuffled",
     )
-    return _save(fig, source, f"{task}-permutation-importance")
+    return _save(fig, store, f"{prefix}-permutation-importance.png")
 
 
-def _chart_shap(table: pd.DataFrame, source: str, task: str) -> Path:
+def _chart_shap(table: pd.DataFrame, store: ObjectStore, prefix: str) -> str:
     top = table.head(15).iloc[::-1]
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.barh(top["feature"], top["mean_abs_shap"], color="#DD8452")
     ax.set(title="Mean absolute SHAP value", xlabel="mean |SHAP| on the positive class")
-    return _save(fig, source, f"{task}-shap-importance")
+    return _save(fig, store, f"{prefix}-shap-importance.png")
 
 
-def _save(fig, source: str, name: str) -> Path:
-    destination = settings.dir_docs / "models" / source / f"{name}.png"
-    destination.parent.mkdir(parents=True, exist_ok=True)
+def _save(fig, store: ObjectStore, name: str) -> str:
     fig.tight_layout()
-    fig.savefig(destination, dpi=150)
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", dpi=150)
     plt.close(fig)
-    return destination
+    return store.put(name, buffer.getvalue(), kind="plots", content_type="image/png").key
 
 
-def explain(pipeline, x: pd.DataFrame, y: np.ndarray, task: str, source: str) -> Explanation:
+def explain(
+    pipeline,
+    x: pd.DataFrame,
+    y: np.ndarray,
+    task: str,
+    source: str,
+    *,
+    store: ObjectStore,
+    version: int,
+) -> Explanation:
+    """Explain the champion of `task`; the charts are stored under `<task>-v<version>-`."""
     permutation = permutation_table(pipeline, x, y)
     shap_importance, _ = shap_table(pipeline, x)
 
-    charts = [_chart_permutation(permutation, source, task)]
+    prefix = f"{task}-v{version}"
+    charts = [_chart_permutation(permutation, store, prefix)]
     if shap_importance is not None:
-        charts.append(_chart_shap(shap_importance, source, task))
+        charts.append(_chart_shap(shap_importance, store, prefix))
 
     return Explanation(
         task=task,
@@ -181,8 +197,9 @@ def write_report(explanation: Explanation) -> Path:
         parts.append("\n## SHAP\n\nNot computed: the `ml` extra is not installed.\n")
 
     parts.append("\n## Charts\n")
-    parts += [f"![{c.stem}](models/{explanation.source}/{c.name})\n" for c in explanation.charts]
+    parts += [f"Stored in object storage as `{key}`.\n" for key in explanation.charts]
 
     destination = settings.dir_docs / f"interpretability-{explanation.source}-{explanation.task}.md"
+    destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text("\n".join(parts), encoding="utf-8")
     return destination

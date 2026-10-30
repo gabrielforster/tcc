@@ -1,25 +1,34 @@
 """Turning text into vectors, behind an interface so the choice stays reversible.
 
-The default is TF-IDF over character n-grams plus words. That is a deliberate starting
-point rather than a placeholder:
+The default is the multilingual sentence-transformer, because it is the only embedder
+whose vectors mean the same thing in every tenant: TF-IDF is fitted to whatever corpus it
+is given, so its vectors cannot be stored once and compared later. TF-IDF stays as the
+lexical baseline, and it was a deliberate starting point rather than a placeholder:
 
 * it needs no API key, no model download and no GPU, so the pipeline runs in CI and on a
   fresh clone;
 * character n-grams handle Portuguese morphology (parcelamento/parcelar/parcelas) without a
   stemmer, which matters because this corpus is Portuguese;
-* it gives the paper a real lexical baseline to measure a neural retriever *against*.
-  Reporting "embeddings scored 0.82" means little; "embeddings scored 0.82 against a
-  TF-IDF baseline at 0.71 on the same questions" is a result.
+* it gives the paper a real lexical baseline to measure a neural retriever *against*, and
+  a baseline is only worth having if it is allowed to win. A neural score on its own means
+  little; the same score beside a lexical one over the same questions is a result -- and
+  on this corpus the baseline is the one ahead, which is why the default above is a choice
+  about storing vectors across tenants rather than a claim that it retrieves better.
+  `docs/rag.md` owns the measurement and is the only place the figures live.
 
-`SentenceTransformerEmbedder` is the drop-in for that comparison and is imported lazily, so
-the heavy dependency only exists for whoever asks for it.
+`SentenceTransformerEmbedder` is imported lazily so that importing this module stays
+cheap, and the loaded model is cached per process: loading it costs seconds and hundreds
+of megabytes, and an embedder is built per call site.
 """
 
 from abc import ABC, abstractmethod
+from functools import cache
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import FeatureUnion
+
+from collection.config import settings
 
 
 class Embedder(ABC):
@@ -76,27 +85,24 @@ class TfidfEmbedder(Embedder):
         return _normalise(np.asarray(self.vectoriser.transform(texts).todense(), dtype=float))
 
 
+@cache
+def _load_model(name: str):
+    """One loaded model per name for the whole process, shared by every embedder."""
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(name)
+
+
 class SentenceTransformerEmbedder(Embedder):
-    """Neural embeddings, for the comparison against the lexical baseline."""
+    """The platform embedder: one model for every tenant, so vectors are comparable."""
 
     name = "sentence-transformer"
 
-    def __init__(self, model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
-        self.model_name = model
-        self._model = None
+    def __init__(self, model: str | None = None):
+        self.model_name = model or settings.embedding_model
 
     def _load(self):
-        if self._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-            except ImportError as error:
-                raise ImportError(
-                    "Neural embeddings need sentence-transformers, which is not installed "
-                    "by default because it pulls in torch. Install it explicitly to run "
-                    "the comparison: uv pip install sentence-transformers"
-                ) from error
-            self._model = SentenceTransformer(self.model_name)
-        return self._model
+        return _load_model(self.model_name)
 
     def fit(self, texts: list[str]) -> "SentenceTransformerEmbedder":
         self._load()
@@ -113,7 +119,7 @@ EMBEDDERS: dict[str, type[Embedder]] = {
 }
 
 
-def get_embedder(name: str = "tfidf") -> Embedder:
+def get_embedder(name: str = "sentence-transformer") -> Embedder:
     if name not in EMBEDDERS:
         raise ValueError(f"Unknown embedder: {name!r}. Available: {', '.join(EMBEDDERS)}")
     return EMBEDDERS[name]()

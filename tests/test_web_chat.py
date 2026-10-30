@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from collection.agents.events import Event, EventType
 from collection.agents.responsive import TemplateResponder
 from collection.api.app import ModelRegistry, create_app
-from collection.api.chat import ChatService
+from collection.api.chat import ChatService, _http_error
 from collection.channels import session as session_module
 from collection.channels.delivery import DeliveryStatus
 from collection.channels.session import (
@@ -31,7 +31,9 @@ from collection.channels.session import (
     RateLimited,
     SessionNotFound,
     SessionStore,
+    TenantNotServable,
     TokenError,
+    UnknownTenant,
     clean_message,
     issue_token,
     verify_token,
@@ -44,7 +46,7 @@ from collection.voice.transcribe import ScriptedTranscriber
 
 @pytest.fixture
 def channel(index):
-    return ChatChannel(index=index, responder=TemplateResponder())
+    return ChatChannel(retriever=index, responder=TemplateResponder())
 
 
 @pytest.fixture
@@ -122,6 +124,14 @@ def test_the_browser_cannot_name_a_customer_without_a_token(client):
     assert forged.status_code == 401
 
 
+def test_a_tenant_that_cannot_be_served_and_one_that_does_not_exist_answer_differently():
+    # A tenant behind its lifecycle gate is a refusal the customer cannot do anything
+    # about; an embed naming a tenant nobody has is a wrong address. Mapping both onto
+    # one code would tell a tenant in onboarding to go looking for a typo.
+    assert _http_error(TenantNotServable("not yet")).status_code == 403
+    assert _http_error(UnknownTenant("who?")).status_code == 404
+
+
 # -------------------------------------------------------------------- sessions
 def test_a_session_opens_with_a_greeting_that_says_it_is_automated(client):
     body = open_session(client)
@@ -136,7 +146,7 @@ def test_an_unknown_session_is_not_found(client):
 
 def test_an_expired_session_is_not_found(index):
     store = SessionStore()
-    channel = ChatChannel(index=index, store=store, responder=TemplateResponder())
+    channel = ChatChannel(retriever=index, store=store, responder=TemplateResponder())
     session, _ = channel.open()
     session.last_seen_at = time.time() - session_module.SESSION_TTL_SECONDS - 1
     with pytest.raises(SessionNotFound, match="expired"):
@@ -159,7 +169,7 @@ def test_a_long_conversation_is_handed_to_a_person(channel):
 
 def test_expired_sessions_are_swept(index):
     store = SessionStore()
-    stale, _ = ChatChannel(index=index, store=store).open()
+    stale, _ = ChatChannel(retriever=index, store=store).open()
     stale.last_seen_at = time.time() - session_module.SESSION_TTL_SECONDS - 1
     store.open()  # a write sweeps
     assert len(store) == 1
@@ -337,7 +347,7 @@ SPOKEN_FIGURE = "consigo pagar mil duzentos e cinquenta reais a vista"
 def hearing(index, transcript=SPOKEN, confidence=1.0):
     """A channel whose recogniser is the scripted control arm, never a real model."""
     return ChatChannel(
-        index=index,
+        retriever=index,
         responder=TemplateResponder(),
         transcriber=ScriptedTranscriber(
             transcripts={"voice-note": transcript}, confidence=confidence
@@ -581,7 +591,7 @@ def test_a_reply_is_owned_by_the_session_that_received_it(client):
 
 
 def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
-    channel = ChatChannel(index=index, responder=TemplateResponder())
+    channel = ChatChannel(retriever=index, responder=TemplateResponder())
     delivery_id = channel.seed(
         Event(
             type=EventType.CONTACT_SCHEDULED,
@@ -600,7 +610,7 @@ def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
 
 
 # ------------------------------------------------------- the one-process seeding demo
-# `collection seed` and `collection serve` are different processes and the mailbox is an
+# `collection contacts` and `collection serve` are different processes and the mailbox is an
 # in-memory dict, so the seeded message only reaches a widget when the server seeds the
 # channel it is itself serving. These pin that it does, and that it stays off by default.
 

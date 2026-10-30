@@ -1,26 +1,67 @@
 """Command line interface for the data pipeline."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Annotated
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from collection.config import settings
+from collection.db.repository import TenantScope
+from collection.db.session import unit_of_work
 
 app = typer.Typer(help="Multi-agent debt collection system pipeline.", no_args_is_help=True)
 console = Console()
 
+db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
+
+tenant_app = typer.Typer(help="Tenants: provisioning and seeding.", no_args_is_help=True)
+app.add_typer(tenant_app, name="tenant")
+
+
+TenantOption = Annotated[
+    str,
+    typer.Option(
+        "--tenant",
+        envvar="COLLECTION_TENANT",
+        help="Slug of the tenant whose data the pipeline works on (or COLLECTION_TENANT).",
+    ),
+]
+
+
+@contextmanager
+def _tenant_scope(slug: str) -> Iterator[TenantScope]:
+    """A scope on the tenant named by `slug`, committed when the command succeeds."""
+    from sqlalchemy import select
+
+    from collection.db.models import Tenant
+
+    with unit_of_work(platform=True) as lookup:
+        tenant_id = lookup.scalar(select(Tenant.id).where(Tenant.slug == slug))
+    if tenant_id is None:
+        console.print(f"[red]No tenant with slug {slug!r}.[/]")
+        raise typer.Exit(code=1)
+    with unit_of_work(tenant_id) as session:
+        yield TenantScope(session, tenant_id)
+
 
 @app.command()
 def extract(
+    tenant: TenantOption,
     source: str = typer.Option(
         None,
         help="synthetic | home-credit | bank-marketing | erp (defaults to DATA_SOURCE in .env)",
     ),
 ) -> None:
-    """Extract the raw dataset from the configured source into data/raw."""
+    """Extract the raw dataset from the configured source into the tenant's object storage."""
     from collection.data.ingest import extract as _extract
 
-    dataset = _extract(source)
+    with _tenant_scope(tenant) as scope:
+        dataset = _extract(scope, source)
     table = Table(title=f"Raw dataset ({source or settings.data_source})")
     table.add_column("table")
     table.add_column("rows", justify="right")
@@ -29,16 +70,25 @@ def extract(
         covered = "[green]yes[/]" if name in dataset.provides else "[dim]-[/]"
         table.add_row(name, f"{len(df):,}", covered)
     console.print(table)
-    console.print(f"[green]Written to[/] {settings.dir_raw}")
+    console.print(f"[green]Stored under[/] tenants/<id>/raw/ for {tenant}")
 
 
 @app.command()
-def ingest() -> None:
-    """Anonymize (LGPD), validate the schema and write the dataset to data/interim."""
+def ingest(
+    tenant: TenantOption,
+    source: str = typer.Option(None, help="defaults to DATA_SOURCE in .env"),
+) -> None:
+    """Extract, anonymize (LGPD), validate, and write the tenant's rows and objects."""
     from collection.data.ingest import ingest as _ingest
 
-    for name, path in _ingest().items():
-        console.print(f"[green]ok[/] {name} -> {path}")
+    with _tenant_scope(tenant) as scope:
+        report = _ingest(scope, source)
+    console.print(
+        f"[green]ok[/] {report.source}: {report.customers} customers, "
+        f"{report.receivables} receivables"
+    )
+    for key in (*report.raw_keys, *report.interim_keys):
+        console.print(f"  {key}")
 
 
 @app.command()
@@ -50,52 +100,70 @@ def dictionary() -> None:
 
 
 @app.command()
-def eda() -> None:
-    """Generate docs/eda.md and the charts under docs/eda/."""
+def eda(tenant: TenantOption) -> None:
+    """Generate docs/eda.md and the charts under docs/eda/ from the tenant's data."""
     from collection.eda.report import generate_report
 
-    console.print(f"[green]ok[/] {generate_report()}")
+    with _tenant_scope(tenant) as scope:
+        console.print(f"[green]ok[/] {generate_report(scope)}")
 
 
 @app.command()
 def features(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            help="also write the splits and the preprocessor as files into this directory"
+        ),
+    ] = None,
 ) -> None:
-    """Build features, the chronological 70/15/15 split and the preprocessor."""
+    """Build features and the chronological 70/15/15 split; files only if `--out` is given."""
+    from collection.data.ingest import load_interim
     from collection.features.build import build_splits, save_splits
     from collection.features.preprocess import fit_and_save
 
     tasks = ["propensity", "default"] if task == "both" else [task]
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
     for t in tasks:
         try:
-            splits = build_splits(t)
+            splits = build_splits(t, tables)
         except ValueError as error:
             # Expected when the ingested source carries no receivables; a traceback here
             # would suggest a bug rather than a source that covers a different table.
             console.print(f"[yellow]skipped[/] {error}")
             raise typer.Exit(code=1) from None
-        save_splits(t)
-        preprocessor_path = fit_and_save(splits)
         console.print(f"\n[bold]Task: {t}[/] (target `{splits.target}`)")
         console.print(splits.summary().to_string(index=False))
-        console.print(f"[green]preprocessor[/] -> {preprocessor_path}")
+        if out is not None:
+            save_splits(t, tables, out)
+            console.print(f"[green]preprocessor[/] -> {fit_and_save(splits, out)}")
 
 
 @app.command()
 def train(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
     tune: bool = typer.Option(True, help="run the randomised hyperparameter search"),
 ) -> None:
-    """Train the candidate models, pick a champion and score it once on the test split."""
-    import joblib
-
+    """Train the platform model on the tenant's data, record a new version, score it once."""
+    from collection.data.ingest import load_interim, source_metadata
     from collection.models import report as model_report
-    from collection.models.train import train_task
+    from collection.models.train import train as _train
+    from collection.storage.objects import ObjectStore
+
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
+        source = source_metadata(scope)["source"]
+        tenant_id = scope.tenant_id
 
     tasks = ["propensity", "default"] if task == "both" else [task]
     for t in tasks:
         console.print(f"\n[bold]Training: {t}[/]")
-        result = train_task(t, tune=tune)
+        trained = _train(t, tables, source=source, tune=tune, tenant_id=tenant_id)
+        result = trained.fitted.result
         console.print(result.comparison_table().to_string(index=False))
         console.print(f"\n[green]champion[/] {result.champion} (threshold {result.threshold:.2f})")
         console.print(
@@ -103,43 +171,81 @@ def train(
             f"roc_auc={result.test.roc_auc:.4f} f1={result.test.f1:.4f} "
             f"(majority baseline average_precision={result.test_baseline['average_precision']:.4f})"
         )
-
-        from collection.features.build import build_splits
-
-        splits = build_splits(t)
-        bundle = joblib.load(settings.dir_processed / f"model_{t}.joblib")
-        x_test = splits.test.drop(columns=[splits.target])
+        console.print(f"[green]model[/] {trained.row.artifact_key} (version {trained.row.version})")
         curve = model_report.curves(
-            bundle["pipeline"], x_test, splits.test[splits.target], result.source, t
+            trained.fitted.pipeline,
+            trained.fitted.x_test,
+            trained.fitted.y_test,
+            name=f"{t}-v{trained.row.version}-curves.png",
+            store=ObjectStore(),
         )
         console.print(f"[green]report[/] -> {model_report.write(result, curve)}")
 
 
 @app.command()
 def explain(
+    tenant: TenantOption,
     task: str = typer.Option("both", help="propensity | default | both"),
 ) -> None:
-    """Permutation importance and SHAP values for the trained champion."""
-    import joblib
-
+    """Permutation importance and SHAP values for the latest platform model."""
+    from collection.data.ingest import load_interim
     from collection.features.build import build_splits
     from collection.models.explain import explain as _explain
     from collection.models.explain import write_report
+    from collection.models.store import latest_model, read_bundle
+    from collection.storage.objects import ObjectStore
 
     tasks = ["propensity", "default"] if task == "both" else [task]
+    with _tenant_scope(tenant) as scope:
+        tables = load_interim(scope)
+    with unit_of_work(platform=True) as platform:
+        models = {t: latest_model(platform, t) for t in tasks}
     for t in tasks:
-        path = settings.dir_processed / f"model_{t}.joblib"
-        if not path.exists():
+        row = models[t]
+        if row is None:
             console.print(f"[yellow]skipped[/] no model for '{t}'. Run `collection train` first.")
             continue
-        bundle = joblib.load(path)
-        splits = build_splits(t)
+        bundle = read_bundle(row)
+        splits = build_splits(t, tables)
+        missing = [c for c in bundle["features"] if c not in splits.test.columns]
+        if missing:
+            console.print(
+                f"[red]skipped[/] {t} model version {row.version} expects features this "
+                f"tenant's frames do not produce: {missing[:5]}"
+                + (f" (+{len(missing) - 5} more)" if len(missing) > 5 else "")
+            )
+            continue
         x_test = splits.test[bundle["features"]]
         y_test = splits.test[splits.target].to_numpy()
-        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']})")
-        explanation = _explain(bundle["pipeline"], x_test, y_test, t, bundle["source"])
+        console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']}, version {row.version})")
+        explanation = _explain(
+            bundle["pipeline"],
+            x_test,
+            y_test,
+            t,
+            bundle["source"],
+            store=ObjectStore(),
+            version=row.version,
+        )
         console.print(explanation.permutation.head(10).to_string(index=False))
         console.print(f"[green]report[/] -> {write_report(explanation)}")
+
+
+@app.command()
+def score(
+    tenant: TenantOption,
+    task: str = typer.Option("propensity", help="propensity | default"),
+) -> None:
+    """Score the tenant's customers against the platform's latest model."""
+    from collection.models.scoring import score_customers
+
+    with _tenant_scope(tenant) as scope:
+        try:
+            written = score_customers(scope, task)
+        except LookupError as error:
+            console.print(f"[yellow]skipped[/] {error}")
+            raise typer.Exit(code=1) from None
+    console.print(f"[green]ok[/] {written} customers scored ({task})")
 
 
 @app.command()
@@ -161,7 +267,7 @@ def serve(
 
     import uvicorn
 
-    from collection.api.app import available_models
+    from collection.api.app import load_published
 
     if seed_demo:
         # uvicorn is started by import string (so `--reload` can re-import the app in a
@@ -172,11 +278,20 @@ def serve(
         os.environ["CHAT_SEED_DEMO"] = "1"
         settings.chat_seed_demo = True
 
-    models = available_models()
-    if not models:
+    # Asked of the registry's own loader, so this line reports what the server will serve
+    # rather than a second opinion about it -- and keeps the two cases the API keeps
+    # apart: a task the record or the bucket could not answer for is not a task nobody
+    # has trained.
+    loaded = load_published()
+    if loaded.bundles:
+        console.print(f"[green]models[/] {', '.join(sorted(loaded.bundles))}")
+    if loaded.problems:
+        console.print(
+            f"[yellow]warning[/] unavailable: {', '.join(sorted(loaded.problems))}; "
+            "/score will answer 503 for those until the load succeeds."
+        )
+    elif not loaded.bundles:
         console.print("[yellow]warning[/] no trained models found; /score will return 404.")
-    else:
-        console.print(f"[green]models[/] {', '.join(models)}")
     if settings.chat_enabled:
         console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
         console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")
@@ -234,32 +349,20 @@ def demo() -> None:
     console.print(f"\n[green]summary[/] {trace.counts()}")
 
 
-@app.command()
-def rag(
-    query: str = typer.Option(None, help="run a single query against the index"),
-    top_k: int = typer.Option(5),
-    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer"),
-    evaluate_only: bool = typer.Option(False, "--evaluate", help="only run the evaluation"),
+def _report_retrieval(
+    retriever, query: str | None, top_k: int, evaluate_only: bool, customer_only: bool
 ) -> None:
-    """Build the knowledge index, evaluate retrieval, or answer a single query."""
-    from collection.rag.documents import load_directory
-    from collection.rag.embeddings import get_embedder
-    from collection.rag.evaluate import load_questions, sweep
-    from collection.rag.index import VectorIndex
+    """One query or one metric table, whichever arm produced the retriever.
 
-    documents = load_directory(settings.dir_knowledge)
-    index = VectorIndex(embedder=get_embedder(embedder))
-    index.add_documents(documents).build()
-
-    stats = index.stats()
-    console.print(
-        f"[green]indexed[/] {stats['documents']} documents -> {stats['chunks']} chunks "
-        f"({stats['embedder']}, {stats['dimensions']} dims, "
-        f"mean {stats['mean_words_per_chunk']} words/chunk)"
-    )
+    Both arms print through here so the comparison in `docs/rag.md` cannot quietly be
+    between two different metric definitions: the question set, the ks and the sweep are
+    the same code whether passages came from a fitted matrix or from the database.
+    """
+    from collection.db.seed import INTERNAL_DOCUMENTS
+    from collection.rag.evaluate import customer_visible, load_questions, sweep
 
     if query and not evaluate_only:
-        for hit in index.search(query, top_k=top_k):
+        for hit in retriever.search(query, top_k=top_k):
             preview = " ".join(hit.text.split())[:160]
             console.print(f"\n[bold]{hit.document_id}[/] ({hit.score:.3f})\n  {preview}...")
         return
@@ -269,11 +372,78 @@ def rag(
         console.print("[yellow]no questions.json; skipping evaluation[/]")
         return
     questions = load_questions(questions_file)
-    table = sweep(index, questions)
+    if customer_only:
+        questions = customer_visible(questions, INTERNAL_DOCUMENTS)
+    table = sweep(retriever, questions)
     console.print(f"\n[bold]Retrieval over {len(questions)} labelled questions[/]")
     console.print(table.to_string(index=False))
 
-    index.save(settings.dir_processed / f"rag_index_{embedder}.joblib")
+
+@app.command()
+def rag(
+    query: str = typer.Option(None, help="run a single query against the index"),
+    top_k: int = typer.Option(5),
+    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer (tfidf arm only)"),
+    retriever: str = typer.Option(
+        "tfidf", help="tfidf (in-memory baseline) | pgvector (what actually serves)"
+    ),
+    tenant: str = typer.Option(
+        "desenvolvimento",
+        "--tenant",
+        envvar="COLLECTION_TENANT",
+        help="Tenant whose published knowledge the pgvector arm retrieves from.",
+    ),
+    evaluate_only: bool = typer.Option(False, "--evaluate", help="only run the evaluation"),
+    customer_only: bool = typer.Option(
+        False,
+        "--customer-only",
+        help="measure only what a customer may be shown: withhold internal documents from "
+        "the corpus and from the gold sets, which is what makes the two arms comparable.",
+    ),
+) -> None:
+    """Evaluate retrieval, or answer a single query, against either retriever."""
+    if retriever == "pgvector":
+        from collection.rag.retriever import PgVectorRetriever
+
+        with _tenant_scope(tenant) as scope:
+            console.print(
+                f"[green]retrieving[/] from tenant {tenant!r} "
+                f"({settings.embedding_model}, {settings.embedding_dimensions} dims)"
+            )
+            # The SQL audience filter already withholds internal documents from this arm,
+            # so `--customer-only` changes nothing here but the labels; it is accepted all
+            # the same, because the flag has to mean the same thing to both arms for the
+            # two tables to be read side by side.
+            _report_retrieval(PgVectorRetriever(scope), query, top_k, evaluate_only, customer_only)
+        return
+    if retriever != "tfidf":
+        console.print(f"[red]Unknown retriever {retriever!r}. Available: tfidf, pgvector.[/]")
+        raise typer.Exit(code=1)
+
+    from collection.rag.documents import load_directory
+    from collection.rag.embeddings import get_embedder
+    from collection.rag.index import VectorIndex
+
+    documents = load_directory(settings.dir_knowledge)
+    if customer_only:
+        from collection.db.seed import INTERNAL_DOCUMENTS
+
+        documents = [d for d in documents if d.root_id not in INTERNAL_DOCUMENTS]
+    index = VectorIndex(embedder=get_embedder(embedder))
+    index.add_documents(documents).build()
+
+    stats = index.stats()
+    console.print(
+        f"[green]indexed[/] {stats['documents']} documents -> {stats['chunks']} chunks "
+        f"({stats['embedder']}, {stats['dimensions']} dims, "
+        f"mean {stats['mean_words_per_chunk']} words/chunk)"
+    )
+    _report_retrieval(index, query, top_k, evaluate_only, customer_only)
+    # A corpus-restricted index is a different artefact and must not overwrite the full
+    # one: `collection answer` loads the full corpus and would otherwise answer from a
+    # knowledge base with the authority limits silently missing.
+    suffix = "_customer_only" if customer_only else ""
+    index.save(settings.dir_processed / f"rag_index_{embedder}{suffix}.joblib")
 
 
 @app.command()
@@ -362,7 +532,7 @@ def answer(
                 "generation failed and the template answered instead."
             )
     path = responder_eval.write_report(
-        table, results, settings.dir_docs / "responder-comparison.md"
+        table, results, settings.dir_docs / "responder-comparison.md", retriever=index
     )
     console.print(f"[green]report[/] -> {path}")
 
@@ -495,7 +665,7 @@ def voice(
 
 
 @app.command()
-def seed() -> None:
+def contacts() -> None:
     """Report what the outbound path decides for each overdue receivable.
 
     It runs the whole path in this process -- proactive agent, rules engine, composition,
@@ -543,14 +713,88 @@ def seed() -> None:
     )
 
 
+@tenant_app.command("seed")
+def tenant_seed(
+    name: str = typer.Option("Desenvolvimento", "--name", help="Name of the tenant to seed."),
+) -> None:
+    """Create a development tenant, load `knowledge/` into it, ingest, and activate it.
+
+    This is what makes a fresh clone usable, and it is safe to run again after editing a
+    file under `knowledge/`: unchanged documents keep their version, an edited one gets the
+    next, and ingestion replaces the tenant's rows rather than adding to them.
+    """
+    from collection.db.seed import seed_development_tenant
+
+    try:
+        tenant = seed_development_tenant(name)
+    except ValueError as error:
+        console.print(f"[red]{error}[/]")
+        raise typer.Exit(code=1) from None
+
+    table = Table(title="Seeded tenant")
+    table.add_column("field")
+    table.add_column("value")
+    table.add_row("name", tenant.name)
+    table.add_row("slug", tenant.slug)
+    table.add_row("state", f"[green]{tenant.state.value}[/]")
+    table.add_row("tenant_key", tenant.tenant_key)
+    console.print(table)
+    console.print(
+        f"\n[dim]export COLLECTION_TENANT={tenant.slug}  # the pipeline commands read this\n"
+        f"DEFAULT_TENANT_KEY={tenant.tenant_key}  # in .env, so the chat serves this tenant[/]"
+    )
+
+
+@db_app.command("upgrade")
+def db_upgrade(revision: str = typer.Argument("head", help="Target revision.")) -> None:
+    """Apply migrations up to a revision (default: head)."""
+    from alembic import command
+
+    from collection.db.migrations import alembic_config
+
+    command.upgrade(alembic_config(), revision)
+    console.print(f"[green]ok[/] database at {revision}")
+
+
+@db_app.command("downgrade")
+def db_downgrade(
+    revision: str = typer.Argument("-1", help="Target revision."),
+    yes: bool = typer.Option(False, "--yes", help="Answer the confirmation in advance."),
+) -> None:
+    """Drop what the migrations created, back to a revision (default: one step).
+
+    Every migration in this chain is additive, so a downgrade is a `DROP TABLE`, not an
+    edit: one step from head takes `platform_models` and `customer_scores` with their
+    rows, and `base` takes the whole record -- tenants, knowledge, conversations and all.
+
+    It runs against DATABASE_URL, which is the development database and never the test
+    one, so it names that database and asks before it does anything. `--yes` answers in
+    advance, for a script that means it.
+    """
+    from alembic import command
+    from sqlalchemy import make_url
+
+    from collection.db.migrations import alembic_config
+
+    url = make_url(settings.database_url)
+    console.print(
+        f"[red]downgrade[/] to {revision} on [bold]{url.database}[/] at "
+        f"{url.host}:{url.port} drops the tables the migrations above it created, "
+        "and the rows in them."
+    )
+    if not yes:
+        typer.confirm("Drop them?", abort=True)
+    command.downgrade(alembic_config(), revision)
+    console.print(f"[green]ok[/] database at {revision}")
+
+
 @app.command()
-def pipeline() -> None:
-    """Run extract + ingest + dictionary + eda + features."""
-    extract(source=None)
-    ingest()
+def pipeline(tenant: TenantOption) -> None:
+    """Run ingest (which extracts) + dictionary + eda + features for the tenant."""
+    ingest(tenant=tenant, source=None)
     dictionary()
-    eda()
-    features(task="both")
+    eda(tenant=tenant)
+    features(tenant=tenant, task="both", out=None)
 
 
 if __name__ == "__main__":

@@ -10,27 +10,16 @@ import numpy as np
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from collection.data import ingest
 from collection.data.anonymize import anonymize
 from collection.models.candidates import candidates
 from collection.models.metrics import SELECTION_METRIC, baseline_scores, score
-from collection.models.train import _best_threshold, train_task
+from collection.models.train import _best_threshold, fit_task
 
 
-@pytest.fixture(autouse=True)
-def _temporary_dataset(dataset, monkeypatch, tmp_path):
-    for name, df in anonymize(dataset).items():
-        df.to_parquet(tmp_path / f"{name}.parquet", index=False)
-    (tmp_path / "source.json").write_text(
-        '{"source": "test", "provides": ["customers", "invoices", '
-        '"collection_events", "agreements"]}'
-    )
-    for module in ("dir_interim", "dir_processed", "dir_raw"):
-        monkeypatch.setattr(ingest.settings, module, tmp_path)
-    from collection.models import train as train_module
-
-    monkeypatch.setattr(train_module.settings, "dir_processed", tmp_path)
-    monkeypatch.setattr(train_module.settings, "dir_raw", tmp_path)
+@pytest.fixture(scope="module")
+def tables(dataset):
+    """The anonymized frames, in memory: training needs no directory and no services."""
+    return anonymize(dataset)
 
 
 # ------------------------------------------------------------------------------ metrics
@@ -63,32 +52,32 @@ def test_threshold_search_prefers_a_threshold_that_beats_the_default():
 
 
 # --------------------------------------------------------------------------- candidates
-def test_the_grid_covers_both_imbalance_strategies_and_a_baseline(dataset):
+def test_the_grid_covers_both_imbalance_strategies_and_a_baseline(dataset, tables):
     from collection.features.build import build_splits
 
-    grid = candidates(build_splits("default"))
+    grid = candidates(build_splits("default", tables))
     assert sum(c.is_baseline for c in grid) == 1
     assert {"class_weight", "smote"} <= {c.imbalance for c in grid}
     assert {"logistic_regression", "random_forest", "xgboost"} == {c.family for c in grid}
 
 
-def test_smote_candidates_resample_inside_the_pipeline(dataset):
+def test_smote_candidates_resample_inside_the_pipeline(dataset, tables):
     """SMOTE must be a pipeline step, so it only ever sees training folds."""
     from collection.features.build import build_splits
     from collection.models.candidates import build_pipeline
 
-    splits = build_splits("default")
+    splits = build_splits("default", tables)
     smote_candidate = next(c for c in candidates(splits) if c.imbalance == "smote")
     pipeline = build_pipeline(smote_candidate, splits)
     assert "smote" in dict(pipeline.steps)
     assert list(dict(pipeline.steps))[0] == "preprocess"
 
 
-def test_every_candidate_fits_preprocessing_inside_the_pipeline(dataset):
+def test_every_candidate_fits_preprocessing_inside_the_pipeline(dataset, tables):
     from collection.features.build import build_splits
     from collection.models.candidates import build_pipeline
 
-    splits = build_splits("default")
+    splits = build_splits("default", tables)
     for candidate in candidates(splits):
         steps = dict(build_pipeline(candidate, splits).steps)
         assert "preprocess" in steps, candidate.name
@@ -100,57 +89,31 @@ def trained():
     return None
 
 
-def test_training_selects_the_champion_on_validation_average_precision():
-    result = train_task("default", tune=False)
+def test_training_selects_the_champion_on_validation_average_precision(tables):
+    result = fit_task("default", tables, tune=False).result
     best = max(result.candidates, key=lambda c: c.validation[SELECTION_METRIC])
     assert result.champion == best.name
 
 
-def test_every_candidate_is_cross_validated_and_scored_on_validation():
-    result = train_task("default", tune=False)
+def test_every_candidate_is_cross_validated_and_scored_on_validation(tables):
+    result = fit_task("default", tables, tune=False).result
     assert len(result.candidates) == 6
     for candidate in result.candidates:
         assert candidate.cv_mean > 0
         assert set(candidate.validation) >= {"average_precision", "roc_auc", "f1"}
 
 
-def test_the_champion_beats_the_majority_baseline_on_ranking():
-    result = train_task("default", tune=False)
+def test_the_champion_beats_the_majority_baseline_on_ranking(tables):
+    result = fit_task("default", tables, tune=False).result
     assert result.test.average_precision > result.test_baseline["average_precision"]
     assert result.test.roc_auc > 0.5
 
 
-def test_training_persists_the_model_and_its_threshold(tmp_path):
-    import joblib
-
-    result = train_task("default", tune=False)
-    bundle = joblib.load(tmp_path / "model_default.joblib")
-    assert bundle["threshold"] == result.threshold
-    assert bundle["target"] == result.target
-    assert hasattr(bundle["pipeline"], "predict_proba")
-
-
-def test_metrics_are_written_for_later_reading():
-    from collection.models.train import evaluate_task
-
-    train_task("default", tune=False)
-    metrics = evaluate_task("default")
-    assert metrics["champion"]
-    assert metrics["test"]["average_precision"] > 0
-
-
-def test_evaluate_explains_itself_when_nothing_was_trained():
-    from collection.models.train import evaluate_task
-
-    with pytest.raises(FileNotFoundError, match="collection train"):
-        evaluate_task("propensity")
-
-
-def test_a_model_fitted_on_the_training_split_never_sees_test_rows():
+def test_a_model_fitted_on_the_training_split_never_sees_test_rows(tables):
     """The test split must not appear in what the champion was fitted on."""
     from collection.features.build import build_splits
 
-    splits = build_splits("default")
+    splits = build_splits("default", tables)
     estimator = LogisticRegression(max_iter=100)
     train_ids = set(splits.train["invoice_id"]) | set(splits.validation["invoice_id"])
     test_ids = set(splits.test["invoice_id"])

@@ -60,6 +60,10 @@ class SessionRequest(BaseModel):
     """
 
     token: str | None = Field(default=None, description="signed identity token, server-issued")
+    #: Which tenant's channel this is. Public: it travels in the embed on the host page
+    #: and reaches that tenant's own chat and nothing else. Omitted, the request falls
+    #: back to `default_tenant_key`, which is how the demo page works.
+    tenant_key: str | None = Field(default=None, description="public tenant key from the embed")
 
 
 class SessionResponse(BaseModel):

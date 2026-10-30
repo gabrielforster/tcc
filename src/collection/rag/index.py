@@ -6,13 +6,17 @@ and a recall penalty in exchange for speed nobody needs. Exact cosine similarity
 normalised matrix is one dot product, and it removes a whole class of "did the index lose
 this document" question from the evaluation.
 
-Swapping in pgvector or Qdrant later means implementing `search`; the schema (chunk id,
-text, metadata, vector) is already what those stores expect.
+This is the evaluation-time index, not the serving path. Answers to customers are
+retrieved from the database by `PgVectorRetriever`, which is tenant-scoped, reads only
+current versions and withholds internal documents; this class has no notion of any of
+those. It stays because the evaluation harness needs a corpus-fitted baseline to compare
+that retriever against.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import joblib
 import numpy as np
@@ -21,11 +25,20 @@ from collection.rag.chunking import Chunk, chunk_text
 from collection.rag.documents import Document
 from collection.rag.embeddings import Embedder, get_embedder
 
+#: Retrieved passages below this similarity are not worth quoting back. Defined here, below
+#: both retrievers and the agent, so none of them has to import another to read it.
+MIN_RELEVANCE = 0.05
+TOP_K = 3
+
 
 @dataclass
 class Retrieved:
     chunk: Chunk
     score: float
+    #: Set by the database retriever so a retrieval record can cite the exact chunk and
+    #: version without a second query; the in-memory index has neither.
+    chunk_id: UUID | None = None
+    version_id: UUID | None = None
 
     @property
     def document_id(self) -> str:

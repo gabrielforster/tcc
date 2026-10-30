@@ -23,28 +23,14 @@ probability, because it is not one.
 """
 
 from dataclasses import dataclass
-from enum import StrEnum
 
 import numpy as np
 
+from collection.domain.intent import Intent
 from collection.rag.embeddings import TfidfEmbedder
 
 #: Below this margin the message is treated as unclear and escalated.
 MIN_CONFIDENCE = 0.04
-
-
-class Intent(StrEnum):
-    DEBT_INQUIRY = "debt_inquiry"
-    SECOND_COPY = "second_copy"
-    NEGOTIATION = "negotiation"
-    DISPUTE = "dispute"
-    PAYMENT_CLAIM = "payment_claim"
-    OPT_OUT = "opt_out"
-    #: Greetings and courtesy. Not one of the five intents the schedule names, but a real
-    #: category in any customer channel -- and without it "bom dia, tudo bem?" collided
-    #: with the negotiation cue "nao tenho como pagar tudo agora" on the shared word.
-    SMALL_TALK = "small_talk"
-    UNKNOWN = "unknown"
 
 
 #: Cue phrases per intent, in the language customers actually write in.

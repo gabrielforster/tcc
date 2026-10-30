@@ -1,43 +1,49 @@
-.PHONY: setup up down extract ingest dictionary eda features train explain serve demo rag answer outreach voice seed pipeline test lint fmt
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts migrate pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
 
-up:               ## start Postgres (pgvector) and Redis
+up:               ## start Postgres (pgvector), Redis and MinIO
 	docker compose up -d
 
 down:
 	docker compose down
 
-extract:          ## extract the raw dataset from the configured source
+seed:             ## create the development tenant, load knowledge/ into it, ingest, activate
+	uv run collection tenant seed
+
+extract:          ## store the raw dataset in object storage (COLLECTION_TENANT=<slug>)
 	uv run collection extract
 
-ingest:           ## anonymize + validate + write to data/interim
+ingest:           ## extract + anonymize + validate; needs COLLECTION_TENANT=<slug>
 	uv run collection ingest
 
 dictionary:       ## regenerate docs/data-dictionary.md from the domain schema
 	uv run collection dictionary
 
-eda:              ## descriptive statistics and charts under docs/eda/
+eda:              ## descriptive statistics and charts under docs/eda/ (COLLECTION_TENANT=<slug>)
 	uv run collection eda
 
-features:         ## feature engineering + chronological 70/15/15 split
+features:         ## feature engineering + chronological 70/15/15 split (COLLECTION_TENANT=<slug>)
 	uv run collection features
 
-train:            ## train candidates, pick a champion, score it once on test
+train:            ## train candidates, publish the champion as a platform model version (COLLECTION_TENANT=<slug>)
 	uv run collection train
 
-explain:          ## permutation importance and SHAP for the champion
+score:            ## score the tenant's customers against the latest platform model (COLLECTION_TENANT=<slug>)
+	uv run collection score
+
+explain:          ## permutation importance and SHAP for the champion (COLLECTION_TENANT=<slug>)
 	uv run collection explain
 
-serve:            ## run the scoring API on http://127.0.0.1:8000
-	uv run collection serve
+serve:            ## run the scoring API on http://127.0.0.1:8000; ARGS="--seed-demo" is the live demo
+	uv run collection serve $(ARGS)
 
 demo:             ## route a mix of events through the orchestrator
 	uv run collection demo
 
-rag:              ## build the knowledge index and evaluate retrieval
-	uv run collection rag
+rag:              ## evaluate retrieval; ARGS="--retriever pgvector" measures the serving path
+	uv run collection rag $(ARGS)
 
 answer:           ## evaluate the responders; ARGS="--compare" also runs the LLM arm
 	uv run collection answer $(ARGS)
@@ -48,10 +54,13 @@ outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs
 voice:            ## sweep what recognition error costs; ARGS="--audio FILE" transcribes one clip
 	uv run collection voice $(ARGS)
 
-seed:             ## report what the outbound path decides (serve --seed-demo is the live demo)
-	uv run collection seed
+contacts:         ## report what the outbound path decides (serve --seed-demo is the live demo)
+	uv run collection contacts
 
-pipeline:         ## the whole data pipeline, end to end
+migrate:          ## apply database migrations (alembic upgrade head)
+	uv run collection db upgrade
+
+pipeline:         ## the whole data pipeline, end to end (set COLLECTION_TENANT)
 	uv run collection pipeline
 
 test:

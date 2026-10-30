@@ -56,6 +56,36 @@ no push transport. Conversations carry a thread: the channel puts the transcript
 event, and the agent resolves follow-ups against it
 ([`docs/multi-turn.md`](./multi-turn.md)).
 
+## The durable record
+
+Below all of it sits the record. Everything the serving path reads is a row or an object
+now, and it belongs to a tenant: the tenant itself with its lifecycle, its customers and
+receivables, its knowledge as versioned documents with per-chunk vectors in `pgvector`,
+its conversations and turns, and the delivery status of every message. Files — raw and
+anonymized frames, trained models — live in object storage under the tenant's own prefix,
+each with a row that says what it is. A restart loses the queue and the mailbox, by the
+argument in [`docs/web-chat.md`](./web-chat.md); it no longer loses the conversation.
+
+A tenant is only servable in `ACTIVE`, reached by climbing
+`provisioned → ingesting → ready → active` one rung at a time. A tenant with no ingested
+data has nothing to answer from, and a confident answer with no grounding is worse than a
+refusal, so the state is a gate rather than a label. `collection tenant seed` is what walks
+a development tenant up that ladder — see the README.
+
+**The scope guard** is the one place a query can be refused. Every tenant's rows share a
+table, so "my data" and "someone else's data" differ by a predicate, and a predicate left
+to call sites is a predicate that will eventually be forgotten — once, quietly, in a read
+that returns another customer's invoices. So a session carries its tenant, and two
+listeners on it enforce the boundary: a read whose mappers include a tenant-scoped table is
+refused when no tenant is bound (`UnscopedQuery`) and silently narrowed when one is, and a
+write of a row belonging to another tenant is refused (`CrossTenantWrite`). A query that
+forgot the predicate therefore returns nothing rather than leaking. "Tenant-scoped" is
+asked of the mapped table, so a table added later inherits the guard by having a
+`tenant_id` column. The platform scope — the tenants table, the shared model registry —
+has to be asked for by name, which is what keeps it auditable. The reasoning, and the
+holes the guard deliberately does not cover, are written out in
+`src/collection/db/session.py`.
+
 ## The event contract
 
 Every interaction is an immutable `Event`. Agents never mutate what they receive; they emit

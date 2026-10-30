@@ -1,5 +1,12 @@
-"""Writes the model comparison report for a task."""
+"""Writes the model comparison report for a task.
 
+The curves are an object in the platform store, named after the model version they
+describe, because they are a product of a training run and belong beside its weights. The
+Markdown report is a document a developer asked for and goes to `docs/`; it names the
+object rather than embedding a file that no longer exists beside it.
+"""
+
+import io
 from pathlib import Path
 
 import matplotlib
@@ -13,11 +20,13 @@ from sklearn.metrics import PrecisionRecallDisplay, RocCurveDisplay  # noqa: E40
 from collection.config import settings  # noqa: E402
 from collection.models.metrics import SELECTION_METRIC  # noqa: E402
 from collection.models.train import TaskResult  # noqa: E402
+from collection.storage.objects import ObjectStore  # noqa: E402
 
 sns.set_theme(style="whitegrid", palette="deep")
 
 
-def curves(estimator, x_test, y_test, source: str, task: str) -> Path:
+def curves(estimator, x_test, y_test, *, name: str, store: ObjectStore) -> str:
+    """Draw the ROC and precision-recall curves and store them as `name`; returns the key."""
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     RocCurveDisplay.from_estimator(estimator, x_test, y_test, ax=axes[0])
     axes[0].plot([0, 1], [0, 1], "--", color="gray", linewidth=1)
@@ -25,15 +34,14 @@ def curves(estimator, x_test, y_test, source: str, task: str) -> Path:
     PrecisionRecallDisplay.from_estimator(estimator, x_test, y_test, ax=axes[1])
     axes[1].axhline(y_test.mean(), linestyle="--", color="gray", linewidth=1)
     axes[1].set_title("Precision-recall — test split")
-    destination = settings.dir_docs / "models" / source / f"{task}-curves.png"
-    destination.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(destination, dpi=150)
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", dpi=150)
     plt.close(fig)
-    return destination
+    return store.put(name, buffer.getvalue(), kind="plots", content_type="image/png").key
 
 
-def write(result: TaskResult, curve_path: Path | None = None) -> Path:
+def write(result: TaskResult, curve_key: str | None = None) -> Path:
     confusion = pd.DataFrame(
         result.test.confusion,
         index=["actual negative", "actual positive"],
@@ -83,12 +91,11 @@ def write(result: TaskResult, curve_path: Path | None = None) -> Path:
         for name, params in tuned.items():
             parts.append(f"- `{name}`: {params}")
         parts.append("")
-    if curve_path is not None:
-        parts.append(
-            f"\n## Curves\n\n![{curve_path.stem}](models/{result.source}/{curve_path.name})\n"
-        )
+    if curve_key is not None:
+        parts.append(f"\n## Curves\n\nStored in object storage as `{curve_key}`.\n")
 
     destination = settings.dir_docs / f"model-{result.source}-{result.task}.md"
+    destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text("\n".join(parts), encoding="utf-8")
     return destination
 

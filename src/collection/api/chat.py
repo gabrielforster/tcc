@@ -9,14 +9,19 @@ The status codes are chosen for a widget running on someone else's page, where t
 thing distinguishing "try again in a moment" from "start over" is the number it gets back:
 
 * `401` the token did not verify -- the host application must mint a new one;
-* `404` the session is unknown or expired -- open a new one and keep the transcript;
+* `403` the tenant exists and is not serving conversations yet (spec 6.2) -- retrying
+  changes nothing, and nothing the customer does will;
+* `404` the session is unknown or expired -- open a new one and keep the transcript; also
+  an embed naming a tenant that does not exist, which is a wrong address, not a refusal;
 * `409` the thread hit its turn cap and a person has it -- stop sending;
 * `422` the message was empty or too long -- the widget can say so without a round trip;
   also a voice note the decoder refused (not audio, too short, too long);
 * `429` rate limited -- back off, do not reopen the session.
 
-The index is built once at startup. It is the same `VectorIndex` the CLI uses, so the
-answers served here are the answers the evaluation measured.
+A channel is built once, per tenant, and kept. Without a `default_tenant_key` there is one
+channel on the in-memory store and the same `VectorIndex` the CLI uses, so the answers
+served here are the answers the evaluation measured; with one, the channel reads and
+writes that tenant's rows and the conversation outlives the process.
 """
 
 import os
@@ -24,6 +29,7 @@ import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import Lock
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -40,28 +46,46 @@ from collection.api.schemas import (
     TranscriptResponse,
     TranscriptTurn,
 )
-from collection.channels.delivery import BackwardsStatus, DeliveryStatus
+from collection.channels.delivery import (
+    BackwardsStatus,
+    ConversationDeliveries,
+    DatabaseDeliveryLog,
+    DeliveryStatus,
+)
 from collection.channels.outbound import SEED_DEMO_CUSTOMER
 from collection.channels.session import (
     ConversationEnded,
+    DatabaseSessionStore,
     InvalidMessage,
     RateLimited,
     SessionNotFound,
+    TenantNotServable,
     TokenError,
+    UnknownTenant,
     issue_token,
+    resolve_tenant,
 )
 from collection.channels.web import ChatChannel
 from collection.config import settings
+from collection.db.repository import TenantScope
+from collection.db.session import session_factory
 from collection.rag.documents import load_directory
 from collection.rag.index import VectorIndex
+from collection.rag.retriever import PgVectorRetriever
 from collection.voice.audio import AudioError
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 _STATUS = {
     TokenError: 401,
+    # The embed names a tenant that does not exist. Not 401: the key identifies and never
+    # authorises, so being wrong about it is a wrong address, not a failed login.
+    UnknownTenant: 404,
     SessionNotFound: 404,
     ConversationEnded: 409,
+    # The tenant exists and is not serving conversations yet (spec 6.2). Nothing the
+    # caller can fix by retrying or by opening a new session, so it is not a 404.
+    TenantNotServable: 403,
     InvalidMessage: 422,
     RateLimited: 429,
     # A clip the decoder refused is a request the caller can fix, like an empty message.
@@ -111,24 +135,86 @@ def default_responder() -> Responder:
 
 
 class ChatService:
-    """Holds the channel, so the index is built once rather than per request."""
+    """Holds a channel per tenant, so retrieval is wired once rather than per request.
+
+    A channel is the expensive thing here -- an index or a retriever, a classifier and an
+    agent that counts unclear messages across a customer's whole thread -- so it is built
+    once and kept. With no `default_tenant_key` there is no database behind the chat at
+    all: one channel on the in-memory store, which is the fresh clone, the demo page and
+    the test suite.
+
+    Only `/sessions` carries a tenant key, so which tenant a later request belongs to is
+    remembered here, by session id. That map is in this process and nowhere else: a
+    restart keeps the conversations (they are rows) and loses the routing, so a widget
+    that outlives the server is answered 404 and opens a new session. Making that durable
+    means resolving the tenant from the session id, which is §6.8's work, not this one's.
+    """
 
     def __init__(self, channel: ChatChannel | None = None) -> None:
         self._channel = channel
+        self._tenants: dict[str, ChatChannel] = {}
+        self._sessions: dict[str, ChatChannel] = {}
+        self._lock = Lock()
 
     def load(self) -> None:
         if self._channel is None:
-            index = VectorIndex()
-            index.add_documents(load_directory(settings.dir_knowledge)).build()
-            self._channel = ChatChannel(index=index, responder=default_responder())
+            self._channel = self._build(settings.default_tenant_key)
 
     @property
     def channel(self) -> ChatChannel:
+        """The channel for a request that names no tenant."""
         if self._channel is None:
             raise HTTPException(
                 status_code=503, detail="Chat is still starting. Try again in a moment."
             )
         return self._channel
+
+    def channel_for(self, tenant_key: str | None) -> ChatChannel:
+        """The channel serving a tenant, built on first use."""
+        key = (tenant_key or settings.default_tenant_key).strip()
+        if not key or key == settings.default_tenant_key.strip():
+            return self.channel
+        with self._lock:
+            if key not in self._tenants:
+                self._tenants[key] = self._build(key)
+            return self._tenants[key]
+
+    def of_session(self, session_id: str) -> ChatChannel:
+        """The channel a session was opened on; the default one for anything else."""
+        with self._lock:
+            return self._sessions.get(session_id, self.channel)
+
+    def remember(self, session_id: str, channel: ChatChannel) -> None:
+        with self._lock:
+            self._sessions[session_id] = channel
+
+    def forget(self, session_id: str) -> None:
+        """Drop the routing for a session the caller has closed."""
+        with self._lock:
+            self._sessions.pop(session_id, None)
+
+    def _build(self, tenant_key: str) -> ChatChannel:
+        """The channel for a tenant key, or the in-memory one when there is no key.
+
+        Everything durable hangs off one `TenantScope`: the retriever reads that tenant's
+        knowledge, the store writes its conversations and turns, the delivery log its
+        deliveries. One scope, so one tenant, decided here and not restated anywhere
+        downstream.
+        """
+        if not tenant_key.strip():
+            index = VectorIndex()
+            index.add_documents(load_directory(settings.dir_knowledge)).build()
+            return ChatChannel(retriever=index, responder=default_responder())
+
+        tenant = resolve_tenant(tenant_key.strip())
+        scope = TenantScope(session_factory()(), tenant.id)
+        store = DatabaseSessionStore(scope)
+        return ChatChannel(
+            retriever=PgVectorRetriever(scope),
+            responder=default_responder(),
+            store=store,
+            delivery=ConversationDeliveries(DatabaseDeliveryLog(scope), store),
+        )
 
 
 @asynccontextmanager
@@ -142,10 +228,13 @@ def create_router(service: ChatService) -> APIRouter:
 
     @router.post("/sessions", response_model=SessionResponse, status_code=201)
     def open_session(request: SessionRequest) -> SessionResponse:
+        """Open a conversation on the tenant the embed names, or on the default one."""
         try:
-            session, greeting = service.channel.open(request.token)
+            channel = service.channel_for(request.tenant_key)
+            session, greeting = channel.open(request.token)
         except Exception as error:
             raise _http_error(error) from error
+        service.remember(session.session_id, channel)
         return SessionResponse(
             session_id=session.session_id,
             greeting=greeting,
@@ -156,7 +245,7 @@ def create_router(service: ChatService) -> APIRouter:
     @router.post("/sessions/{session_id}/messages", response_model=MessageResponse)
     def send_message(session_id: str, request: MessageRequest) -> MessageResponse:
         try:
-            reply = service.channel.send(session_id, request.text)
+            reply = service.of_session(session_id).send(session_id, request.text)
         except Exception as error:
             raise _http_error(error) from error
         return MessageResponse(**vars(reply))
@@ -169,17 +258,18 @@ def create_router(service: ChatService) -> APIRouter:
         container by its suffix, and the scripted recogniser keys its transcripts on the stem.
         """
         name = Path(file.filename or "").name or "upload"
+        channel = service.of_session(session_id)
         try:
             # Resolve the session and spend a rate-limit hit *before* touching the body.
             # Session creation needs no auth, so anything read first is reachable by a
             # caller who invented the id and is not yet limited.
-            session = service.channel.store.get(session_id)
+            session = channel.store.get(session_id)
             session.check_rate()
             data = _read_capped(file)
             with tempfile.TemporaryDirectory(prefix="voice-") as directory:
                 path = Path(directory) / name
                 path.write_bytes(data)
-                reply = service.channel.send_audio(session_id, path, rate_checked=True)
+                reply = channel.send_audio(session_id, path, rate_checked=True)
         # Only the errors this layer knows how to explain. Anything else -- an OSError
         # writing the temp file, a bug in rendering -- is ours, not the caller's, and
         # should surface as a 500 rather than a tidy 400.
@@ -201,18 +291,19 @@ def create_router(service: ChatService) -> APIRouter:
         Any other step backwards, such as `entregue` after `lida`, contradicts the record and
         is a 409. An unknown delivery id, or one that belongs to another session, is a 404.
         """
+        channel = service.of_session(session_id)
         try:
-            service.channel.store.get(session_id)
+            channel.store.get(session_id)
         except Exception as error:
             raise _http_error(error) from error
         status = DeliveryStatus(report.status)
         try:
-            owner = service.channel.delivery.of(delivery_id).owner
+            owner = channel.delivery.of(delivery_id).owner
             # Another session's message is reported as absent, not forbidden: the caller
             # learns nothing about ids that are not theirs. `None` is unowned and allowed.
             if owner is not None and owner != session_id:
                 raise KeyError(delivery_id)
-            record = service.channel.delivery.advance(delivery_id, status)
+            record = channel.delivery.advance(delivery_id, status)
         except KeyError:
             raise HTTPException(status_code=404, detail="unknown delivery id") from None
         except BackwardsStatus as late:
@@ -226,7 +317,7 @@ def create_router(service: ChatService) -> APIRouter:
     @router.get("/sessions/{session_id}", response_model=TranscriptResponse)
     def transcript(session_id: str) -> TranscriptResponse:
         try:
-            session = service.channel.store.get(session_id)
+            session = service.of_session(session_id).store.get(session_id)
         except Exception as error:
             raise _http_error(error) from error
         return TranscriptResponse(
@@ -247,7 +338,8 @@ def create_router(service: ChatService) -> APIRouter:
 
     @router.delete("/sessions/{session_id}", status_code=204)
     def close_session(session_id: str) -> None:
-        service.channel.store.close(session_id)
+        service.of_session(session_id).store.close(session_id)
+        service.forget(session_id)
 
     @router.get("/widget.js", include_in_schema=False)
     def widget() -> FileResponse:

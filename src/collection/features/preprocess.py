@@ -1,12 +1,13 @@
 """Encoding and scaling, fitted on the training split only (no statistics leakage)."""
 
+from pathlib import Path
+
 import joblib
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from collection.config import settings
 from collection.features.build import BOOLEAN, CATEGORICAL, Splits
 
 NON_FEATURES = {"invoice_id", "customer_id", "reference_date"}
@@ -40,11 +41,11 @@ def build_preprocessor(splits: Splits) -> ColumnTransformer:
     )
 
 
-def fit_and_save(splits: Splits) -> str:
-    """Fit the preprocessor on the training split and serialize it for block II."""
-    settings.prepare_directories()
+def fit_and_save(splits: Splits, directory: Path) -> str:
+    """Fit the preprocessor on the training split and serialize it into `directory`."""
+    directory.mkdir(parents=True, exist_ok=True)
     preprocessor = build_preprocessor(splits)
     preprocessor.fit(splits.train)
-    path = settings.dir_processed / f"preprocessor_{splits.task}.joblib"
+    path = directory / f"preprocessor_{splits.task}.joblib"
     joblib.dump(preprocessor, path)
     return str(path)

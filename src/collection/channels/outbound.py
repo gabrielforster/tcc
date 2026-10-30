@@ -3,7 +3,7 @@
 The proactive agent decides *whether* to contact someone, on which channel and with which
 words; `ChatChannel.seed` puts the result where the widget will find it. Nothing joined
 those two halves, so the behaviour existed only in tests. This module is the join, and
-`collection seed` is the command that runs it.
+`collection contacts` is the command that runs it.
 
 It is deliberately thin. Every decision here already belongs to something else: the rules
 engine says whether the contact is permitted, the composer writes the message, the
@@ -109,12 +109,12 @@ def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -
     Seeds into `channel` when one is given -- which is how the live demo works: the API
     hands over the channel it is already serving, so the mailbox the job fills is the
     mailbox the widget drains. A mailbox is an in-memory dict, so a run against a channel
-    of its own leaves nothing behind for another process; `collection seed` is a report of
+    of its own leaves nothing behind for another process; `collection contacts` is a report of
     what the path does, and `collection serve --seed-demo` is the demo of it.
     """
     if channel is None:
         index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
-        channel = ChatChannel(index=index)
+        channel = ChatChannel(retriever=index)
 
     # The fixture names a customer who has opted out, and the whole point of including
     # them is to watch the contact be suppressed. A channel that had never heard of them
@@ -153,7 +153,7 @@ def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -
 def summary_lines(result: SeedResult) -> list[str]:
     """The run's outcome as plain text, for a log that has no table in it.
 
-    Shared with the CLI so the server's startup line and `collection seed` cannot drift
+    Shared with the CLI so the server's startup line and `collection contacts` cannot drift
     into reporting the same run differently.
     """
     lines = [

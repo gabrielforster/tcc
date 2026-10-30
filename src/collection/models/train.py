@@ -14,22 +14,28 @@ Protocol, fixed before any result is read:
 The decision threshold is tuned on validation too: the operational question is which
 receivables enter the queue, so the threshold that maximises F1 on validation is carried
 to test rather than an untested 0.5.
+
+Training computes and returns; it writes nothing. Putting the model, its metrics and the
+version row somewhere is `models.store.publish`, so the protocol above can be exercised
+(and tested) with no database or bucket, and the one place that decides where a model
+lives is not tangled into the place that decides which model wins.
 """
 
-import json
-from dataclasses import asdict, dataclass, field
+import uuid
+from dataclasses import dataclass, field
 from typing import Any
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
+from sqlalchemy.orm import Session
 
 from collection.config import settings
-from collection.data.ingest import source_metadata
+from collection.db.models.platform_model import PlatformModel
 from collection.features.build import build_splits
 from collection.models.candidates import SEED, Candidate, build_pipeline, candidates
 from collection.models.metrics import SELECTION_METRIC, Scores, baseline_scores, score
+from collection.models.store import publish
 
 CV_FOLDS = 5
 SEARCH_ITERATIONS = 8
@@ -103,8 +109,28 @@ def _tune(candidate: Candidate, splits, x_train, y_train, cv) -> tuple[Any, dict
     return search.best_estimator_, search.best_params_
 
 
-def train_task(task: str = "propensity", tune: bool = True) -> TaskResult:
-    splits = build_splits(task)
+@dataclass
+class FittedTask:
+    """What a training run produced, before anything is stored."""
+
+    result: TaskResult
+    pipeline: Any
+    x_test: pd.DataFrame
+    y_test: np.ndarray
+    #: Whose data the model was fitted on. A model whose training set is unknown cannot be
+    #: audited or rolled back with understanding.
+    tenant_id: uuid.UUID | None = None
+
+
+def fit_task(
+    task: str,
+    tables: dict[str, pd.DataFrame],
+    *,
+    source: str = "unknown",
+    tune: bool = True,
+    tenant_id: uuid.UUID | None = None,
+) -> FittedTask:
+    splits = build_splits(task, tables)
     x_train, y_train = _features_and_target(splits.train, splits.target)
     x_validation, y_validation = _features_and_target(splits.validation, splits.target)
     x_test, y_test = _features_and_target(splits.test, splits.target)
@@ -150,7 +176,7 @@ def train_task(task: str = "propensity", tune: bool = True) -> TaskResult:
     result = TaskResult(
         task=task,
         target=splits.target,
-        source=source_metadata()["source"],
+        source=source,
         champion=champion.name,
         threshold=threshold,
         candidates=results,
@@ -163,8 +189,7 @@ def train_task(task: str = "propensity", tune: bool = True) -> TaskResult:
         },
         feature_columns=list(x_train.columns),
     )
-    _persist(result, champion_estimator)
-    return result
+    return FittedTask(result, champion_estimator, x_test, y_test, tenant_id)
 
 
 def _cross_validate(estimator, x, y, cv) -> list[float]:
@@ -184,31 +209,26 @@ def _plain(value: Any) -> Any:
     return value.item() if hasattr(value, "item") else value
 
 
-def _persist(result: TaskResult, estimator: Any) -> None:
-    settings.prepare_directories()
-    joblib.dump(
-        {
-            "pipeline": estimator,
-            "threshold": result.threshold,
-            "target": result.target,
-            "task": result.task,
-            "source": result.source,
-            "champion": result.champion,
-            # The serving layer validates incoming payloads against these.
-            "features": result.feature_columns,
-        },
-        settings.dir_processed / f"model_{result.task}.joblib",
-    )
-    payload = asdict(result)
-    payload["test"] = asdict(result.test)
-    (settings.dir_processed / f"metrics_{result.task}.json").write_text(
-        json.dumps(payload, indent=2, default=str)
-    )
+@dataclass
+class TrainedModel:
+    """A published model: the row that names it, and what the run that made it computed."""
+
+    row: PlatformModel
+    fitted: FittedTask
 
 
-def evaluate_task(task: str = "propensity") -> dict:
-    """Read back the metrics of the last training run."""
-    path = settings.dir_processed / f"metrics_{task}.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No metrics for '{task}'. Run `collection train` first.")
-    return json.loads(path.read_text())
+def train(
+    task: str,
+    tables: dict[str, pd.DataFrame],
+    *,
+    source: str = "unknown",
+    tune: bool = True,
+    tenant_id: uuid.UUID | None = None,
+    session: Session | None = None,
+) -> TrainedModel:
+    """Fit the candidates and publish the champion as a new platform model version.
+
+    `session` is a platform session, for a caller that owns the transaction.
+    """
+    fitted = fit_task(task, tables, source=source, tune=tune, tenant_id=tenant_id)
+    return TrainedModel(row=publish(fitted, session=session), fitted=fitted)

@@ -12,10 +12,75 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The suite trains real models and now also exercises Postgres and object storage,
+    # and the first run on a cold cache downloads the embedding model.
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        # pgvector rather than a stock postgres image: the knowledge chunks are a vector
+        # column, so the migrations do not even apply without the extension. Published on
+        # 5433, the port docker-compose.yml uses, so one set of URLs works here and on a
+        # laptop -- the credentials below match that file for the same reason.
+        # `-h 127.0.0.1` on the health check is not redundant: initdb runs a temporary
+        # server that listens on the unix socket only, and a socket-only `pg_isready`
+        # would report healthy while the next step's TCP connection is still refused.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: collection
+          POSTGRES_PASSWORD: collection
+          POSTGRES_DB: collection
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U collection -d collection -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://collection:collection@localhost:5433/collection
+      TEST_DATABASE_URL: postgresql+psycopg://collection:collection@localhost:5433/collection_test
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_BUCKET: collection
+      S3_ACCESS_KEY: collection
+      S3_SECRET_KEY: collection-secret
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start MinIO
+        # Not a `services:` container. A service entry can set an image, environment and
+        # ports but cannot pass a command, and this image's entrypoint does nothing
+        # without `server /data`. The image is the Chainguard build docker-compose.yml
+        # uses, because minio/minio is no longer published to Docker Hub; it ships no
+        # shell and no curl, so there is no in-container health check for the Docker
+        # daemon to run either. Starting it as a step solves both: the command is passed
+        # normally, and readiness is polled from the runner, which does have curl.
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=collection \
+            -e MINIO_ROOT_PASSWORD=collection-secret \
+            cgr.dev/chainguard/minio:latest server /data
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 2
+          done
+          echo "MinIO never became ready:"
+          docker logs minio
+          exit 1
+
+      - name: Create the test database
+        # The fixtures migrate this database but cannot create it: the service container
+        # only ever creates POSTGRES_DB, and creating another one is a server operation.
+        # Keeping the suite off DATABASE_URL is the same rule as on a laptop -- the
+        # migration round-trip test downgrades to base, which is not something to do to
+        # the database the pipeline steps below are using.
+        run: |
+          PGPASSWORD=collection psql -v ON_ERROR_STOP=1 \
+            -h localhost -p 5433 -U collection -d collection \
+            -c 'create database collection_test'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -32,6 +97,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --frozen
 
+      - name: Cache the embedding model
+        # Everything that publishes or retrieves knowledge encodes it with the
+        # sentence-transformer, so the first step that touches `knowledge/` pulls a few
+        # hundred megabytes from Hugging Face. Keyed on the settings module, which is
+        # where the model name and its dimension live.
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('src/collection/config.py') }}
+          # That file also holds settings the model does not depend on, so editing any of
+          # them would otherwise evict a few hundred megabytes. The prefix restores the
+          # last cache whatever the hash, and a model that really did change is simply
+          # fetched into it.
+          restore-keys: |
+            hf-${{ runner.os }}-
+
       - name: Lint
         run: uv run ruff check src tests
 
@@ -41,18 +122,82 @@ jobs:
       - name: Tests
         # The suite trains real models, so it is slower than a unit-test suite and the
         # timeout above is set accordingly.
-        run: uv run pytest -q -p no:warnings
+        env:
+          # Turns the `db_engine` and `bucket` fixtures' skip into a failure. Without it a
+          # misconfigured service here would skip every @pytest.mark.db test and the run
+          # would go green with the tenant guard, the retrieval path, the conversation
+          # record and object storage all unexercised.
+          COLLECTION_REQUIRE_DB: "1"
+        run: uv run pytest -q -p no:warnings -rs --junit-xml=pytest.xml
+
+      - name: Tests again, against an already seeded database
+        # The suite must not depend on a virgin database. It is run over and over against
+        # one database in development, and an assertion about an absolute row count passes
+        # the first time and fails the second -- which is a defect in the test, not in the
+        # code, and one that costs an afternoon to recognise. Four of those were fixed in
+        # this commit's parent, so the property now has to be guarded by something other
+        # than a person remembering to check it.
+        #
+        # The database suite therefore runs a second time against the same database with
+        # the development tenant seeded into it, which is the dirtiest realistic state:
+        # a tenant with its knowledge published, its customers, its receivables and its
+        # objects already committed. The migration round trip is deselected because it
+        # downgrades to base, which would drop exactly the rows this step seeded and leave
+        # the run proving nothing.
+        env:
+          COLLECTION_REQUIRE_DB: "1"
+        run: |
+          # `--deselect` ignores a node id that matches nothing, and says so to nobody.
+          # Renaming that test would orphan the deselect, let the downgrade wipe the seed
+          # mid-run, and leave this step green while proving nothing -- which is the very
+          # kind of silent pass the step exists to catch. So prove the id still resolves
+          # before relying on it.
+          ROUND_TRIP=tests/test_db_setup.py::test_migrations_run_to_head_and_back
+          uv run pytest -q --collect-only "$ROUND_TRIP" > /dev/null || {
+            echo "$ROUND_TRIP no longer exists: update the deselect below."
+            exit 1
+          }
+          DATABASE_URL="$TEST_DATABASE_URL" uv run collection tenant seed
+          uv run pytest -q -p no:warnings -rs --junit-xml=pytest-seeded.xml \
+            -m db --deselect "$ROUND_TRIP"
+
+      - name: No test may have skipped
+        # Both runs above, checked in one place because the question is the same for both.
+        # The fixtures already fail rather than skip under COLLECTION_REQUIRE_DB, so this
+        # is for the skip nobody anticipated: a new infrastructure-conditional skip, a
+        # missing ffmpeg, or `test_migrations_run_to_head_and_back` quietly bowing out
+        # because it could not prove the two database URLs differ. A run that skips its way
+        # to green is the thing this whole job exists to prevent.
+        run: |
+          uv run python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          failed = False
+          for name in ("pytest.xml", "pytest-seeded.xml"):
+              suite = ET.parse(name).getroot().find("testsuite")
+              skipped = int(suite.get("skipped"))
+              print(f"{name}: {suite.get('tests')} tests, {skipped} skipped")
+              failed = failed or skipped > 0
+          sys.exit(1 if failed else 0)
+          PY
 
       - name: Pipeline smoke test
         # Runs the data pipeline end to end on the synthetic source, which needs no
         # credentials and no network. Catches breakage that unit tests can miss, such as
         # a report template referring to a column the features no longer produce.
+        # The commands are tenant-scoped and read and write the record and object storage,
+        # so a tenant has to exist first: `tenant seed` creates it, publishes `knowledge/`
+        # into it and activates it, which is exactly what a fresh clone runs.
         env:
           DATA_SOURCE: synthetic
           SYNTHETIC_N_CUSTOMERS: "150"
           SYNTHETIC_N_INVOICES: "1500"
           ANONYMIZATION_SALT: ci-salt
+          COLLECTION_TENANT: desenvolvimento
         run: |
+          uv run collection db upgrade
+          uv run collection tenant seed
           uv run collection extract
           uv run collection ingest
           uv run collection dictionary
@@ -61,6 +206,8 @@ jobs:
 
       - name: Retrieval evaluation
         # Fails if a change to the knowledge base or the retriever drops retrieval quality.
+        # The lexical arm, which reads `knowledge/` as files and needs no tenant; the
+        # pgvector arm that actually serves is covered by the database suite above.
         run: uv run collection rag
 
       - name: Responder evaluation

@@ -11,7 +11,21 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+psycopg://collection:collection@localhost:5433/collection"
+    # Tests run against this database when set, so a developer's data is never rolled
+    # through by a fixture; empty means "use database_url".
+    test_database_url: str = ""
     redis_url: str = "redis://localhost:6380/0"
+
+    # S3-compatible object storage (MinIO locally). The defaults match docker-compose.yml.
+    s3_endpoint_url: str = "http://localhost:9000"
+    s3_bucket: str = "collection"
+    s3_access_key: str = "collection"
+    s3_secret_key: str = "collection-secret"
+
+    # Embeddings. The dimension is part of the schema (pgvector columns are fixed-width),
+    # so changing the model to one with another width needs a migration, not just a setting.
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_dimensions: int = 384
 
     data_source: str = "synthetic"
     synthetic_seed: int = 42
@@ -33,6 +47,11 @@ class Settings(BaseSettings):
     # uvicorn by import string, so the flag has to reach the app through the environment.
     # Never enable it in a deployment: it fabricates contacts for fixture customers.
     chat_seed_demo: bool = False
+    # The tenant a chat request belongs to when it names none -- the demo page, and any
+    # single-tenant deployment. Empty means there is no database behind the chat at all:
+    # the channel runs on the in-memory store, which is what a fresh clone and the test
+    # suite do. A key is public (it travels in an embed) and identifies, never authorises.
+    default_tenant_key: str = ""
 
     # Generation. The key is read from the environment like any other secret and is never
     # committed; without it the LLM responder refuses and the template arm still runs.
