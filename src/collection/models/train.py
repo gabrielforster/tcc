@@ -96,7 +96,7 @@ def _tune(candidate: Candidate, splits, x_train, y_train, cv) -> tuple[Any, dict
         scoring="average_precision",
         cv=cv,
         random_state=SEED,
-        n_jobs=-1,
+        n_jobs=settings.n_jobs,
         refit=True,
     )
     search.fit(x_train, y_train)

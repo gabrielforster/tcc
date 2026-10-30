@@ -66,7 +66,7 @@ def permutation_table(pipeline, x: pd.DataFrame, y: np.ndarray) -> pd.DataFrame:
         scoring="average_precision",
         n_repeats=PERMUTATION_REPEATS,
         random_state=SEED,
-        n_jobs=-1,
+        n_jobs=settings.n_jobs,
     )
     return (
         pd.DataFrame(

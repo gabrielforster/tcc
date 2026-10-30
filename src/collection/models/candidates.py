@@ -19,6 +19,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
+from collection.config import settings
 from collection.features.build import Splits
 from collection.features.preprocess import build_preprocessor
 
@@ -60,7 +61,7 @@ def _xgboost(scale_pos_weight: float | None) -> Any:
         eval_metric="aucpr",
         tree_method="hist",
         random_state=SEED,
-        n_jobs=-1,
+        n_jobs=settings.n_jobs,
         **({"scale_pos_weight": scale_pos_weight} if scale_pos_weight else {}),
     )
 
@@ -94,7 +95,7 @@ def candidates(splits: Splits) -> list[Candidate]:
                 min_samples_leaf=2,
                 class_weight="balanced_subsample",
                 random_state=SEED,
-                n_jobs=-1,
+                n_jobs=settings.n_jobs,
             ),
             imbalance="class_weight",
             search_space={
@@ -107,7 +108,7 @@ def candidates(splits: Splits) -> list[Candidate]:
             name="random_forest + smote",
             family="random_forest",
             estimator=RandomForestClassifier(
-                n_estimators=400, min_samples_leaf=2, random_state=SEED, n_jobs=-1
+                n_estimators=400, min_samples_leaf=2, random_state=SEED, n_jobs=settings.n_jobs
             ),
             imbalance="smote",
         ),
