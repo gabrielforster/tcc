@@ -5,10 +5,15 @@ configured bucket is never read from or written to. The fixture skips when MinIO
 unreachable and fails instead under COLLECTION_REQUIRE_DB=1, as `db_engine` does.
 """
 
+import os
+import subprocess
+import sys
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from collection.config import ROOT
 from collection.db import session as session_module
 from collection.db.models import StoredObject, Tenant
 from collection.db.repository import TenantScope
@@ -221,3 +226,58 @@ def test_an_unreachable_backend_raises_object_store_error():
 
     with pytest.raises(ObjectStoreError):
         store.get("platform/models/x")
+
+
+#: One bucket-using test, run in a subprocess so the other branch of the fixture's
+#: COLLECTION_REQUIRE_DB check can be reached at all: `bucket` is session-scoped and reads
+#: the variable once, before any test in this process runs.
+_PROBE = "tests/test_object_store.py::test_get_returns_exactly_what_put_stored"
+_UNREACHABLE = {"S3_ENDPOINT_URL": "http://127.0.0.1:1"}
+
+
+def _run_probe(overrides: dict[str, str], *, require_db: bool) -> str:
+    env = {**os.environ, **overrides}
+    env.pop("COLLECTION_REQUIRE_DB", None)
+    if require_db:
+        env["COLLECTION_REQUIRE_DB"] = "1"
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", _PROBE, "-p", "no:cacheprovider", "-rsE"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    return proc.stdout + proc.stderr
+
+
+@pytest.mark.db
+def test_the_bucket_fixture_skips_when_object_storage_is_unreachable(db_engine):
+    out = _run_probe(_UNREACHABLE, require_db=False)
+
+    assert "1 skipped" in out
+    assert "is unusable" in out
+    assert "1 error" not in out
+
+
+@pytest.mark.db
+def test_the_bucket_fixture_fails_instead_of_skipping_when_the_database_is_required(db_engine):
+    out = _run_probe(_UNREACHABLE, require_db=True)
+
+    assert "1 error" in out
+    assert "is unusable" in out
+    assert "skipped" not in out
+
+
+@pytest.mark.db
+def test_the_bucket_fixture_fails_when_required_and_the_credentials_are_wrong(bucket):
+    """Reachable but rejecting: the case a reachability check alone would wave through.
+
+    `bucket` is requested so this only runs where MinIO really does answer with the
+    configured keys -- otherwise the subprocess would be refused for the wrong reason.
+    """
+    out = _run_probe({"S3_ACCESS_KEY": "wrong", "S3_SECRET_KEY": "also-wrong"}, require_db=True)
+
+    assert "1 error" in out
+    assert "InvalidAccessKeyId" in out
+    assert "skipped" not in out

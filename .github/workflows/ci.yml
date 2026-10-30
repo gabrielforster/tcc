@@ -22,6 +22,9 @@ jobs:
         # column, so the migrations do not even apply without the extension. Published on
         # 5433, the port docker-compose.yml uses, so one set of URLs works here and on a
         # laptop -- the credentials below match that file for the same reason.
+        # `-h 127.0.0.1` on the health check is not redundant: initdb runs a temporary
+        # server that listens on the unix socket only, and a socket-only `pg_isready`
+        # would report healthy while the next step's TCP connection is still refused.
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: collection
@@ -30,7 +33,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd "pg_isready -U collection"
+          --health-cmd "pg_isready -U collection -d collection -h 127.0.0.1"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -103,6 +106,12 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: hf-${{ runner.os }}-${{ hashFiles('src/collection/config.py') }}
+          # That file also holds settings the model does not depend on, so editing any of
+          # them would otherwise evict a few hundred megabytes. The prefix restores the
+          # last cache whatever the hash, and a model that really did change is simply
+          # fetched into it.
+          restore-keys: |
+            hf-${{ runner.os }}-
 
       - name: Lint
         run: uv run ruff check src tests
@@ -119,7 +128,49 @@ jobs:
           # would go green with the tenant guard, the retrieval path, the conversation
           # record and object storage all unexercised.
           COLLECTION_REQUIRE_DB: "1"
-        run: uv run pytest -q -p no:warnings
+        run: uv run pytest -q -p no:warnings -rs --junit-xml=pytest.xml
+
+      - name: Tests again, against an already seeded database
+        # The suite must not depend on a virgin database. It is run over and over against
+        # one database in development, and an assertion about an absolute row count passes
+        # the first time and fails the second -- which is a defect in the test, not in the
+        # code, and one that costs an afternoon to recognise. Four of those were fixed in
+        # this commit's parent, so the property now has to be guarded by something other
+        # than a person remembering to check it.
+        #
+        # The database suite therefore runs a second time against the same database with
+        # the development tenant seeded into it, which is the dirtiest realistic state:
+        # a tenant with its knowledge published, its customers, its receivables and its
+        # objects already committed. The migration round trip is deselected because it
+        # downgrades to base, which would drop exactly the rows this step seeded and leave
+        # the run proving nothing.
+        env:
+          COLLECTION_REQUIRE_DB: "1"
+        run: |
+          DATABASE_URL="$TEST_DATABASE_URL" uv run collection tenant seed
+          uv run pytest -q -p no:warnings -rs --junit-xml=pytest-seeded.xml \
+            -m db --deselect tests/test_db_setup.py::test_migrations_run_to_head_and_back
+
+      - name: No test may have skipped
+        # Both runs above, checked in one place because the question is the same for both.
+        # The fixtures already fail rather than skip under COLLECTION_REQUIRE_DB, so this
+        # is for the skip nobody anticipated: a new infrastructure-conditional skip, a
+        # missing ffmpeg, or `test_migrations_run_to_head_and_back` quietly bowing out
+        # because it could not prove the two database URLs differ. A run that skips its way
+        # to green is the thing this whole job exists to prevent.
+        run: |
+          uv run python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          failed = False
+          for name in ("pytest.xml", "pytest-seeded.xml"):
+              suite = ET.parse(name).getroot().find("testsuite")
+              skipped = int(suite.get("skipped"))
+              print(f"{name}: {suite.get('tests')} tests, {skipped} skipped")
+              failed = failed or skipped > 0
+          sys.exit(1 if failed else 0)
+          PY
 
       - name: Pipeline smoke test
         # Runs the data pipeline end to end on the synthetic source, which needs no
