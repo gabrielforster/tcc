@@ -230,30 +230,37 @@ def test_a_late_report_racing_a_reply_cannot_move_the_row_backwards(committed_de
     """
     engine, tenant_id, delivery_id = committed_delivery
     reply = Session(engine)
-    reply_log = DatabaseDeliveryLog(TenantScope(reply, tenant_id))
-    reply_log.advance(delivery_id, DeliveryStatus.RESPONDIDA)  # row lock held, uncommitted
+    try:
+        reply_log = DatabaseDeliveryLog(TenantScope(reply, tenant_id))
+        reply_log.advance(delivery_id, DeliveryStatus.RESPONDIDA)  # row lock held, uncommitted
 
-    outcome: dict[str, object] = {}
-    started = threading.Event()
+        outcome: dict[str, object] = {}
+        started = threading.Event()
 
-    def late_report() -> None:
-        with Session(engine) as session:
-            log = DatabaseDeliveryLog(TenantScope(session, tenant_id))
-            started.set()
-            try:
-                log.advance(delivery_id, DeliveryStatus.LIDA)
-                session.commit()
-                outcome["result"] = "advanced"
-            except BackwardsStatus as exc:
-                outcome["result"] = exc
+        def late_report() -> None:
+            with Session(engine) as session:
+                log = DatabaseDeliveryLog(TenantScope(session, tenant_id))
+                started.set()
+                try:
+                    log.advance(delivery_id, DeliveryStatus.LIDA)
+                    session.commit()
+                    outcome["result"] = "advanced"
+                except BackwardsStatus as exc:
+                    outcome["result"] = exc
 
-    worker = threading.Thread(target=late_report)
-    worker.start()
-    started.wait(5)
-    worker.join(0.5)
-    assert worker.is_alive(), "the late report should be waiting on the reply's row lock"
-    reply.commit()
-    reply.close()
+        worker = threading.Thread(target=late_report)
+        worker.start()
+        started.wait(5)
+        worker.join(0.5)
+        # Only a precondition: a thread blocked on the UPDATE is alive with or without the
+        # lock. The outcome assertions below are what prove the lock did its job.
+        assert worker.is_alive(), "the late report finished before the reply committed"
+        reply.commit()
+    finally:
+        # A failure above must not leave the row lock held, or the worker and the
+        # fixture's cleanup would block forever instead of the test failing.
+        reply.rollback()
+        reply.close()
     worker.join(10)
 
     assert isinstance(outcome["result"], BackwardsStatus)

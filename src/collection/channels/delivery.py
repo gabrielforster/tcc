@@ -62,11 +62,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
+from typing import TYPE_CHECKING
 
-from collection.db.models.conversation import Conversation, Turn
-from collection.db.models.delivery import Delivery
-from collection.db.repository import TenantScope
 from collection.domain.delivery import DeliveryStatus
+
+if TYPE_CHECKING:
+    from collection.db.models.conversation import Conversation, Turn
+    from collection.db.models.delivery import Delivery
+    from collection.db.repository import TenantScope
 
 
 class BackwardsStatus(ValueError):
@@ -169,11 +172,14 @@ _STAMP = {
 class DatabaseDeliveryLog:
     """`DeliveryLog`'s contract on rows, within one tenant.
 
+    The model imports are inside the methods so that importing this module, for the
+    in-memory log, does not load the database layer.
+
     The caller owns the transaction, as with every other write through a `TenantScope`:
     nothing here commits.
     """
 
-    def __init__(self, scope: TenantScope, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, scope: "TenantScope", clock: Callable[[], float] = time.time) -> None:
         self._scope = scope
         self._clock = clock
 
@@ -182,14 +188,16 @@ class DatabaseDeliveryLog:
         text: str,
         owner: str | None = None,
         *,
-        conversation: Conversation,
-        turn: Turn | None = None,
+        conversation: "Conversation",
+        turn: "Turn | None" = None,
     ) -> DeliveryRecord:
         """Register a message as sent. The text is not kept: the log tracks status only.
 
         A row has to belong to a conversation, which the in-memory log never needed, so
         the conversation is required and the turn it is tied to is optional.
         """
+        from collection.db.models.delivery import Delivery
+
         row = Delivery(
             conversation_id=conversation.id,
             turn_id=turn.id if turn is not None else None,
@@ -220,7 +228,9 @@ class DatabaseDeliveryLog:
     def _now(self) -> datetime:
         return datetime.fromtimestamp(self._clock(), UTC)
 
-    def _find(self, delivery_id: str, *, lock: bool = False) -> Delivery:
+    def _find(self, delivery_id: str, *, lock: bool = False) -> "Delivery":
+        from collection.db.models.delivery import Delivery
+
         try:
             key = uuid.UUID(delivery_id)
         except ValueError:
@@ -234,11 +244,11 @@ class DatabaseDeliveryLog:
             raise KeyError(delivery_id)
         return row
 
-    def _lock(self, delivery_id: str) -> Delivery:
+    def _lock(self, delivery_id: str) -> "Delivery":
         return self._find(delivery_id, lock=True)
 
     @staticmethod
-    def _record(row: Delivery) -> DeliveryRecord:
+    def _record(row: "Delivery") -> DeliveryRecord:
         stamp = getattr(row, _STAMP[row.status])
         return DeliveryRecord(
             id=str(row.id), status=row.status, at=stamp.timestamp(), owner=row.owner
