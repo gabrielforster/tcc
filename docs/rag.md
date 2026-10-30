@@ -160,8 +160,9 @@ serve many tenants, survive an edit, and cite the text a customer was actually s
 Before this measurement, this document named six questions where the lexical baseline put
 the wrong document first and predicted that a neural retriever should win exactly those,
 because the gap there was semantic rather than lexical. Keeping the prediction next to the
-outcome is the point of having written it down, so here is the outcome. Both columns are
-over the customer-facing corpus; a bold entry is a hit.
+outcome is the point of having written it down, so here is the outcome, for those
+questions and for every other one where the two arms disagree. Both columns are over the
+customer-facing corpus; a bold entry is a hit.
 
 | question | tfidf@1 | pgvector@1 | gold |
 |---|---|---|---|
@@ -184,14 +185,17 @@ right unaided. One of the two supporting cases was an artefact of the corpus, no
 representation.
 
 Against those two genuine fixes, the embedder loses three questions the baseline gets
-right, and all three go the same way: `posso parcelar minha divida?`, `quantas vezes voces
-podem me contatar por semana?` and `nao reconheco essa divida` drift towards
-`tabela-de-parcelamento.csv` or `faq.md`. **That is the chunking difference, not the
-embedder.** The instalment table is one versioned document in the database and is embedded
+right: `posso parcelar minha divida?`, `quantas vezes voces podem me contatar por semana?`
+and `nao reconheco essa divida`. Two of the three drift to `tabela-de-parcelamento.csv`,
+and **the likeliest explanation for those two is the chunking difference rather than the
+embedder** -- likeliest, not measured, because the experiment that would settle it has not
+been run. The instalment table is one versioned document in the database and is embedded
 whole, so its vector is a blurred average of every band and sits weakly close to a great
 many questions; the in-memory index splits it row by row and gives each band a sharp vector
-of its own. The two retrievers are not only different representations, they are reading
-differently shaped documents.
+of its own. The third, `posso parcelar minha divida?`, drifts to `faq.md` instead, which
+that mechanism does not explain. The two retrievers are not only different
+representations, they are reading differently shaped documents, and this comparison cannot
+separate the two causes.
 
 **So the next thing to try is chunking, not the model.** Splitting a published CSV into a
 chunk per row — which `chunk_text` already does for prose and which the versioning model
