@@ -11,18 +11,26 @@ import uuid
 import boto3
 import pytest
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from collection.config import settings
+from collection.db import session as session_module
 from collection.db.models import StoredObject, Tenant
 from collection.db.repository import TenantScope
-from collection.db.session import bind_tenant
+from collection.db.session import CrossTenantWrite, UnscopedQuery, bind_tenant
 from collection.storage.objects import ObjectStore, ObjectStoreError
 
 
 @pytest.fixture(scope="session")
-def bucket():
+def monkeypatch_session():
+    with pytest.MonkeyPatch.context() as patch:
+        yield patch
+
+
+@pytest.fixture(scope="session")
+def bucket(monkeypatch_session):
     name = f"collection-test-{uuid.uuid4().hex[:12]}"
     client = boto3.client(
         "s3",
@@ -39,14 +47,18 @@ def bucket():
         if os.environ.get("COLLECTION_REQUIRE_DB") == "1":
             pytest.fail(message, pytrace=False)
         pytest.skip(message)
+    # A store built without `bucket=` must not reach the configured bucket either.
+    monkeypatch_session.setattr(settings, "s3_bucket", name)
     yield name
     try:
         for page in client.get_paginator("list_objects_v2").paginate(Bucket=name):
             for item in page.get("Contents", []):
                 client.delete_object(Bucket=name, Key=item["Key"])
         client.delete_bucket(Bucket=name)
-    except Exception:
-        pass  # the bucket was never created if no test got as far as a first use
+    except ClientError as exc:
+        # Never created if no test got as far as a first use; anything else is real.
+        if exc.response.get("Error", {}).get("Code") != "NoSuchBucket":
+            raise
 
 
 def _tenant_scope(db: Session, slug: str) -> TenantScope:
@@ -136,11 +148,11 @@ def test_a_tenant_scoped_store_cannot_read_another_tenants_key(db, bucket):
     "hostile",
     ["../x", "a/../../x", "/abs", "a//b", "a\\b", "", ".", "a/."],
 )
-def test_no_name_can_reach_outside_the_stores_prefix(db, bucket, hostile):
+def test_no_name_can_reach_outside_the_stores_prefix(db, bucket, hostile, monkeypatch):
     scope = _tenant_scope(db, "one")
     store = ObjectStore(scope, bucket=bucket)
-    other = ObjectStore(_tenant_scope(db, "two"), bucket=bucket)
-    other.put("s.txt", b"secret", kind="raw", content_type="text/plain")
+    writes = []
+    monkeypatch.setattr(store._client, "put_object", lambda **kw: writes.append(kw))
 
     with pytest.raises(ObjectStoreError):
         store.put(hostile, b"x", kind="raw", content_type="text/plain")
@@ -148,6 +160,75 @@ def test_no_name_can_reach_outside_the_stores_prefix(db, bucket, hostile):
         store.put("ok", b"x", kind=hostile, content_type="text/plain")
     with pytest.raises(ObjectStoreError):
         store.get(f"tenants/{scope.tenant_id}/raw/{hostile}")
+    assert writes == []
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("field", ["kind", "content_type"])
+def test_an_overlong_column_is_refused_before_anything_is_uploaded(db, bucket, field, monkeypatch):
+    store = ObjectStore(_tenant_scope(db, "one"), bucket=bucket)
+    writes = []
+    monkeypatch.setattr(store._client, "put_object", lambda **kw: writes.append(kw))
+    args = {"kind": "k", "content_type": "t"} | {field: "x" * 300}
+
+    with pytest.raises(ObjectStoreError):
+        store.put("n", b"x", **args)
+    assert writes == []
+
+
+@pytest.mark.db
+def test_a_tenant_session_sees_no_platform_row(db, bucket):
+    platform = _platform_session(db)
+    ObjectStore(bucket=bucket, session=platform).put(
+        "m.bin", b"m", kind="models", content_type="text/plain"
+    )
+    scope = _tenant_scope(db, "one")
+
+    assert scope.all(StoredObject) == []
+    assert scope.session.scalars(select(StoredObject)).all() == []
+
+
+@pytest.mark.db
+def test_a_session_with_no_tenant_cannot_query_stored_objects(db):
+    session = Session(bind=db.connection(), join_transaction_mode="create_savepoint")
+
+    with pytest.raises(UnscopedQuery):
+        session.scalars(select(StoredObject)).all()
+
+
+@pytest.mark.db
+def test_a_platform_session_reads_platform_rows(db, bucket):
+    session = _platform_session(db)
+    stored = ObjectStore(bucket=bucket, session=session).put(
+        "m.bin", b"m", kind="models", content_type="text/plain"
+    )
+
+    assert session.scalars(select(StoredObject.key)).all() == [stored.key]
+
+
+@pytest.mark.db
+def test_a_tenant_session_cannot_add_a_null_tenant_row(db):
+    scope = _tenant_scope(db, "one")
+    scope.session.add(
+        StoredObject(tenant_id=None, kind="k", key="platform/k/x", content_type="t", size_bytes=1)
+    )
+
+    with pytest.raises(CrossTenantWrite):
+        scope.session.flush()
+
+
+@pytest.mark.db
+def test_a_platform_store_without_a_session_commits_through_its_own_unit_of_work(
+    db, bucket, monkeypatch
+):
+    factory = sessionmaker(bind=db.connection(), join_transaction_mode="create_savepoint")
+    monkeypatch.setattr(session_module, "session_factory", lambda: factory)
+
+    stored = ObjectStore(bucket=bucket).put("m.bin", b"m", kind="models", content_type="text/plain")
+
+    assert stored.key == "platform/models/m.bin" and stored.tenant_id is None
+    check = _platform_session(db)
+    assert check.scalars(select(StoredObject.key)).all() == [stored.key]
 
 
 @pytest.mark.db

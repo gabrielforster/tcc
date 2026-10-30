@@ -11,14 +11,20 @@ tenant's store therefore cannot be pointed at another tenant's data by any argum
 `..`, a leading `/`, an empty segment or another tenant's whole key all fail before a
 request is made. A scope-less store serves the platform prefix only.
 
-The bytes are written before the row. A crash between the two leaves an orphan object,
-which costs a few bytes; the other order leaves a row promising a file that is not there.
+The bytes are written before the row, so a row never promises a file that is not there.
+That is not the same as the two always agreeing: a first `put` that fails after the upload
+leaves an orphan object (a few bytes), and a re-`put` that fails after overwriting leaves
+the old row describing the previous size and content type. Everything that can be checked
+deterministically (segment shape, column lengths) is checked before the upload, so what
+remains is a database outage mid-call.
 
 `ObjectStoreError` wraps every backend failure for the reason `LLMError` does: callers
 decide what a missing or unreachable file means (fall back, retry, fail the request), and
 cannot if each failure is a different botocore type. The bucket is created on first use
 because a fresh MinIO has none. MinIO's image has no healthcheck, so readiness is not
-assumed: the client retries its first calls instead.
+assumed: the client retries its first calls instead. Database errors are not wrapped:
+they propagate as SQLAlchemy raised them, because the row lives in the caller's
+transaction and the caller owns that failure.
 """
 
 import uuid
@@ -84,9 +90,17 @@ class ObjectStore:
         )
         self._bucket_ready = False
 
-    def put(self, key: str, data: bytes, *, kind: str, content_type: str) -> StoredObject:
-        """Store `data` as `<prefix><kind>/<key>` and return the row describing it."""
-        full_key = f"{self.prefix}{_segment(kind, 'kind')}/{_segment(key, 'name')}"
+    def put(self, name: str, data: bytes, *, kind: str, content_type: str) -> StoredObject:
+        """Store `data` as `<prefix><kind>/<name>` and return the row describing it.
+
+        The object is written first and the row second, so a failure between them can
+        leave an orphan object (first put) or a row describing the previous version
+        (re-put). Invalid arguments are refused before anything is written; database
+        errors propagate unwrapped.
+        """
+        full_key = f"{self.prefix}{_segment(kind, 'kind')}/{_segment(name, 'name')}"
+        if len(kind) > 64 or len(content_type) > 255 or len(full_key) > 1024:
+            raise ObjectStoreError("kind, content_type or key is longer than the row can hold")
         self._call(
             self._client.put_object,
             Bucket=self._ensure_bucket(),
@@ -103,6 +117,8 @@ class ObjectStore:
         return self._call(response["Body"].read)
 
     def exists(self, key: str) -> bool:
+        """Whether the key is present. A key outside this store's prefix raises: that is a
+        caller bug or a probe, not an absence."""
         try:
             self._client.head_object(Bucket=self._ensure_bucket(), Key=self._own(key))
         except ClientError as exc:
@@ -138,7 +154,15 @@ class ObjectStore:
                     "NotFound",
                 ):
                     raise ObjectStoreError(str(exc)) from exc
-                self._call(self._client.create_bucket, Bucket=self.bucket)
+                try:
+                    self._client.create_bucket(Bucket=self.bucket)
+                except ClientError as created:
+                    # Another process won the race to create it, which is what we wanted.
+                    code = created.response.get("Error", {}).get("Code")
+                    if code not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+                        raise ObjectStoreError(str(created)) from created
+                except BotoCoreError as created:
+                    raise ObjectStoreError(str(created)) from created
             except BotoCoreError as exc:
                 raise ObjectStoreError(str(exc)) from exc
             self._bucket_ready = True
