@@ -87,5 +87,8 @@ def advance(tenant: Tenant, to: TenantState) -> None:
     if to not in _ALLOWED[tenant.state]:
         raise InvalidTransition(tenant.state, to)
     tenant.state = to
-    if to is TenantState.ACTIVE:
+    # `activated_at` answers "when did this tenant finish onboarding and become servable",
+    # a fact about onboarding, not about the latest resume. A suspension is an
+    # interruption, not a new onboarding, so only the first activation is recorded.
+    if to is TenantState.ACTIVE and tenant.activated_at is None:
         tenant.activated_at = datetime.now(UTC)

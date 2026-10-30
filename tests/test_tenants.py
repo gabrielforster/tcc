@@ -116,3 +116,27 @@ def test_a_tenant_persists_with_its_defaults_and_slug_and_key_are_unique(db):
     with pytest.raises(IntegrityError), db.begin_nested():
         db.add(Tenant(name="Other", slug="other", tenant_key=stored.tenant_key))
         db.flush()
+
+
+def test_activated_at_survives_a_suspension():
+    tenant = _tenant(TenantState.READY)
+    advance(tenant, TenantState.ACTIVE)
+    first = tenant.activated_at
+
+    advance(tenant, TenantState.SUSPENDED)
+
+    assert tenant.activated_at == first
+
+
+def test_reactivation_after_a_suspension_keeps_the_first_activation_date():
+    tenant = _tenant(TenantState.READY)
+    advance(tenant, TenantState.ACTIVE)
+    first = tenant.activated_at
+    assert first is not None
+
+    advance(tenant, TenantState.SUSPENDED)
+    advance(tenant, TenantState.READY)
+    advance(tenant, TenantState.ACTIVE)
+
+    assert tenant.state is TenantState.ACTIVE
+    assert tenant.activated_at == first
