@@ -17,7 +17,14 @@ from collection.config import settings
 from collection.rag.chunking import chunk_text, split_paragraphs
 from collection.rag.documents import load_directory, load_file
 from collection.rag.embeddings import Embedder, TfidfEmbedder, get_embedder
-from collection.rag.evaluate import Question, evaluate, load_questions, sweep
+from collection.rag.evaluate import (
+    DocumentRetriever,
+    Question,
+    customer_visible,
+    evaluate,
+    load_questions,
+    sweep,
+)
 from collection.rag.index import VectorIndex
 
 LONG_PARAGRAPH = " ".join(f"palavra{i}" for i in range(1200))
@@ -304,8 +311,8 @@ class _FixedRetriever:
         return self.ranking[:top_k]
 
 
-def test_the_evaluation_measures_anything_that_ranks_documents():
-    """The comparison in docs/rag.md is only honest if both arms run the same metric code."""
+def test_the_metrics_are_arithmetic_on_a_scripted_ranking():
+    """Pins the metric definitions themselves, with no retriever in the way."""
     questions = [Question(question="q", relevant=frozenset({"b.md"}))]
     scores = evaluate(_FixedRetriever(["a.md", "b.md", "c.md"]), questions, k=3)
     assert scores.recall == pytest.approx(1.0)
@@ -313,18 +320,49 @@ def test_the_evaluation_measures_anything_that_ranks_documents():
     assert scores.precision == pytest.approx(1 / 3)
 
 
-@pytest.mark.db
-def test_the_pgvector_retriever_ranks_whole_documents_for_the_evaluation(db, pg_scope):
-    """Several chunks of one document must not crowd the ranking the metrics see."""
+def test_both_retrievers_satisfy_the_contract_the_evaluation_measures_through(index):
+    """The comparison in docs/rag.md is only honest if both arms run the same metric code.
+
+    That is what `DocumentRetriever` is for, so this asks the question directly rather than
+    waiting for a measurement run to fail half way through one arm.
+    """
     from collection.rag.retriever import PgVectorRetriever
 
-    _publish_knowledge(pg_scope, "faq.md", "boleto segunda via vencimento pix")
+    assert isinstance(index, DocumentRetriever)
+    assert isinstance(PgVectorRetriever.__new__(PgVectorRetriever), DocumentRetriever)
+    assert not isinstance(object(), DocumentRetriever)
+
+
+def test_withholding_a_document_restricts_the_labels_and_drops_what_it_alone_answered():
+    """A question only an internal document answers is not a miss, it is out of scope."""
+    questions = [
+        Question(question="both", relevant=frozenset({"faq.md", "limites.md"})),
+        Question(question="internal only", relevant=frozenset({"limites.md"})),
+    ]
+    restricted = customer_visible(questions, frozenset({"limites.md"}))
+    assert [item.question for item in restricted] == ["both"]
+    assert restricted[0].relevant == frozenset({"faq.md"})
+
+
+@pytest.mark.db
+def test_the_pgvector_retriever_ranks_whole_documents_for_the_evaluation(db, pg_scope):
+    """Several chunks of one document must not crowd the ranking the metrics see.
+
+    The long document chunks into more than `top_k` pieces, every one of them closer to
+    the query than the other document, so a retriever that did not dedupe to documents
+    would return it twice and never reach `politica.md` at all.
+    """
+    from collection.db.models import KnowledgeChunk
+    from collection.rag.retriever import PgVectorRetriever
+
+    long_faq = "\n\n".join(["boleto segunda via vencimento pix"] * 600)
+    faq = _publish_knowledge(pg_scope, "faq.md", long_faq)
     _publish_knowledge(pg_scope, "politica.md", "contato de cobranca nao ocorre aos domingos")
+    assert len(pg_scope.all(KnowledgeChunk, KnowledgeChunk.version_id == faq.id)) > 2
 
-    ranked = PgVectorRetriever(pg_scope).search_documents("boleto segunda via", top_k=2)
+    ranked = PgVectorRetriever(pg_scope).search_documents("boleto segunda via cobranca", top_k=2)
 
-    assert ranked[0] == "faq.md"
-    assert len(ranked) == len(set(ranked))
+    assert ranked == ["faq.md", "politica.md"]
 
 
 @pytest.mark.db

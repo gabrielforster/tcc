@@ -18,11 +18,12 @@ Metrics, per the schedule's "retrieval top-k avaliado por precisão/revocação"
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import pandas as pd
 
 
+@runtime_checkable
 class DocumentRetriever(Protocol):
     """What the evaluation needs from a retriever, and nothing more.
 
@@ -30,7 +31,9 @@ class DocumentRetriever(Protocol):
     drift apart: whatever ranks the corpus, the evaluation only ever sees file-level
     document ids, best first. It is a protocol rather than a base class because the two
     implementations have nothing else in common -- one is a fitted matrix in this process,
-    the other a SQL statement against a tenant's rows.
+    the other a SQL statement against a tenant's rows. It is runtime-checkable so that
+    "this retriever can be measured" is a question the tests can ask directly, rather than
+    one that is only answered when a measurement run fails half way through.
     """
 
     def search_documents(self, query: str, top_k: int = 5) -> list[str]: ...
@@ -101,6 +104,25 @@ def load_questions(path: Path | str) -> list[Question]:
         )
         for item in payload
     ]
+
+
+def customer_visible(questions: list[Question], withheld: frozenset[str]) -> list[Question]:
+    """The question set as a customer-facing retriever can possibly answer it.
+
+    Comparing the serving retriever against the in-memory baseline is only like-for-like if
+    the *corpus* is the same for both, not just the labels. The serving retriever filters
+    internal documents in SQL, so it can never spend a ranking slot on one; a baseline that
+    still indexes them spends slots on documents the comparison then scores as misses, and
+    is handicapped rather than equalised. So the caller withholds the same documents from
+    the baseline's corpus, and this withholds them from the labels: gold sets lose them,
+    and a question they were the only answer to is dropped, because no retriever under
+    comparison could find it.
+    """
+    restricted = [
+        Question(item.question, frozenset(item.relevant - withheld), item.note)
+        for item in questions
+    ]
+    return [item for item in restricted if item.relevant]
 
 
 def sweep(

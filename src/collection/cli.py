@@ -340,14 +340,17 @@ def demo() -> None:
     console.print(f"\n[green]summary[/] {trace.counts()}")
 
 
-def _report_retrieval(retriever, query: str | None, top_k: int, evaluate_only: bool) -> None:
+def _report_retrieval(
+    retriever, query: str | None, top_k: int, evaluate_only: bool, customer_only: bool
+) -> None:
     """One query or one metric table, whichever arm produced the retriever.
 
     Both arms print through here so the comparison in `docs/rag.md` cannot quietly be
     between two different metric definitions: the question set, the ks and the sweep are
     the same code whether passages came from a fitted matrix or from the database.
     """
-    from collection.rag.evaluate import load_questions, sweep
+    from collection.db.seed import INTERNAL_DOCUMENTS
+    from collection.rag.evaluate import customer_visible, load_questions, sweep
 
     if query and not evaluate_only:
         for hit in retriever.search(query, top_k=top_k):
@@ -360,6 +363,8 @@ def _report_retrieval(retriever, query: str | None, top_k: int, evaluate_only: b
         console.print("[yellow]no questions.json; skipping evaluation[/]")
         return
     questions = load_questions(questions_file)
+    if customer_only:
+        questions = customer_visible(questions, INTERNAL_DOCUMENTS)
     table = sweep(retriever, questions)
     console.print(f"\n[bold]Retrieval over {len(questions)} labelled questions[/]")
     console.print(table.to_string(index=False))
@@ -380,6 +385,12 @@ def rag(
         help="Tenant whose published knowledge the pgvector arm retrieves from.",
     ),
     evaluate_only: bool = typer.Option(False, "--evaluate", help="only run the evaluation"),
+    customer_only: bool = typer.Option(
+        False,
+        "--customer-only",
+        help="measure only what a customer may be shown: withhold internal documents from "
+        "the corpus and from the gold sets, which is what makes the two arms comparable.",
+    ),
 ) -> None:
     """Evaluate retrieval, or answer a single query, against either retriever."""
     if retriever == "pgvector":
@@ -390,7 +401,11 @@ def rag(
                 f"[green]retrieving[/] from tenant {tenant!r} "
                 f"({settings.embedding_model}, {settings.embedding_dimensions} dims)"
             )
-            _report_retrieval(PgVectorRetriever(scope), query, top_k, evaluate_only)
+            # The SQL audience filter already withholds internal documents from this arm,
+            # so `--customer-only` changes nothing here but the labels; it is accepted all
+            # the same, because the flag has to mean the same thing to both arms for the
+            # two tables to be read side by side.
+            _report_retrieval(PgVectorRetriever(scope), query, top_k, evaluate_only, customer_only)
         return
     if retriever != "tfidf":
         console.print(f"[red]Unknown retriever {retriever!r}. Available: tfidf, pgvector.[/]")
@@ -401,6 +416,10 @@ def rag(
     from collection.rag.index import VectorIndex
 
     documents = load_directory(settings.dir_knowledge)
+    if customer_only:
+        from collection.db.seed import INTERNAL_DOCUMENTS
+
+        documents = [d for d in documents if d.root_id not in INTERNAL_DOCUMENTS]
     index = VectorIndex(embedder=get_embedder(embedder))
     index.add_documents(documents).build()
 
@@ -410,8 +429,12 @@ def rag(
         f"({stats['embedder']}, {stats['dimensions']} dims, "
         f"mean {stats['mean_words_per_chunk']} words/chunk)"
     )
-    _report_retrieval(index, query, top_k, evaluate_only)
-    index.save(settings.dir_processed / f"rag_index_{embedder}.joblib")
+    _report_retrieval(index, query, top_k, evaluate_only, customer_only)
+    # A corpus-restricted index is a different artefact and must not overwrite the full
+    # one: `collection answer` loads the full corpus and would otherwise answer from a
+    # knowledge base with the authority limits silently missing.
+    suffix = "_customer_only" if customer_only else ""
+    index.save(settings.dir_processed / f"rag_index_{embedder}{suffix}.joblib")
 
 
 @app.command()
@@ -500,7 +523,7 @@ def answer(
                 "generation failed and the template answered instead."
             )
     path = responder_eval.write_report(
-        table, results, settings.dir_docs / "responder-comparison.md"
+        table, results, settings.dir_docs / "responder-comparison.md", retriever=index
     )
     console.print(f"[green]report[/] -> {path}")
 

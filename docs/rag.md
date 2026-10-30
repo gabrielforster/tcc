@@ -6,6 +6,8 @@ responsive agent answers from.
 ```sh
 collection rag --retriever tfidf            # the lexical baseline, fitted in process
 collection rag --retriever pgvector         # what actually serves, over a seeded tenant
+collection rag --retriever tfidf --customer-only     # the comparable arms: both over
+collection rag --retriever pgvector --customer-only  # the customer-facing corpus only
 collection rag --query "posso parcelar?"    # single query
 ```
 
@@ -31,7 +33,9 @@ The reason for the move is not speed. A TF-IDF vocabulary is fitted to one corpu
 process, so the same sentence meant a different vector in every tenant and any edit
 invalidated the whole matrix; a fixed model gives every tenant one space and lets a
 version's vectors be written once and never recomputed, which is what keeps an old
-answer's citation pointing at the text that was actually shown.
+answer's citation pointing at the text that was actually shown. It was not a retrieval
+quality decision, and the measurement below is why that distinction has to be made
+carefully: on this corpus the move did not improve retrieval quality.
 
 `collection rag --retriever tfidf` still builds the TF-IDF index, because that is the
 lexical baseline the pretrained embedder has to be measured against;
@@ -42,7 +46,7 @@ lexical baseline the pretrained embedder has to be measured against;
 | Stage | Choice | Why |
 |---|---|---|
 | Loading | TXT, Markdown, CSV natively; PDF and DOCX lazily | PDF/DOCX pull heavy dependencies for a corpus that is mostly text, so they are imported only if such a file appears |
-| CSV | One document per row, column names kept in each row's text | The tables here — instalment bands, fee schedules — are looked up row-wise, and a row must read standalone to retrieve on its own |
+| CSV | One document per row in the baseline index; one versioned file on the serving path | A row must read standalone to retrieve on its own, which is why the index splits them — but a document is a file, so `publish_document` versions and cites the table as a whole. The two therefore chunk a table differently, and the measurement below shows it costing the serving path |
 | Chunking | Paragraphs kept whole where they fit, 500–1000 words, 75 overlap | A chunk ending mid-sentence retrieves badly and reads worse when quoted back to a customer |
 | Embedding | `paraphrase-multilingual-MiniLM-L12-v2` when serving; TF-IDF over word *and* character n-grams as the baseline | A fixed pretrained model means one vector space for every tenant and vectors that can be stored once; TF-IDF needs no API key or download, so the baseline still runs in CI |
 | Index | Exact cosine over a normalised matrix | Hundreds of chunks, not millions — approximate search would add operational weight and a recall penalty for speed nobody needs |
@@ -55,10 +59,11 @@ lands comfortably inside a typical context budget either way.
 ## Why TF-IDF stays, now that it no longer serves
 
 It gives the paper a real lexical baseline to measure the neural retriever **against**.
-Reporting "embeddings scored 0.82" says little; "embeddings scored 0.82 against a TF-IDF
-baseline at 0.71 on the same questions" is a result. That is why `--retriever tfidf`
-keeps building it after the serving path moved to pgvector: it is the control arm, not a
-placeholder that was left behind.
+Reporting "embeddings scored 0.80" says little; "embeddings scored 0.80 against a TF-IDF
+baseline at 0.82 on the same questions and the same corpus" is a result — and, as the
+measurement below shows, not the result that was expected. That is exactly why
+`--retriever tfidf` keeps building it after the serving path moved to pgvector: a control
+arm is only worth having if it is allowed to win.
 
 ## Results on the shipped corpus
 
@@ -72,27 +77,31 @@ is where passages come from.
   `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dims), cosine
   distance in Postgres over the *Desenvolvimento* tenant's published chunks.
 
-### The two arms do not see the same corpus
+### Making the two arms comparable
 
-This has to be said before any number is read.
+This has to be settled before any number is read, because it decides which table is the
+result.
 
 `limites-de-alcada.md` is published `INTERNAL`, and the pgvector retriever filters on the
-audience, so that document can never be returned by it — by design, because it holds the
-discount ceilings. Two of the sixteen labelled questions (*"quando o atendimento precisa
-chamar um humano?"* and *"qual o valor minimo de cada parcela?"*) are answered only by
-that file, so they are unavoidable misses for the serving arm, and two more list it among
-several relevant documents. The arms also chunk differently: the index makes one document
-per CSV row (5 documents → 9 chunks), while the database versions a file as a whole
-(5 documents → 5 chunks).
+audience in SQL, so that document can never occupy a result slot — by design, because it
+holds the discount ceilings. The in-memory index has no such notion and indexes all five
+files. Two of the sixteen labelled questions (*"quando o atendimento precisa chamar um
+humano?"* and *"qual o valor minimo de cada parcela?"*) are answered only by that file, so
+they are unavoidable misses for the serving arm.
 
-So two tables are reported. The **full set** is what each arm scores on the labelled
-questions as written. The **customer-visible subset** strips `limites-de-alcada.md` from
-every gold set and drops the two questions that leaves with nothing to find — 14 questions
-over the corpus both arms can actually return. **The subset is the like-for-like
-comparison; the full set is not**, and the difference between them is a measure of the
-audience filter, not of retrieval quality.
+Withholding the document from the *labels* alone does not fix this, and the first version
+of this measurement got it wrong that way: the baseline still ranks the internal document,
+spends rank 1 on it for two questions, and is then scored as having missed — a handicap,
+not an equalisation. **`--customer-only` withholds it from the corpus as well**, so both
+arms rank the same four customer-facing documents, and the same two unanswerable questions
+are dropped from both. That is the comparable measurement.
 
-### Full question set (16 questions)
+The arms still chunk differently, and that difference is real rather than procedural: the
+index makes one document per CSV row (5 documents → 9 chunks, 4 → 8 under
+`--customer-only`), while the database versions a file as a whole (5 documents →
+5 chunks). It is part of what is being compared, and it turns out to matter.
+
+### Full question set (16 questions) — not a comparison
 
 | k | precision@k (tfidf) | recall@k (tfidf) | MRR (tfidf) | precision@k (pgvector) | recall@k (pgvector) | MRR (pgvector) |
 |--:|--:|--:|--:|--:|--:|--:|
@@ -101,55 +110,96 @@ audience filter, not of retrieval quality.
 |  5 | 0.2500 | 1.0000 | 0.7833 | 0.2000 | 0.8229 | 0.7031 |
 | 10 | 0.1250 | 1.0000 | 0.7833 | 0.1000 | 0.8229 | 0.7031 |
 
-pgvector cannot reach recall 1.0 here, and the gap is the withheld document, not the
-embedder.
+This is each arm against the question set as written, and it is reported for completeness
+only. pgvector's 0.8229 is not a shortfall to explain: it is the arithmetic ceiling for any
+retriever that cannot return the withheld document — `(12·1 + 1/2 + 2/3)/16 = 0.8229`. The
+gap is the audience filter, not the embedder, and the table must not be read as a quality
+comparison.
 
-### Customer-visible subset (14 questions) — the like-for-like comparison
+### Customer-facing corpus (14 questions) — the comparison
+
+Both arms over the same four documents, `--customer-only` on each.
 
 | k | precision@k (tfidf) | recall@k (tfidf) | MRR (tfidf) | precision@k (pgvector) | recall@k (pgvector) | MRR (pgvector) |
 |--:|--:|--:|--:|--:|--:|--:|
-|  1 | 0.5714 | 0.5357 | 0.5714 | 0.6429 | 0.6429 | 0.6429 |
-|  3 | 0.3333 | 0.8571 | 0.7143 | 0.3571 | 0.9286 | 0.7857 |
-|  5 | 0.2286 | 1.0000 | 0.7429 | 0.2286 | 1.0000 | 0.8036 |
-| 10 | 0.1143 | 1.0000 | 0.7429 | 0.1143 | 1.0000 | 0.8036 |
+|  1 | 0.7143 | 0.6429 | 0.7143 | 0.6429 | 0.6429 | 0.6429 |
+|  3 | 0.3333 | 0.8571 | 0.7857 | 0.3571 | 0.9286 | 0.7857 |
+|  5 | 0.2286 | 1.0000 | 0.8214 | 0.2286 | 1.0000 | 0.8036 |
+| 10 | 0.1143 | 1.0000 | 0.8214 | 0.1143 | 1.0000 | 0.8036 |
 
-**The pretrained embedder wins, on MRR, by 0.061 (0.8036 against 0.7429).** It also puts
-the right document first on 9 of 14 questions instead of 8, and has the right document in
-the top 3 on 13 instead of 12. Both arms reach recall@5 = 1.0: on a corpus of five
-documents, five is nearly the whole shelf, so recall@5 is not a discriminating number here
-and MRR remains the one to watch.
+**The pretrained embedder does not beat the lexical baseline on this corpus.** TF-IDF is
+ahead on MRR — 0.8214 against 0.8036, a difference of 0.018 — and puts a gold document
+first on 10 of 14 questions against pgvector's 9. The result went the other way from the
+hypothesis this document wrote down in advance, and it is reported as measured.
 
-The win is real but small, and it is honest to say so: one position of rank, on fourteen
-questions, over five documents. It is a result that points the right way, not one that
-settles the question.
+It is a mixed result rather than a rout, and the mixture is the interesting part:
+
+| | tfidf | pgvector | ahead |
+|---|--:|--:|---|
+| MRR@5 | **0.8214** | 0.8036 | tfidf, by 0.018 |
+| MRR@3 | 0.7857 | 0.7857 | tie |
+| recall@1 | 0.6429 | 0.6429 | tie |
+| questions with a gold document at rank 1 | **10 / 14** | 9 / 14 | tfidf, by one question |
+| recall@3 | 0.8571 | **0.9286** | pgvector |
+| recall@5 | 1.0000 | 1.0000 | tie |
+
+(recall@1 ties while the rank-1 counts differ because two questions have two gold
+documents each: TF-IDF's extra rank-1 hits are on those, and score 0.5 apiece.)
+
+So the embedder is *better at getting the answer into the top three* and *worse at putting
+it first*. On fourteen questions over four documents, a 0.018 MRR difference is a quarter
+of a reciprocal-rank point in total — about what one question moving from second place to
+fourth would cost — which is well inside what a corpus this size can resolve. **The honest
+statement is that the two retrievers are within noise of each other here, with the lexical
+baseline nominally ahead.** Nothing in these numbers justifies the move to pgvector on
+retrieval quality; the move is justified by what the in-memory index cannot do at all —
+serve many tenants, survive an edit, and cite the text a customer was actually shown.
 
 ## What changed, question by question
 
 Before this measurement, this document named six questions where the lexical baseline put
 the wrong document first and predicted that a neural retriever should win exactly those,
-because the gap there was semantic rather than lexical. Measured, that prediction half
-held, and keeping the prediction next to the outcome is the point of having written it
-down.
+because the gap there was semantic rather than lexical. Keeping the prediction next to the
+outcome is the point of having written it down, so here is the outcome. Both columns are
+over the customer-facing corpus; a bold entry is a hit.
 
-| question | tfidf@1 | pgvector@1 | should be |
+| question | tfidf@1 | pgvector@1 | gold |
 |---|---|---|---|
 | voces podem me ligar no domingo? | faq.md | **politica-de-cobranca.md** | politica-de-cobranca.md |
-| nao quero mais receber mensagens de cobranca | limites-de-alcada.md | **politica-de-cobranca.md** | politica-de-cobranca.md |
 | em quantas vezes consigo dividir um atraso de 45 dias? | faq.md | **tabela-de-parcelamento.csv** | tabela-de-parcelamento.csv |
-| posso parcelar minha divida? | limites-de-alcada.md | faq.md | tabela-de-parcelamento.csv |
+| nao quero mais receber mensagens de cobranca | **politica-de-cobranca.md** | **politica-de-cobranca.md** | politica-de-cobranca.md |
+| posso parcelar minha divida? | **script-de-negociacao.md** | faq.md | tabela-de-parcelamento.csv, script-de-negociacao.md |
+| quantas vezes voces podem me contatar por semana? | **politica-de-cobranca.md** | tabela-de-parcelamento.csv | politica-de-cobranca.md |
+| nao reconheco essa divida, o valor esta errado | **script-de-negociacao.md** | tabela-de-parcelamento.csv | politica-de-cobranca.md, script-de-negociacao.md |
 | qual o desconto para pagamento a vista? | script-de-negociacao.md | faq.md | tabela-de-parcelamento.csv |
 | como comecar a conversa de cobranca por telefone? | faq.md | politica-de-cobranca.md | script-de-negociacao.md |
-| quantas vezes voces podem me contatar por semana? | politica-de-cobranca.md | tabela-de-parcelamento.csv | politica-de-cobranca.md |
-| nao reconheco essa divida, o valor esta errado | script-de-negociacao.md | tabela-de-parcelamento.csv | politica-de-cobranca.md / script-de-negociacao.md |
 
-The two questions the hypothesis was built on — *"voces podem me ligar no domingo?"* against
-a policy that says *"não há contato aos domingos"*, and the opt-out phrasing — are both
-fixed, and that is the predicted mechanism working. But the embedder also broke two
-questions the lexical baseline had right, both towards `tabela-de-parcelamento.csv`: a
-table joined into one document and embedded whole has a diffuse vector that is weakly close
-to many questions, where TF-IDF's row-per-document split gave each band its own sharp one.
-That is a chunking consequence of the move to versioned documents, not an embedder defect,
-and it is the first thing to try changing if these numbers are pushed further.
+The prediction partly held. *"Voces podem me ligar no domingo?"* against a policy that says
+*"não há contato aos domingos"* is the case the hypothesis was built on, and the embedder
+does fix it where TF-IDF still answers `faq.md`; it also fixes the 45-day instalment
+lookup. But *"nao quero mais receber mensagens de cobranca"*, the other question the
+hypothesis rested on, was never a semantic failure at all — TF-IDF had ranked the internal
+document first, and once that document is withheld from both arms the baseline gets it
+right unaided. One of the two supporting cases was an artefact of the corpus, not of the
+representation.
+
+Against those two genuine fixes, the embedder loses three questions the baseline gets
+right, and all three go the same way: `posso parcelar minha divida?`, `quantas vezes voces
+podem me contatar por semana?` and `nao reconheco essa divida` drift towards
+`tabela-de-parcelamento.csv` or `faq.md`. **That is the chunking difference, not the
+embedder.** The instalment table is one versioned document in the database and is embedded
+whole, so its vector is a blurred average of every band and sits weakly close to a great
+many questions; the in-memory index splits it row by row and gives each band a sharp vector
+of its own. The two retrievers are not only different representations, they are reading
+differently shaped documents.
+
+**So the next thing to try is chunking, not the model.** Splitting a published CSV into a
+chunk per row — which `chunk_text` already does for prose and which the versioning model
+allows, since chunks belong to a version — would put the serving path on the same document
+shape the baseline enjoys, and would test the embedder on its own terms. That experiment is
+not in this measurement, and until it is run, the comparison above is between a
+representation *and* a chunking at once, which is the main thing limiting what it can
+conclude.
 
 The relevance floor (`MIN_RELEVANCE = 0.05`) never bound in this measurement: the lowest
 top-1 similarity any of the sixteen questions produced was 0.2312. Nothing was dropped for

@@ -257,7 +257,10 @@ The serving path no longer uses that in-memory index: it retrieves from `pgvecto
 the chunks a document's current version was embedded into at publish time, filtered to one
 tenant and to the customer audience in SQL. `collection rag --retriever pgvector` measures
 that path over a seeded tenant, and `--retriever tfidf` keeps the in-memory index as the
-lexical baseline it is measured against; both tables are in `docs/rag.md`.
+lexical baseline it is measured against. Adding `--customer-only` to both withholds the
+internal document from either corpus, which is what makes the two comparable — and
+measured that way, the pretrained embedder does **not** beat TF-IDF on this corpus. The
+tables, and why the move was made anyway, are in `docs/rag.md`.
 
 ### Generation
 
