@@ -70,6 +70,9 @@ def publish_document(
     # max+1 and the embedding runs before commit, so without it two publishers overlap for
     # as long as model inference takes; the unique constraint would stop the duplicate but
     # fail one of them, where a lock simply makes the second wait and then see version N.
+    # A first publish has no row to lock; it is protected by UNIQUE (tenant_id, path)
+    # instead, so of two concurrent first publishes the loser gets an IntegrityError and
+    # is expected to retry.
     document = list(
         session.scalars(
             scope.select(KnowledgeDocument).where(KnowledgeDocument.path == path).with_for_update()

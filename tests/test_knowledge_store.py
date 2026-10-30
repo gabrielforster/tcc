@@ -1,5 +1,7 @@
 import hashlib
 import re
+import sys
+import types
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -45,15 +47,16 @@ def test_the_content_hash_is_sha256_of_the_normalised_body():
 
 
 def test_the_embedding_model_is_loaded_once_and_shared(monkeypatch):
-    import sentence_transformers
-
     built: list[str] = []
 
     class Counting:
         def __init__(self, name):
             built.append(name)
 
-    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", Counting)
+    # A fake module, not a patched attribute: importing the real package imports torch.
+    monkeypatch.setitem(
+        sys.modules, "sentence_transformers", types.SimpleNamespace(SentenceTransformer=Counting)
+    )
     _load_model.cache_clear()
     try:
         first, second = get_embedder(), get_embedder()
