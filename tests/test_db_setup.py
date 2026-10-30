@@ -5,7 +5,6 @@ import sys
 import pytest
 from alembic import command
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 
 from collection.config import ROOT, settings
 from collection.db.base import TenantScoped
@@ -48,7 +47,10 @@ def _skip_unless_provably_separate() -> None:
         pytest.skip("downgrades to base: set TEST_DATABASE_URL to a separate throwaway database")
     try:
         same = _identity(settings.test_database_url) == _identity(settings.database_url)
-    except (SQLAlchemyError, ArgumentError, ValueError) as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Deliberately broad: the only question is "can I prove these differ?", and every
+        # failure (no driver, bad URL, unreachable server) answers no. pytest.skip raises
+        # Skipped, a BaseException, so the skips below are not swallowed by this clause.
         pytest.skip(f"cannot prove TEST_DATABASE_URL differs from DATABASE_URL: {exc}")
     if same:
         pytest.skip(
