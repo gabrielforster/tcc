@@ -129,12 +129,28 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
 ```sh
 cp .env.example .env      # set your own ANONYMIZATION_SALT
 make setup                # creates .venv (Python 3.12) and installs dependencies
-make up                   # Postgres with pgvector + Redis
-export COLLECTION_TENANT=<slug>   # the tenant whose data the pipeline works on (must exist)
+make up                   # docker compose up -d: Postgres with pgvector, Redis and MinIO
+make migrate              # apply the migrations (alembic upgrade head)
+make seed                 # create the development tenant and leave it servable
+export COLLECTION_TENANT=desenvolvimento   # the tenant the pipeline commands work on
 make pipeline             # ingest (extracts) -> dictionary -> eda -> features
 make train                # train, publish a platform model version, write the comparison report
 make test lint
 ```
+
+`make seed` is what makes a fresh clone usable. Everything the serving path reads lives in
+the database now — the tenant, the knowledge, the conversations — so a clone with an empty
+database has nothing to answer from. The command creates a tenant called *Desenvolvimento*,
+publishes every file under `knowledge/` into it as a versioned document (the authority
+limits as `internal`, the rest as `customer`), ingests the synthetic dataset, and advances
+the tenant through `ingesting → ready → active`, which is the only state the chat serves.
+It climbs that ladder one rung at a time, so a run that fails half way leaves a tenant that
+is honestly not servable rather than one that claims to be.
+
+Run it again whenever a file under `knowledge/` changes: unchanged bytes keep their
+version, an edited document mints the next one, and ingestion replaces the tenant's rows
+instead of adding to them. It prints the tenant's `tenant_key`; put that in
+`DEFAULT_TENANT_KEY` in `.env` to have the chat widget serve this tenant.
 
 `make pipeline` runs schedule deliverables 3-5 end to end and produces:
 
@@ -233,8 +249,12 @@ against a labelled question set — see [`docs/rag.md`](./docs/rag.md).
 Retrieval is measured **before** any LLM is involved: an agent that invents an answer
 because nothing relevant was retrieved has a retrieval failure, not a generation one, and
 the eventual hallucination numbers only mean something if retrieval quality is already
-known. The default embedder is TF-IDF over word and character n-grams — no API key, no
-model download, and a real lexical baseline for a neural retriever to be measured against.
+known.
+
+The serving path no longer uses that in-memory index: it retrieves from `pgvector`, over
+the chunks a document's current version was embedded into at publish time, filtered to one
+tenant and to the customer audience in SQL. `collection rag` still builds the TF-IDF index,
+because it is the lexical baseline the pretrained embedder is measured against.
 
 ### Generation
 
@@ -313,11 +333,11 @@ because both are easy to read as stronger claims than they are: `entregue` and `
 with no push transport, the message waits in a mailbox until the customer opens the widget.
 
 ```sh
-make seed                        # report what the outbound path decides, receivable by receivable
+make contacts                    # report what the outbound path decides, receivable by receivable
 make serve ARGS="--seed-demo"    # the live demo: the server seeds the channel it serves
 ```
 
-The two are not interchangeable. A mailbox is in memory, so `make seed` fills one that
+The two are not interchangeable. A mailbox is in memory, so `make contacts` fills one that
 dies with the command; only `--seed-demo` leaves a message waiting in a thread a browser
 can open, because then it is the same channel object.
 

@@ -19,6 +19,9 @@ console = Console()
 db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 
+tenant_app = typer.Typer(help="Tenants: provisioning and seeding.", no_args_is_help=True)
+app.add_typer(tenant_app, name="tenant")
+
 
 TenantOption = Annotated[
     str,
@@ -643,6 +646,34 @@ def seed() -> None:
     console.print(
         "[dim]Seeded, not pushed: there is no push transport, so each message waits in "
         "the customer's mailbox until the widget is opened.[/]"
+    )
+
+
+@tenant_app.command("seed")
+def tenant_seed(
+    name: str = typer.Option("Desenvolvimento", "--name", help="Name of the tenant to seed."),
+) -> None:
+    """Create a development tenant, load `knowledge/` into it, ingest, and activate it.
+
+    This is what makes a fresh clone usable, and it is safe to run again after editing a
+    file under `knowledge/`: unchanged documents keep their version, an edited one gets the
+    next, and ingestion replaces the tenant's rows rather than adding to them.
+    """
+    from collection.db.seed import seed_development_tenant
+
+    tenant = seed_development_tenant(name)
+
+    table = Table(title="Seeded tenant")
+    table.add_column("field")
+    table.add_column("value")
+    table.add_row("name", tenant.name)
+    table.add_row("slug", tenant.slug)
+    table.add_row("state", f"[green]{tenant.state.value}[/]")
+    table.add_row("tenant_key", tenant.tenant_key)
+    console.print(table)
+    console.print(
+        f"\n[dim]export COLLECTION_TENANT={tenant.slug}  # the pipeline commands read this\n"
+        f"DEFAULT_TENANT_KEY={tenant.tenant_key}  # in .env, so the chat serves this tenant[/]"
     )
 
 

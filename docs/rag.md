@@ -16,6 +16,23 @@ the hallucination numbers the paper will report are only meaningful if retrieval
 already known. So retrieval is evaluated against a labelled question set before any LLM is
 involved.
 
+## Where retrieval actually runs
+
+Serving no longer uses the in-memory index described below. Knowledge is published as
+versioned rows and each chunk is embedded once, at publish time, by a **pretrained
+sentence-transformer**; a question is retrieved by cosine distance in **pgvector**, in one
+statement that also carries the tenant predicate, the current-version filter and the
+customer-audience filter — see `src/collection/rag/retriever.py`.
+
+The reason for the move is not speed. A TF-IDF vocabulary is fitted to one corpus in one
+process, so the same sentence meant a different vector in every tenant and any edit
+invalidated the whole matrix; a fixed model gives every tenant one space and lets a
+version's vectors be written once and never recomputed, which is what keeps an old
+answer's citation pointing at the text that was actually shown.
+
+`collection rag` still builds the TF-IDF index, because that is the lexical baseline the
+pretrained embedder has to be measured against.
+
 ## Pipeline
 
 | Stage | Choice | Why |
@@ -31,15 +48,21 @@ whichever model eventually consumes the chunks, and pinning one now would be fal
 precision; for Portuguese the ratio is roughly 1.3 tokens per word, so the configured range
 lands comfortably inside a typical context budget either way.
 
-## Why TF-IDF is the default, not a placeholder
+## Why TF-IDF stays, now that it no longer serves
 
-It gives the paper a real lexical baseline to measure a neural retriever **against**.
+It gives the paper a real lexical baseline to measure the neural retriever **against**.
 Reporting "embeddings scored 0.82" says little; "embeddings scored 0.82 against a TF-IDF
-baseline at 0.71 on the same questions" is a result.
-`SentenceTransformerEmbedder` is the drop-in for that comparison — it is imported lazily so
-the torch dependency exists only for whoever runs it.
+baseline at 0.71 on the same questions" is a result. That is why `collection rag` keeps
+building it after the serving path moved to pgvector: it is the control arm, not a
+placeholder that was left behind.
 
 ## Results on the shipped corpus
+
+> [!NOTE]
+> The numbers below were measured against the **TF-IDF index**, which is no longer what
+> serves a question. They are superseded by the measurement of the pgvector retriever in
+> this branch, and they stay here until that measurement replaces them — as the baseline
+> the new numbers are read against, not as a description of the serving path.
 
 5 documents, 9 chunks, 16 labelled questions:
 

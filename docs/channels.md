@@ -159,17 +159,19 @@ receivables, the rules engine, composition, the compliance check, and the mailbo
 commands use it, and the difference between them is the mailbox's own nature.
 
 ```sh
-make seed                        # the report: runs the path and prints the outcome per receivable
+make contacts                    # the report: runs the path and prints the outcome per receivable
 make serve ARGS="--seed-demo"    # the demo: the server seeds the channel it is serving
 ```
 
-**A mailbox is an in-memory dict.** `make seed` therefore fills a mailbox that belongs to
-its own process and vanishes with it — it is a report of what the path decides, not a way
+**A mailbox is an in-memory dict.** `make contacts` therefore fills a mailbox that belongs
+to its own process and vanishes with it — it is a report of what the path decides, not a way
 to leave a message for a server to serve later. `serve --seed-demo` seeds the channel the
 API itself holds, which is what makes "open the widget and the message is waiting" true
 rather than a claim; in that mode the demo page is served carrying a token for the seeded
-customer, since an anonymous session has a random id and so an empty mailbox. Nothing is
-persisted either way: a restart loses the thread, exactly as it loses the sessions.
+customer, since an anonymous session has a random id and so an empty mailbox. The mailbox
+itself is not persisted either way: a restart loses whatever was seeded into it and never
+delivered, even for a tenant whose conversations are rows
+([`docs/web-chat.md`](./web-chat.md)).
 
 And the message still waits, possibly forever, for a customer who never comes back.
 

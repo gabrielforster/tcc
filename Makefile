@@ -1,4 +1,4 @@
-.PHONY: setup up down extract ingest dictionary eda features train score explain serve demo rag answer outreach voice seed migrate pipeline test lint fmt
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts migrate pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -8,6 +8,9 @@ up:               ## start Postgres (pgvector), Redis and MinIO
 
 down:
 	docker compose down
+
+seed:             ## create the development tenant, load knowledge/ into it, ingest, activate
+	uv run collection tenant seed
 
 extract:          ## store the raw dataset in object storage (COLLECTION_TENANT=<slug>)
 	uv run collection extract
@@ -51,7 +54,7 @@ outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs
 voice:            ## sweep what recognition error costs; ARGS="--audio FILE" transcribes one clip
 	uv run collection voice $(ARGS)
 
-seed:             ## report what the outbound path decides (serve --seed-demo is the live demo)
+contacts:         ## report what the outbound path decides (serve --seed-demo is the live demo)
 	uv run collection seed
 
 migrate:          ## apply database migrations (alembic upgrade head)
