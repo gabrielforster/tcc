@@ -4,6 +4,12 @@ Alembic and the test fixtures read the metadata, so a model that is not imported
 invisible to autogenerate.
 """
 
+from collection.db.models.conversation import (
+    Conversation,
+    ConversationState,
+    Turn,
+    TurnRetrieval,
+)
 from collection.db.models.customer import Customer, Receivable, ReceivableStatus, days_overdue
 from collection.db.models.internal_user import InternalUser
 from collection.db.models.knowledge import (
@@ -16,6 +22,8 @@ from collection.db.models.tenant import InvalidTransition, Tenant, TenantState, 
 
 __all__ = [
     "Audience",
+    "Conversation",
+    "ConversationState",
     "Customer",
     "InternalUser",
     "InvalidTransition",
@@ -26,6 +34,8 @@ __all__ = [
     "ReceivableStatus",
     "Tenant",
     "TenantState",
+    "Turn",
+    "TurnRetrieval",
     "advance",
     "days_overdue",
 ]

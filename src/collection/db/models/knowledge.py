@@ -102,6 +102,9 @@ class KnowledgeChunk(TenantScoped, Base):
     __tablename__ = "knowledge_chunks"
     __table_args__ = (
         UniqueConstraint("version_id", "ordinal"),
+        # The target of `TurnRetrieval`'s foreign key, which cites a chunk together with
+        # the version it was read from.
+        UniqueConstraint("tenant_id", "version_id", "id"),
         ForeignKeyConstraint(
             ["tenant_id", "version_id"],
             ["knowledge_versions.tenant_id", "knowledge_versions.id"],
