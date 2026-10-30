@@ -9,6 +9,9 @@ from collection.config import settings
 app = typer.Typer(help="Multi-agent debt collection system pipeline.", no_args_is_help=True)
 console = Console()
 
+db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
+
 
 @app.command()
 def extract(
@@ -541,6 +544,32 @@ def seed() -> None:
         "[dim]Seeded, not pushed: there is no push transport, so each message waits in "
         "the customer's mailbox until the widget is opened.[/]"
     )
+
+
+def _alembic_config():
+    from alembic.config import Config
+
+    from collection.config import ROOT
+
+    return Config(str(ROOT / "alembic.ini"))
+
+
+@db_app.command("upgrade")
+def db_upgrade(revision: str = typer.Argument("head", help="Target revision.")) -> None:
+    """Apply migrations up to a revision (default: head)."""
+    from alembic import command
+
+    command.upgrade(_alembic_config(), revision)
+    console.print(f"[green]ok[/] database at {revision}")
+
+
+@db_app.command("downgrade")
+def db_downgrade(revision: str = typer.Argument("-1", help="Target revision.")) -> None:
+    """Roll migrations back to a revision (default: one step)."""
+    from alembic import command
+
+    command.downgrade(_alembic_config(), revision)
+    console.print(f"[green]ok[/] database at {revision}")
 
 
 @app.command()

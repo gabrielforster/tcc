@@ -1,4 +1,4 @@
-# Local infrastructure. Only what the data pipeline and the RAG module need.
+# Local infrastructure: Postgres (with pgvector), Redis and S3-compatible object storage.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -28,5 +28,21 @@ services:
       timeout: 3s
       retries: 10
 
+  # Chainguard build: the upstream minio/minio image is no longer published to Docker Hub.
+  # It ships no shell or curl, so there is no in-container healthcheck.
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: collection-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: collection
+      MINIO_ROOT_PASSWORD: collection-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
 volumes:
   pgdata:
+  miniodata:

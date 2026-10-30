@@ -20,3 +20,6 @@ data/processed/*
 
 # Local working notes: a scratch handoff file, never shared
 HANDOFF.md
+
+# Local provider/setup notes, never shared
+*.local.md
