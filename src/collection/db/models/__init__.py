@@ -19,6 +19,7 @@ from collection.db.models.knowledge import (
     KnowledgeDocument,
     KnowledgeVersion,
 )
+from collection.db.models.stored_object import StoredObject
 from collection.db.models.tenant import InvalidTransition, Tenant, TenantState, advance
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "KnowledgeVersion",
     "Receivable",
     "ReceivableStatus",
+    "StoredObject",
     "Tenant",
     "TenantState",
     "Turn",
