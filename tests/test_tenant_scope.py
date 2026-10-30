@@ -619,3 +619,69 @@ def test_no_synchronize_strategy_lets_a_write_leave_the_tenant(db, probes, strat
     assert [p.label for p in TenantScope(db, one.id).all(ScopedProbe)] == ["renamed"]
     _unbind(db)
     assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
+
+
+@pytest.mark.db
+def test_a_write_hidden_in_a_cte_is_refused(db, probes):
+    """Postgres runs `WITH w AS (INSERT ...) SELECT`; it reaches the listener as a Select."""
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    smuggled = (
+        insert(ScopedProbe)
+        .values(id=uuid.uuid4(), label="smuggled", tenant_id=other.id)
+        .returning(ScopedProbe.id)
+        .cte("smuggled")
+    )
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(select(smuggled.c.id))
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("dml", ["update", "delete"])
+def test_an_update_or_delete_hidden_in_a_cte_is_refused(db, probes, dml):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    statement = (
+        update(ScopedProbe).values(tenant_id=other.id) if dml == "update" else delete(ScopedProbe)
+    )
+    smuggled = statement.returning(ScopedProbe.id).cte("smuggled")
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(select(smuggled.c.id))
+
+
+@pytest.mark.db
+def test_the_select_inside_an_insert_is_scoped_too(db, probes):
+    """What the `is_insert` skip broke, pinned: do not add one back to the early return.
+
+    An INSERT carries no rows of its own, so skipping the predicate injection for it looks
+    free. It is not: the INSERT can carry a SELECT, and an unscoped SELECT reads every
+    tenant. Here the subquery picks the last label in descending order, which is the other
+    tenant's unless the predicate reached it.
+    """
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    newest = select(ScopedProbe.label).order_by(ScopedProbe.label.desc()).limit(1).scalar_subquery()
+
+    db.execute(insert(ScopedProbe).values(id=uuid.uuid4(), label=newest, tenant_id=one.id))
+
+    db.expunge_all()
+    assert sorted(p.label for p in TenantScope(db, one.id).all(ScopedProbe)) == [
+        "one-probe",
+        "one-probe",
+    ]
+
+
+@pytest.mark.db
+def test_a_bulk_delete_on_a_bound_session_cannot_touch_another_tenants_row(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    db.execute(delete(ScopedNote))
+    db.execute(delete(ScopedProbe))
+
+    db.expunge_all()
+    assert TenantScope(db, one.id).all(ScopedProbe) == []
+    _unbind(db)
+    assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
