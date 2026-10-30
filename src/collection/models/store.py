@@ -4,8 +4,14 @@ A model is a platform artifact, not a tenant's. `publish` writes the weights and
 metrics as objects under the `platform/` prefix and one `PlatformModel` row that names
 them, all through a platform session -- the explicit, auditable exception to the tenant
 guard. The version is the next integer for that kind, and the `(kind, version)` constraint
-is what stops two simultaneous publishes from sharing one: the second fails instead of
-quietly shadowing the first.
+makes the second of two simultaneous publishes fail on its row. Two publishers can still
+compute the same version, so the object key carries a random suffix as well: each publish
+writes its own bytes, and the loser's upload is an orphan rather than an overwrite of the
+winner's weights.
+
+What the row records about provenance: `metrics["trained_on"]` holds the tenant whose
+frames fitted the model, the dataset source and the row count. Today that is one tenant's
+data; pooling several is pending id namespacing.
 
 The weights are written before the row, so the row never points at nothing. If the row
 then fails, an orphan object remains; that is the store's documented trade, and it is
@@ -22,6 +28,7 @@ fetches it from the bucket, rather than looking in a directory.
 
 import io
 import json
+import uuid
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
@@ -54,6 +61,11 @@ def bundle_of(fitted: "FittedTask") -> dict[str, Any]:
 def metrics_of(fitted: "FittedTask") -> dict[str, Any]:
     payload = asdict(fitted.result)
     payload["test"] = asdict(fitted.result.test)
+    payload["trained_on"] = {
+        "tenant_id": None if fitted.tenant_id is None else str(fitted.tenant_id),
+        "source": fitted.result.source,
+        "rows": sum(fitted.result.split_sizes.values()),
+    }
     # Round-tripped so what goes in the JSONB column is exactly what the object holds.
     return json.loads(json.dumps(payload, default=str))
 
@@ -80,17 +92,18 @@ def _publish(fitted: "FittedTask", session: Session) -> PlatformModel:
         or 0
     ) + 1
     store = ObjectStore(session=session)
+    stem = f"{kind}-v{version}-{uuid.uuid4().hex[:8]}"
     weights = io.BytesIO()
     joblib.dump(bundle_of(fitted), weights)
     artifact = store.put(
-        f"{kind}-v{version}.joblib",
+        f"{stem}.joblib",
         weights.getvalue(),
         kind="models",
         content_type="application/octet-stream",
     )
     metrics = metrics_of(fitted)
     store.put(
-        f"{kind}-v{version}.json",
+        f"{stem}.json",
         json.dumps(metrics, indent=2).encode(),
         kind="metrics",
         content_type="application/json",

@@ -130,8 +130,9 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
 cp .env.example .env      # set your own ANONYMIZATION_SALT
 make setup                # creates .venv (Python 3.12) and installs dependencies
 make up                   # Postgres with pgvector + Redis
-make pipeline             # extract -> ingest -> dictionary -> eda -> features
-make train                # train the models and write the comparison report
+export COLLECTION_TENANT=<slug>   # the tenant whose data the pipeline works on (must exist)
+make pipeline             # ingest (extracts) -> dictionary -> eda -> features
+make train                # train, publish a platform model version, write the comparison report
 make test lint
 ```
 
@@ -141,7 +142,7 @@ make test lint
 |---|---|
 | `data/raw/` | Only for sources that read local files (e.g. Home Credit CSVs). Pipeline output no longer goes here: raw and anonymized frames are objects under the tenant prefix |
 | `data/interim/` | Unused by the pipeline; kept for a developer who asks for a file |
-| `data/processed/` | Chronological 70/15/15 splits and the serialized preprocessor, per task |
+| `data/processed/` | Nothing from the pipeline. `collection features --out DIR` writes the splits and preprocessor as files if you ask for them |
 | `docs/data-dictionary.md` | Dictionary generated from the domain schema |
 | `docs/eda-<source>.md` + `docs/eda/<source>/*.png` | Exploratory report and charts, one set per data source |
 

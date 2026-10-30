@@ -18,19 +18,19 @@ ingest:           ## extract + anonymize + validate; needs COLLECTION_TENANT=<sl
 dictionary:       ## regenerate docs/data-dictionary.md from the domain schema
 	uv run collection dictionary
 
-eda:              ## descriptive statistics and charts under docs/eda/
+eda:              ## descriptive statistics and charts under docs/eda/ (COLLECTION_TENANT=<slug>)
 	uv run collection eda
 
-features:         ## feature engineering + chronological 70/15/15 split
+features:         ## feature engineering + chronological 70/15/15 split (COLLECTION_TENANT=<slug>)
 	uv run collection features
 
-train:            ## train candidates, publish the champion as a platform model version
+train:            ## train candidates, publish the champion as a platform model version (COLLECTION_TENANT=<slug>)
 	uv run collection train
 
-score:            ## score the tenant's customers against the latest platform model
+score:            ## score the tenant's customers against the latest platform model (COLLECTION_TENANT=<slug>)
 	uv run collection score
 
-explain:          ## permutation importance and SHAP for the champion
+explain:          ## permutation importance and SHAP for the champion (COLLECTION_TENANT=<slug>)
 	uv run collection explain
 
 serve:            ## run the scoring API on http://127.0.0.1:8000

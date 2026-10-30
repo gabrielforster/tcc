@@ -21,6 +21,7 @@ version row somewhere is `models.store.publish`, so the protocol above can be ex
 lives is not tangled into the place that decides which model wins.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -116,10 +117,18 @@ class FittedTask:
     pipeline: Any
     x_test: pd.DataFrame
     y_test: np.ndarray
+    #: Whose data the model was fitted on. A model whose training set is unknown cannot be
+    #: audited or rolled back with understanding.
+    tenant_id: uuid.UUID | None = None
 
 
 def fit_task(
-    task: str, tables: dict[str, pd.DataFrame], *, source: str = "unknown", tune: bool = True
+    task: str,
+    tables: dict[str, pd.DataFrame],
+    *,
+    source: str = "unknown",
+    tune: bool = True,
+    tenant_id: uuid.UUID | None = None,
 ) -> FittedTask:
     splits = build_splits(task, tables)
     x_train, y_train = _features_and_target(splits.train, splits.target)
@@ -180,7 +189,7 @@ def fit_task(
         },
         feature_columns=list(x_train.columns),
     )
-    return FittedTask(result, champion_estimator, x_test, y_test)
+    return FittedTask(result, champion_estimator, x_test, y_test, tenant_id)
 
 
 def _cross_validate(estimator, x, y, cv) -> list[float]:
@@ -214,11 +223,12 @@ def train(
     *,
     source: str = "unknown",
     tune: bool = True,
+    tenant_id: uuid.UUID | None = None,
     session: Session | None = None,
 ) -> TrainedModel:
     """Fit the candidates and publish the champion as a new platform model version.
 
     `session` is a platform session, for a caller that owns the transaction.
     """
-    fitted = fit_task(task, tables, source=source, tune=tune)
+    fitted = fit_task(task, tables, source=source, tune=tune, tenant_id=tenant_id)
     return TrainedModel(row=publish(fitted, session=session), fitted=fitted)

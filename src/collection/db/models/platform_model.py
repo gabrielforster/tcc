@@ -1,7 +1,9 @@
 """The models the platform trains, and what they say about a tenant's customers.
 
-Models are app-level: there is one propensity model and one default-risk model, trained
-by the platform on pooled data and versioned as platform artifacts. A tenant's pipeline
+Models are app-level: there is one propensity model and one default-risk model, versioned
+as platform artifacts. They are meant to be trained on pooled data; today a run fits one
+tenant's frames (recorded in `metrics["trained_on"]`) because pooling is pending id
+namespacing in the pseudonym. A tenant's pipeline
 run imports and indexes its own data and scores its receivables against the latest
 version; it never trains one. That is why `PlatformModel` has no `tenant_id` -- and,
 because it has none, no `TenantScoped` mixin and no guard: any session may read which

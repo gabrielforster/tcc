@@ -17,8 +17,10 @@ been trained; one dependency being down must not stop the chat from serving.
 """
 
 import logging
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
@@ -46,35 +48,92 @@ TASKS = ("propensity", "default")
 PASSTHROUGH = ("invoice_id", "customer_id")
 
 
-def load_published() -> dict[str, dict[str, Any]]:
-    """The latest published bundle of each task, from the record and the platform prefix."""
+@dataclass(frozen=True)
+class Loaded:
+    """What a load found, and why anything is missing from it."""
+
+    bundles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    problems: dict[str, str] = field(default_factory=dict)
+
+
+def load_published() -> Loaded:
+    """The latest published bundle of each task, from the record and the platform prefix.
+
+    Each task is loaded on its own: one unreadable artifact must not take the others with
+    it. The per-task catch is broad on purpose -- a truncated or incompatible pickle raises
+    `UnpicklingError`, `ModuleNotFoundError` or `AttributeError`, none of which say
+    "storage" -- and every failure is kept as a reason instead of being swallowed.
+    """
+    bundles: dict[str, dict[str, Any]] = {}
+    problems: dict[str, str] = {}
     try:
         with unit_of_work(platform=True) as session:
-            bundles = {task: load_bundle(session, task) for task in TASKS}
+            for task in TASKS:
+                try:
+                    bundle = load_bundle(session, task)
+                except Exception as exc:  # noqa: BLE001 - see the docstring
+                    logger.warning("model '%s' could not be loaded: %s", task, exc)
+                    problems[task] = f"{type(exc).__name__}: {exc}"
+                    continue
+                if bundle is not None:
+                    bundles[task] = bundle
     except (SQLAlchemyError, ObjectStoreError) as exc:
         logger.warning("no models loaded: the record or object storage is unreachable: %s", exc)
-        return {}
-    return {task: bundle for task, bundle in bundles.items() if bundle is not None}
+        return Loaded(bundles, {task: f"{type(exc).__name__}: {exc}" for task in TASKS})
+    return Loaded(bundles, problems)
 
 
 class ModelRegistry:
-    """Loads the published champions once, at startup."""
+    """Loads the published champions at startup, and again if that load was degraded.
 
-    def __init__(self, loader: Callable[[], dict[str, dict[str, Any]]] = load_published) -> None:
+    An outage at startup must not become a permanent "nothing is trained": the registry
+    remembers why a task is missing, `/health` reports it, `get` answers 503 (retry) rather
+    than 404 (train something) while it is, and the load is retried lazily, at most once
+    per `RETRY_SECONDS`, by the next request that needs a model.
+    """
+
+    RETRY_SECONDS = 5.0
+
+    def __init__(self, loader: Callable[[], Loaded | dict[str, dict[str, Any]]] = load_published):
         self._loader = loader
         self._bundles: dict[str, dict[str, Any]] = {}
+        self._problems: dict[str, str] = {}
+        self._attempted_at = float("-inf")
 
     def load(self) -> None:
-        self._bundles = dict(self._loader())
+        self._attempted_at = time.monotonic()
+        loaded = self._loader()
+        if not isinstance(loaded, Loaded):
+            loaded = Loaded(dict(loaded))
+        self._bundles, self._problems = dict(loaded.bundles), dict(loaded.problems)
+
+    @property
+    def degraded(self) -> bool:
+        return bool(self._problems)
 
     def get(self, task: str) -> dict[str, Any]:
+        if (
+            task not in self._bundles
+            and self._problems
+            and time.monotonic() - self._attempted_at >= self.RETRY_SECONDS
+        ):
+            self.load()
         if task not in self._bundles:
+            if self._problems:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Models are still unavailable ({self._problems_text()}). "
+                    "Try again in a moment.",
+                )
             trained = ", ".join(self._bundles) or "none"
             raise HTTPException(
                 status_code=404,
                 detail=f"No model for task '{task}'. Trained: {trained}. Run `collection train`.",
             )
         return self._bundles[task]
+
+    def _problems_text(self) -> str:
+        return "; ".join(f"{task}: {why}" for task, why in sorted(self._problems.items()))
 
     @property
     def tasks(self) -> list[str]:
@@ -132,7 +191,9 @@ def create_app(
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
-        return HealthResponse(status="ok", models=registry.tasks)
+        return HealthResponse(
+            status="degraded" if registry.degraded else "ok", models=registry.tasks
+        )
 
     @app.get("/models/{task}", response_model=ModelInfo)
     def model_info(task: str) -> ModelInfo:

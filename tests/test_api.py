@@ -186,5 +186,46 @@ def test_an_unreachable_record_leaves_the_registry_empty_instead_of_failing(monk
     monkeypatch.setattr(app_module, "unit_of_work", unreachable)
     registry = ModelRegistry()
     with TestClient(create_app(registry)) as client:
-        assert client.get("/health").json() == {"status": "ok", "models": []}
-        assert client.get("/models/propensity").status_code == 404
+        assert client.get("/health").json() == {"status": "degraded", "models": []}
+        response = client.get("/models/propensity")
+    assert response.status_code == 503
+    assert "connection refused" in response.json()["detail"]
+
+
+def test_a_degraded_registry_recovers_on_the_next_request_after_the_outage(monkeypatch):
+    from collection.api.app import Loaded
+
+    outcomes = [
+        Loaded(problems={"propensity": "OperationalError: connection refused"}),
+        Loaded(bundles={"propensity": _stub_bundle()}),
+    ]
+    registry = ModelRegistry(loader=lambda: outcomes.pop(0))
+    monkeypatch.setattr(ModelRegistry, "RETRY_SECONDS", 0.0)
+    with TestClient(create_app(registry)) as client:
+        assert client.get("/health").json()["status"] == "degraded"
+        assert client.get("/models/propensity").status_code == 200
+        assert client.get("/health").json() == {"status": "ok", "models": ["propensity"]}
+
+
+def test_one_unreadable_artifact_does_not_discard_the_others(monkeypatch):
+    from collection.api import app as app_module
+
+    class _Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def load_bundle(session, task):
+        if task == "default":
+            raise AttributeError("incompatible pickle")
+        return _stub_bundle()
+
+    monkeypatch.setattr(app_module, "unit_of_work", lambda **kw: _Session())
+    monkeypatch.setattr(app_module, "load_bundle", load_bundle)
+
+    loaded = app_module.load_published()
+
+    assert set(loaded.bundles) == {"propensity"}
+    assert "incompatible pickle" in loaded.problems["default"]

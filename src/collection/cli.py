@@ -154,11 +154,12 @@ def train(
     with _tenant_scope(tenant) as scope:
         tables = load_interim(scope)
         source = source_metadata(scope)["source"]
+        tenant_id = scope.tenant_id
 
     tasks = ["propensity", "default"] if task == "both" else [task]
     for t in tasks:
         console.print(f"\n[bold]Training: {t}[/]")
-        trained = _train(t, tables, source=source, tune=tune)
+        trained = _train(t, tables, source=source, tune=tune, tenant_id=tenant_id)
         result = trained.fitted.result
         console.print(result.comparison_table().to_string(index=False))
         console.print(f"\n[green]champion[/] {result.champion} (threshold {result.threshold:.2f})")
@@ -203,6 +204,14 @@ def explain(
             continue
         bundle = read_bundle(row)
         splits = build_splits(t, tables)
+        missing = [c for c in bundle["features"] if c not in splits.test.columns]
+        if missing:
+            console.print(
+                f"[red]skipped[/] {t} model version {row.version} expects features this "
+                f"tenant's frames do not produce: {missing[:5]}"
+                + (f" (+{len(missing) - 5} more)" if len(missing) > 5 else "")
+            )
+            continue
         x_test = splits.test[bundle["features"]]
         y_test = splits.test[splits.target].to_numpy()
         console.print(f"\n[bold]Explaining: {t}[/] ({bundle['champion']}, version {row.version})")

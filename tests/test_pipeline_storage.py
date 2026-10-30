@@ -10,6 +10,7 @@ tests that need a model and each of them publishes it into its own transaction.
 """
 
 import io
+import re
 
 import joblib
 import pytest
@@ -105,8 +106,9 @@ def test_ingesting_twice_replaces_receivables_instead_of_doubling_them(db, datas
 
 @pytest.mark.db
 def test_ingest_stores_the_raw_frame_as_an_object_and_writes_no_file(
-    db, dataset, tmp_path, monkeypatch
+    db, dataset, fitted, tmp_path, monkeypatch
 ):
+    """The window covers a whole run: ingest, publishing a model, and scoring with it."""
     directories = {}
     for name in ("dir_raw", "dir_interim", "dir_processed"):
         directories[name] = tmp_path / name
@@ -115,6 +117,8 @@ def test_ingest_stores_the_raw_frame_as_an_object_and_writes_no_file(
     scope = _scope(db, "one")
 
     ingest(scope, _Fixed(dataset))
+    publish(fitted, session=_platform(db))
+    assert score_customers(scope, "default") > 0
 
     store = ObjectStore(scope)
     raw = store.get(f"{store.prefix}raw/customers.parquet")
@@ -159,12 +163,19 @@ def test_training_records_a_platform_model_row_with_an_artifact_key(db, fitted):
     assert row.kind == "default"
     assert row.version == 1
     assert row.trained_at is not None
-    assert row.artifact_key == "platform/models/default-v1.joblib"
+    assert re.fullmatch(r"platform/models/default-v1-[0-9a-f]{8}\.joblib", row.artifact_key)
     assert row.metrics["champion"] == fitted.result.champion
     assert row.metrics["test"]["average_precision"] == fitted.result.test.average_precision
     store = ObjectStore(session=session)
     assert store.exists(row.artifact_key)
-    assert store.exists("platform/metrics/default-v1.json")
+    assert store.exists(
+        row.artifact_key.replace("/models/", "/metrics/").replace(".joblib", ".json")
+    )
+    assert row.metrics["trained_on"] == {
+        "tenant_id": None,
+        "source": "fixed",
+        "rows": sum(fitted.result.split_sizes.values()),
+    }
     bundle = joblib.load(io.BytesIO(store.get(row.artifact_key)))
     assert bundle["threshold"] == fitted.result.threshold
     assert bundle["target"] == fitted.result.target
