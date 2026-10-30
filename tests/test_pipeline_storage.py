@@ -155,6 +155,43 @@ def test_an_invalid_dataset_is_refused_before_anything_is_uploaded(db, dataset):
 
 
 @pytest.mark.db
+def test_a_status_the_record_does_not_know_is_refused_before_anything_is_uploaded(db, dataset):
+    invoices = dataset.invoices.copy()
+    invoices.loc[invoices.index[0], "status"] = "renegotiated_again"
+    broken = RawDataset(
+        customers=dataset.customers,
+        invoices=invoices,
+        events=dataset.events,
+        agreements=dataset.agreements,
+    )
+    scope = _scope(db, "one")
+
+    with pytest.raises(ValueError, match="status not in the record's enum"):
+        ingest(scope, _Fixed(broken))
+
+    assert scope.all(StoredObject) == []
+    assert scope.all(Customer) == []
+
+
+@pytest.mark.db
+def test_a_channel_longer_than_the_column_is_refused_before_anything_is_uploaded(db, dataset):
+    customers = dataset.customers.copy()
+    customers.loc[customers.index[0], "preferred_channel"] = "whatsapp-business-api"
+    broken = RawDataset(
+        customers=customers,
+        invoices=dataset.invoices,
+        events=dataset.events,
+        agreements=dataset.agreements,
+    )
+    scope = _scope(db, "one")
+
+    with pytest.raises(ValueError, match="preferred_channel over 20 characters"):
+        ingest(scope, _Fixed(broken))
+
+    assert scope.all(StoredObject) == []
+
+
+@pytest.mark.db
 def test_training_records_a_platform_model_row_with_an_artifact_key(db, fitted):
     session = _platform(db)
 

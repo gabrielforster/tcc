@@ -725,7 +725,11 @@ def tenant_seed(
     """
     from collection.db.seed import seed_development_tenant
 
-    tenant = seed_development_tenant(name)
+    try:
+        tenant = seed_development_tenant(name)
+    except ValueError as error:
+        console.print(f"[red]{error}[/]")
+        raise typer.Exit(code=1) from None
 
     table = Table(title="Seeded tenant")
     table.add_column("field")

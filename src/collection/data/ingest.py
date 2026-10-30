@@ -16,10 +16,14 @@ the tenant's prefix, and it has already lost the identifiers. The rows hold `ext
 computed on anonymized frames can be mapped back to one customer and to no other tenant's.
 
 Validation runs before the first upload: a dataset that is going to be refused must not
-leave objects behind that a later read would trust. Re-ingesting replaces. Customers are
-matched on `external_id` and updated; a receivable has no key of its own in the source
-that survives anonymization, so a tenant's receivables are replaced as a set -- a
-re-import is a fresh picture of what is owed, not an addition to the last one.
+leave objects behind that a later read would trust. That includes the two rules only the
+record knows -- how wide `preferred_channel` is and which statuses the enum names -- so a
+source that would fail at the INSERT fails before anything is stored instead.
+
+Re-ingesting replaces. Customers are matched on `external_id` and updated; a receivable
+has no key of its own in the source that survives anonymization, so a tenant's
+receivables are replaced as a set -- a re-import is a fresh picture of what is owed, not
+an addition to the last one.
 `days_overdue` is a fact about the day of ingestion (`as_of`), as the model documents.
 """
 
@@ -68,9 +72,35 @@ def _resolve(source: DataSource | str | None) -> DataSource:
     return source if isinstance(source, DataSource) else get_source(source)
 
 
+def _record_problems(dataset: RawDataset) -> list[str]:
+    """What the columns will refuse, asked before anything is written.
+
+    `RawDataset.validate` checks the dataset against the data dictionary; these two are
+    the rules only the record knows -- the channel's column width and the status enum --
+    and without them an ERP row with a longer channel or an unknown status reaches the
+    database as a raw `DataError` or `ValueError`, after both frames are already uploaded.
+    """
+    problems: list[str] = []
+    width = Customer.preferred_channel.type.length
+    channels = dataset.customers.get("preferred_channel")
+    if channels is not None:
+        too_long = {str(c) for c in channels.dropna() if len(str(c)) > width}
+        if too_long:
+            problems.append(
+                f"customers: preferred_channel over {width} characters: {sorted(too_long)[:5]}"
+            )
+    statuses = dataset.invoices.get("status")
+    if statuses is not None:
+        known = {s.value for s in ReceivableStatus}
+        unknown = {str(s) for s in statuses.dropna()} - known
+        if unknown:
+            problems.append(f"invoices: status not in the record's enum: {sorted(unknown)[:5]}")
+    return problems
+
+
 def _pull(instance: DataSource, store: ObjectStore) -> tuple[RawDataset, tuple[str, ...]]:
     dataset = instance.extract()
-    problems = dataset.validate()
+    problems = dataset.validate() + _record_problems(dataset)
     if problems:
         raise ValueError("Invalid raw dataset:\n  - " + "\n  - ".join(problems))
     keys = _store_frames(store, "raw", dataset.as_dict())

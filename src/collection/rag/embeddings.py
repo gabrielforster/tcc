@@ -9,9 +9,12 @@ lexical baseline, and it was a deliberate starting point rather than a placehold
   fresh clone;
 * character n-grams handle Portuguese morphology (parcelamento/parcelar/parcelas) without a
   stemmer, which matters because this corpus is Portuguese;
-* it gives the paper a real lexical baseline to measure a neural retriever *against*.
-  Reporting "embeddings scored 0.82" means little; "embeddings scored 0.82 against a
-  TF-IDF baseline at 0.71 on the same questions" is a result.
+* it gives the paper a real lexical baseline to measure a neural retriever *against*, and
+  a baseline is only worth having if it is allowed to win. Reporting "embeddings scored
+  0.80" means little; "embeddings scored 0.80 against a TF-IDF baseline at 0.82 on the
+  same questions" is a result -- and on this corpus that is the direction it went, which
+  is why the default above is a choice about storing vectors across tenants rather than a
+  claim that it retrieves better. `docs/rag.md` carries the measurement.
 
 `SentenceTransformerEmbedder` is imported lazily so that importing this module stays
 cheap, and the loaded model is cached per process: loading it costs seconds and hundreds

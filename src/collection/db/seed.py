@@ -57,7 +57,16 @@ _LADDER = (
 
 
 def slugify(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    """The tenant's slug, refusing a name that has nothing to make one from.
+
+    A name of punctuation alone would otherwise slug to the empty string: the first such
+    tenant would be created with no slug, and the second would fail on the unique
+    constraint with a message about a conflict rather than about the name.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    if not slug:
+        raise ValueError(f"{name!r} has no letters or digits to build a tenant slug from.")
+    return slug
 
 
 def _climb_to(tenant: Tenant, rung: TenantState) -> None:

@@ -53,7 +53,7 @@ from typing import TYPE_CHECKING, Any
 from collection.config import settings
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from sqlalchemy.orm import Session as SQLSession
 
@@ -388,6 +388,9 @@ class DatabaseSessionStore:
         self.lock = RLock()
         #: How many `unit()` blocks are open. Only the outermost ends the transaction.
         self._depth = 0
+        #: In-memory changes that may only be made once the writes they go with are
+        #: committed. Run after the outermost commit, dropped on a rollback.
+        self._on_commit: list[Callable[[], None]] = []
 
     # ------------------------------------------------------------ units of work
     @contextmanager
@@ -407,9 +410,13 @@ class DatabaseSessionStore:
                 yield self._scope
                 if self._depth == 1:
                     self._scope.session.commit()
+                    pending, self._on_commit = self._on_commit, []
+                    for action in pending:
+                        action()
             except Exception:
                 if self._depth == 1:
                     self._scope.session.rollback()
+                    self._on_commit.clear()
                 raise
             finally:
                 self._depth -= 1
@@ -706,10 +713,24 @@ class DatabaseSessionStore:
         widget and walks away would otherwise never be closed by anything.
 
         Call it inside a unit of work: it writes.
+
+        The live sessions go only once those writes are committed. Dropping them here
+        would part company with the rows if the unit of work later rolled back -- `open()`
+        sweeps before it inserts, so a refused insert would leave those conversations
+        `OPEN` in the record with nothing in the process tracking them.
         """
         now = time.time()
-        for session_id in [key for key, s in self._sessions.items() if s.expired(now)]:
-            self._close(self._sessions.pop(session_id).conversation)
+        expired = [key for key, s in self._sessions.items() if s.expired(now)]
+        for session_id in expired:
+            self._close(self._sessions[session_id].conversation)
+        if not expired:
+            return
+
+        def forget() -> None:
+            for session_id in expired:
+                self._sessions.pop(session_id, None)
+
+        self._on_commit.append(forget)
 
     def _close(self, conversation: "Conversation") -> None:
         from collection.db.models.conversation import ConversationState

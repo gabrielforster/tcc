@@ -19,9 +19,9 @@ of a call can skip them:
 
 Similarity is `1 - cosine distance`, ordered by distance and limited in SQL so the
 database never ships the corpus. The relevance floor is applied afterwards in Python,
-using the constant the responsive agent already owns, so it keeps one definition rather
-than a second copy inside a query. The limit therefore applies before the floor: asking
-for `top_k` returns at most `top_k`, possibly fewer.
+using the constants `rag/index.py` owns, so both retrievers answer to one definition of
+"relevant enough" rather than to a second copy inside a query. The limit therefore
+applies before the floor: asking for `top_k` returns at most `top_k`, possibly fewer.
 
 There is deliberately no ANN index. The scan is exact, which is what lets recall be
 stated without caveat; HNSW would also post-filter, so the tenant and audience predicates

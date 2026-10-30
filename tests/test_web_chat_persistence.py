@@ -242,6 +242,26 @@ def test_an_abandoned_session_is_swept_and_its_thread_closed(db):
 
 
 @pytest.mark.db
+def test_a_sweep_whose_unit_of_work_fails_keeps_tracking_the_sessions_it_closed(db):
+    """The sweep's in-memory half may not outrun its writes.
+
+    `open()` sweeps before it inserts, so a failure after the sweep rolls the `CLOSED`
+    writes back. Forgetting the sessions anyway would leave those conversations `OPEN` in
+    the record with nothing in the process tracking them.
+    """
+    channel, scope = _serving(db)
+    stale, _ = channel.open()
+    stale.last_seen_at = time.time() - SESSION_TTL_SECONDS - 1
+
+    with pytest.raises(RuntimeError), channel.store.unit():
+        channel.store._sweep()
+        raise RuntimeError("whatever the caller was going to write next")
+
+    assert len(channel.store) == 1
+    assert scope.get(Conversation, uuid.UUID(stale.session_id)).state is ConversationState.OPEN
+
+
+@pytest.mark.db
 def test_a_seeded_contact_is_shown_in_the_conversation_it_is_recorded_against(db):
     message = "Sua fatura venceu ontem."
     channel, scope = _serving(db)

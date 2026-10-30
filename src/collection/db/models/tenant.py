@@ -60,9 +60,9 @@ class Tenant(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(100), unique=True)
-    tenant_key: Mapped[str] = mapped_column(
-        String(64), unique=True, default=lambda: secrets.token_urlsafe(16)
-    )
+    # No column default: `__init__` below mints the key, because an unsaved tenant has to
+    # carry it already. A second default here would only be a second thing to keep in step.
+    tenant_key: Mapped[str] = mapped_column(String(64), unique=True)
     state: Mapped[TenantState] = mapped_column(
         SAEnum(TenantState, name="tenant_state", values_callable=lambda e: [m.value for m in e]),
         default=TenantState.PROVISIONED,

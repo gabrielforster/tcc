@@ -22,7 +22,7 @@ from collection.db.models import (
     TenantState,
 )
 from collection.db.repository import TenantScope
-from collection.db.seed import seed_development_tenant
+from collection.db.seed import seed_development_tenant, slugify
 from collection.rag.retriever import PgVectorRetriever
 
 CUSTOMER_FACING = {
@@ -133,3 +133,9 @@ def test_seeding_twice_does_not_duplicate_documents_or_versions(seeding, db):
     assert {d.path: d.current_version_id for d in after.all(KnowledgeDocument)} == documents
     assert len(after.all(KnowledgeVersion)) == versions
     _assert_the_source_was_ingested(after)
+
+
+def test_a_name_with_nothing_to_slug_is_refused_rather_than_slugged_to_nothing():
+    """An empty slug would be created once and collide on the unique constraint after."""
+    with pytest.raises(ValueError, match="tenant slug"):
+        slugify("###")
