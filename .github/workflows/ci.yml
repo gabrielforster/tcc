@@ -147,9 +147,19 @@ jobs:
         env:
           COLLECTION_REQUIRE_DB: "1"
         run: |
+          # `--deselect` ignores a node id that matches nothing, and says so to nobody.
+          # Renaming that test would orphan the deselect, let the downgrade wipe the seed
+          # mid-run, and leave this step green while proving nothing -- which is the very
+          # kind of silent pass the step exists to catch. So prove the id still resolves
+          # before relying on it.
+          ROUND_TRIP=tests/test_db_setup.py::test_migrations_run_to_head_and_back
+          uv run pytest -q --collect-only "$ROUND_TRIP" > /dev/null || {
+            echo "$ROUND_TRIP no longer exists: update the deselect below."
+            exit 1
+          }
           DATABASE_URL="$TEST_DATABASE_URL" uv run collection tenant seed
           uv run pytest -q -p no:warnings -rs --junit-xml=pytest-seeded.xml \
-            -m db --deselect tests/test_db_setup.py::test_migrations_run_to_head_and_back
+            -m db --deselect "$ROUND_TRIP"
 
       - name: No test may have skipped
         # Both runs above, checked in one place because the question is the same for both.
