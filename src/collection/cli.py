@@ -340,17 +340,64 @@ def demo() -> None:
     console.print(f"\n[green]summary[/] {trace.counts()}")
 
 
+def _report_retrieval(retriever, query: str | None, top_k: int, evaluate_only: bool) -> None:
+    """One query or one metric table, whichever arm produced the retriever.
+
+    Both arms print through here so the comparison in `docs/rag.md` cannot quietly be
+    between two different metric definitions: the question set, the ks and the sweep are
+    the same code whether passages came from a fitted matrix or from the database.
+    """
+    from collection.rag.evaluate import load_questions, sweep
+
+    if query and not evaluate_only:
+        for hit in retriever.search(query, top_k=top_k):
+            preview = " ".join(hit.text.split())[:160]
+            console.print(f"\n[bold]{hit.document_id}[/] ({hit.score:.3f})\n  {preview}...")
+        return
+
+    questions_file = settings.dir_knowledge / "questions.json"
+    if not questions_file.exists():
+        console.print("[yellow]no questions.json; skipping evaluation[/]")
+        return
+    questions = load_questions(questions_file)
+    table = sweep(retriever, questions)
+    console.print(f"\n[bold]Retrieval over {len(questions)} labelled questions[/]")
+    console.print(table.to_string(index=False))
+
+
 @app.command()
 def rag(
     query: str = typer.Option(None, help="run a single query against the index"),
     top_k: int = typer.Option(5),
-    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer"),
+    embedder: str = typer.Option("tfidf", help="tfidf | sentence-transformer (tfidf arm only)"),
+    retriever: str = typer.Option(
+        "tfidf", help="tfidf (in-memory baseline) | pgvector (what actually serves)"
+    ),
+    tenant: str = typer.Option(
+        "desenvolvimento",
+        "--tenant",
+        envvar="COLLECTION_TENANT",
+        help="Tenant whose published knowledge the pgvector arm retrieves from.",
+    ),
     evaluate_only: bool = typer.Option(False, "--evaluate", help="only run the evaluation"),
 ) -> None:
-    """Build the knowledge index, evaluate retrieval, or answer a single query."""
+    """Evaluate retrieval, or answer a single query, against either retriever."""
+    if retriever == "pgvector":
+        from collection.rag.retriever import PgVectorRetriever
+
+        with _tenant_scope(tenant) as scope:
+            console.print(
+                f"[green]retrieving[/] from tenant {tenant!r} "
+                f"({settings.embedding_model}, {settings.embedding_dimensions} dims)"
+            )
+            _report_retrieval(PgVectorRetriever(scope), query, top_k, evaluate_only)
+        return
+    if retriever != "tfidf":
+        console.print(f"[red]Unknown retriever {retriever!r}. Available: tfidf, pgvector.[/]")
+        raise typer.Exit(code=1)
+
     from collection.rag.documents import load_directory
     from collection.rag.embeddings import get_embedder
-    from collection.rag.evaluate import load_questions, sweep
     from collection.rag.index import VectorIndex
 
     documents = load_directory(settings.dir_knowledge)
@@ -363,22 +410,7 @@ def rag(
         f"({stats['embedder']}, {stats['dimensions']} dims, "
         f"mean {stats['mean_words_per_chunk']} words/chunk)"
     )
-
-    if query and not evaluate_only:
-        for hit in index.search(query, top_k=top_k):
-            preview = " ".join(hit.text.split())[:160]
-            console.print(f"\n[bold]{hit.document_id}[/] ({hit.score:.3f})\n  {preview}...")
-        return
-
-    questions_file = settings.dir_knowledge / "questions.json"
-    if not questions_file.exists():
-        console.print("[yellow]no questions.json; skipping evaluation[/]")
-        return
-    questions = load_questions(questions_file)
-    table = sweep(index, questions)
-    console.print(f"\n[bold]Retrieval over {len(questions)} labelled questions[/]")
-    console.print(table.to_string(index=False))
-
+    _report_retrieval(index, query, top_k, evaluate_only)
     index.save(settings.dir_processed / f"rag_index_{embedder}.joblib")
 
 

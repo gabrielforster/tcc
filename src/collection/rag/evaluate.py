@@ -18,10 +18,22 @@ Metrics, per the schedule's "retrieval top-k avaliado por precisão/revocação"
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import pandas as pd
 
-from collection.rag.index import VectorIndex
+
+class DocumentRetriever(Protocol):
+    """What the evaluation needs from a retriever, and nothing more.
+
+    Both arms are measured through this one method so that the metric definitions cannot
+    drift apart: whatever ranks the corpus, the evaluation only ever sees file-level
+    document ids, best first. It is a protocol rather than a base class because the two
+    implementations have nothing else in common -- one is a fitted matrix in this process,
+    the other a SQL statement against a tenant's rows.
+    """
+
+    def search_documents(self, query: str, top_k: int = 5) -> list[str]: ...
 
 
 @dataclass(frozen=True)
@@ -50,12 +62,14 @@ class RetrievalScores:
         }
 
 
-def evaluate(index: VectorIndex, questions: list[Question], k: int = 5) -> RetrievalScores:
+def evaluate(
+    retriever: DocumentRetriever, questions: list[Question], k: int = 5
+) -> RetrievalScores:
     precisions, recalls, reciprocal_ranks = [], [], []
     misses: list[str] = []
 
     for item in questions:
-        retrieved = index.search_documents(item.question, top_k=k)
+        retrieved = retriever.search_documents(item.question, top_k=k)
         hits = [doc for doc in retrieved if doc in item.relevant]
 
         precisions.append(len(hits) / k)
@@ -89,6 +103,8 @@ def load_questions(path: Path | str) -> list[Question]:
     ]
 
 
-def sweep(index: VectorIndex, questions: list[Question], ks=(1, 3, 5, 10)) -> pd.DataFrame:
+def sweep(
+    retriever: DocumentRetriever, questions: list[Question], ks=(1, 3, 5, 10)
+) -> pd.DataFrame:
     """Metrics across several k, since the right k is an operational choice."""
-    return pd.DataFrame([evaluate(index, questions, k=k).as_row() for k in ks])
+    return pd.DataFrame([evaluate(retriever, questions, k=k).as_row() for k in ks])

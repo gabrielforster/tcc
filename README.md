@@ -255,8 +255,9 @@ known.
 
 The serving path no longer uses that in-memory index: it retrieves from `pgvector`, over
 the chunks a document's current version was embedded into at publish time, filtered to one
-tenant and to the customer audience in SQL. `collection rag` still builds the TF-IDF index,
-because it is the lexical baseline the pretrained embedder is measured against.
+tenant and to the customer audience in SQL. `collection rag --retriever pgvector` measures
+that path over a seeded tenant, and `--retriever tfidf` keeps the in-memory index as the
+lexical baseline it is measured against; both tables are in `docs/rag.md`.
 
 ### Generation
 

@@ -78,3 +78,19 @@ class PgVectorRetriever:
                 )
             )
         return hits
+
+    def search_documents(self, query: str, top_k: int = TOP_K) -> list[str]:
+        """Distinct document paths behind the top chunks, best first.
+
+        The evaluation compares retrievers at the document level, so this mirrors the
+        in-memory index exactly -- including asking for three times as many chunks as
+        documents wanted, because several chunks of one document would otherwise crowd the
+        list and make the ranking look shorter than it is.
+        """
+        seen: list[str] = []
+        for hit in self.search(query, top_k=top_k * 3):
+            if hit.document_id not in seen:
+                seen.append(hit.document_id)
+            if len(seen) == top_k:
+                break
+        return seen

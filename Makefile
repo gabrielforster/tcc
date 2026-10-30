@@ -42,8 +42,8 @@ serve:            ## run the scoring API on http://127.0.0.1:8000
 demo:             ## route a mix of events through the orchestrator
 	uv run collection demo
 
-rag:              ## build the knowledge index and evaluate retrieval
-	uv run collection rag
+rag:              ## evaluate retrieval; ARGS="--retriever pgvector" measures the serving path
+	uv run collection rag $(ARGS)
 
 answer:           ## evaluate the responders; ARGS="--compare" also runs the LLM arm
 	uv run collection answer $(ARGS)

@@ -6,17 +6,68 @@ keeping the two measurable apart is what makes the eventual hallucination number
 anything.
 """
 
+import hashlib
 import json
+import re
 
+import numpy as np
 import pytest
 
+from collection.config import settings
 from collection.rag.chunking import chunk_text, split_paragraphs
 from collection.rag.documents import load_directory, load_file
-from collection.rag.embeddings import TfidfEmbedder, get_embedder
+from collection.rag.embeddings import Embedder, TfidfEmbedder, get_embedder
 from collection.rag.evaluate import Question, evaluate, load_questions, sweep
 from collection.rag.index import VectorIndex
 
 LONG_PARAGRAPH = " ".join(f"palavra{i}" for i in range(1200))
+
+
+class _WordHashEmbedder(Embedder):
+    """Deterministic and offline: each word hashes to one dimension, so overlap is cosine.
+
+    The database arm is tested for ranking and filtering, not for how good the pretrained
+    model is -- that is what the measurement in docs/rag.md reports. Hashing keeps the
+    suite from downloading hundreds of megabytes to assert on an ordering.
+    """
+
+    name = "word-hash"
+
+    def fit(self, texts):
+        return self
+
+    def encode(self, texts):
+        width = settings.embedding_dimensions
+        matrix = np.zeros((len(texts), width))
+        for row, text in enumerate(texts):
+            for word in re.findall(r"\w+", text.lower()):
+                digest = hashlib.sha256(word.encode()).digest()
+                matrix[row, int.from_bytes(digest[:4], "big") % width] += 1
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        return matrix / np.where(norms == 0, 1.0, norms)
+
+
+@pytest.fixture
+def pg_scope(db, monkeypatch):
+    """A tenant scope whose published chunks are embedded without loading a model."""
+    from sqlalchemy.orm import Session
+
+    from collection.db.models import Tenant
+    from collection.db.repository import TenantScope
+
+    monkeypatch.setattr("collection.rag.store.get_embedder", lambda *a: _WordHashEmbedder())
+    monkeypatch.setattr("collection.rag.retriever.get_embedder", lambda *a: _WordHashEmbedder())
+    tenant = Tenant(name="rag", slug="rag")
+    db.add(tenant)
+    db.flush()
+    session = Session(bind=db.connection(), join_transaction_mode="create_savepoint")
+    return TenantScope(session, tenant.id)
+
+
+def _publish_knowledge(scope, path, body, **kwargs):
+    from collection.rag.store import publish_document
+
+    return publish_document(scope, title=path, path=path, body=body, **kwargs)
 
 
 @pytest.fixture
@@ -240,3 +291,61 @@ def test_the_shipped_knowledge_base_answers_its_own_questions():
     scores = evaluate(index, questions, k=5)
     assert scores.recall >= 0.9
     assert scores.mrr >= 0.7
+
+
+# ------------------------------------------------- evaluating the serving retriever
+class _FixedRetriever:
+    """Returns a scripted ranking, so the metrics can be checked against arithmetic."""
+
+    def __init__(self, ranking: list[str]) -> None:
+        self.ranking = ranking
+
+    def search_documents(self, query: str, top_k: int = 5) -> list[str]:
+        return self.ranking[:top_k]
+
+
+def test_the_evaluation_measures_anything_that_ranks_documents():
+    """The comparison in docs/rag.md is only honest if both arms run the same metric code."""
+    questions = [Question(question="q", relevant=frozenset({"b.md"}))]
+    scores = evaluate(_FixedRetriever(["a.md", "b.md", "c.md"]), questions, k=3)
+    assert scores.recall == pytest.approx(1.0)
+    assert scores.mrr == pytest.approx(0.5)
+    assert scores.precision == pytest.approx(1 / 3)
+
+
+@pytest.mark.db
+def test_the_pgvector_retriever_ranks_whole_documents_for_the_evaluation(db, pg_scope):
+    """Several chunks of one document must not crowd the ranking the metrics see."""
+    from collection.rag.retriever import PgVectorRetriever
+
+    _publish_knowledge(pg_scope, "faq.md", "boleto segunda via vencimento pix")
+    _publish_knowledge(pg_scope, "politica.md", "contato de cobranca nao ocorre aos domingos")
+
+    ranked = PgVectorRetriever(pg_scope).search_documents("boleto segunda via", top_k=2)
+
+    assert ranked[0] == "faq.md"
+    assert len(ranked) == len(set(ranked))
+
+
+@pytest.mark.db
+def test_an_internal_document_is_invisible_to_the_evaluated_retriever(db, pg_scope):
+    """Why the two arms are not scored over the same corpus, stated as a test.
+
+    `limites-de-alcada.md` is published INTERNAL, so a question the shipped set answers
+    only from it is an unavoidable miss for this arm. The comparison in docs/rag.md
+    reports a customer-visible subset for exactly this reason, and this test is what keeps
+    that caveat from quietly becoming untrue.
+    """
+    from collection.db.models import Audience
+    from collection.rag.retriever import PgVectorRetriever
+
+    _publish_knowledge(pg_scope, "faq.md", "boleto segunda via vencimento")
+    _publish_knowledge(
+        pg_scope, "limites.md", "desconto maximo de vinte por cento", audience=Audience.INTERNAL
+    )
+
+    questions = [Question(question="desconto maximo", relevant=frozenset({"limites.md"}))]
+    scores = evaluate(PgVectorRetriever(pg_scope), questions, k=5)
+
+    assert scores.recall == 0.0
+    assert scores.misses == ["desconto maximo"]
