@@ -5,11 +5,11 @@ import numpy as np
 import pytest
 from sqlalchemy.orm import Session
 
-from collection.agents.responsive import MIN_RELEVANCE, TOP_K
 from collection.config import settings
 from collection.db.models import Audience, KnowledgeDocument, Tenant
 from collection.db.repository import TenantScope
 from collection.rag.embeddings import Embedder
+from collection.rag.index import MIN_RELEVANCE, TOP_K
 from collection.rag.retriever import PgVectorRetriever
 from collection.rag.store import publish_document
 

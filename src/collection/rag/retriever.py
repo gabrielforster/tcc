@@ -28,12 +28,11 @@ stated without caveat; HNSW would also post-filter, so the tenant and audience p
 would shrink an already-truncated candidate list and quietly cut recall per tenant.
 """
 
-from collection.agents.responsive import MIN_RELEVANCE, TOP_K
 from collection.db.models import Audience, KnowledgeChunk, KnowledgeDocument, KnowledgeVersion
 from collection.db.repository import TenantScope
 from collection.rag.chunking import Chunk
 from collection.rag.embeddings import get_embedder
-from collection.rag.index import Retrieved
+from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved
 
 
 class PgVectorRetriever:

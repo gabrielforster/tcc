@@ -25,6 +25,11 @@ from collection.rag.chunking import Chunk, chunk_text
 from collection.rag.documents import Document
 from collection.rag.embeddings import Embedder, get_embedder
 
+#: Retrieved passages below this similarity are not worth quoting back. Defined here, below
+#: both retrievers and the agent, so none of them has to import another to read it.
+MIN_RELEVANCE = 0.05
+TOP_K = 3
+
 
 @dataclass
 class Retrieved:

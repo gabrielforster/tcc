@@ -35,7 +35,7 @@ from collection.agents.conversation import (
 )
 from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
-from collection.rag.index import Retrieved, VectorIndex
+from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved, VectorIndex
 from collection.voice.audio import AudioError
 from collection.voice.transcribe import (
     MIN_CONFIDENCE,
@@ -55,9 +55,6 @@ SMALL_TALK_REPLY = "Olá! Posso ajudar com a sua pendência, um parcelamento ou 
 CONFIRM_PREFIX = 'Entendi: "{transcript}". Confirma que é isso?'
 #: Consecutive unclear messages before handing over.
 UNCLEAR_LIMIT = 3
-#: Retrieved passages below this similarity are not worth quoting back.
-MIN_RELEVANCE = 0.05
-TOP_K = 3
 
 
 @dataclass
