@@ -131,7 +131,7 @@ def ingest(
     instance = _resolve(source)
     store = store or ObjectStore(scope)
     dataset, raw_keys = _pull(instance, store)
-    interim_keys = _store_frames(store, "interim", anonymize(dataset))
+    interim_keys = _store_frames(store, "interim", anonymize(dataset, tenant=scope.tenant_id))
     store.put(
         METADATA_FILE,
         _metadata(instance.name, dataset),
@@ -170,7 +170,7 @@ def _write_customers(scope: TenantScope, frame: pd.DataFrame) -> dict[str, Custo
         if customer is None:
             customer = Customer(external_id=external_id, pseudonym="")
             scope.add(customer)
-        customer.pseudonym = pseudonym(external_id, "cus_")
+        customer.pseudonym = pseudonym(external_id, "cus_", tenant=scope.tenant_id)
         customer.preferred_channel = None if pd.isna(channel) else str(channel)
         written[external_id] = customer
     scope.session.flush()

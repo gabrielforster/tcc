@@ -68,10 +68,16 @@ def _own_bucket(bucket):
 
 
 @pytest.fixture(scope="module")
-def fitted(dataset):
+def fitted(dataset, tenant_id):
+    """A platform model, fitted on one tenant's frames.
+
+    Which tenant does not matter: the pseudonym is the grouping key for a customer's
+    receivables, never a feature, so a model fitted on one tenant's frames scores
+    another's.
+    """
     from collection.data.anonymize import anonymize
 
-    return fit_task("default", anonymize(dataset), source="fixed", tune=False)
+    return fit_task("default", anonymize(dataset, tenant=tenant_id), source="fixed", tune=False)
 
 
 @pytest.mark.db
@@ -263,6 +269,37 @@ def test_scoring_writes_one_score_per_customer_against_that_model_version(db, da
     # Scoring again against the same version replaces, never doubles.
     assert score_customers(scope, "default") == written
     assert scope.session.scalar(select(func.count()).select_from(CustomerScore)) == written
+
+
+@pytest.mark.db
+def test_scoring_refuses_when_the_frames_were_anonymized_under_another_key(db, dataset, fitted):
+    """A stale `interim/` object matches no row, and silently writing nothing hides it."""
+    scope = _scope(db, "one")
+    ingest(scope, _Fixed(dataset))
+    publish(fitted, session=_platform(db))
+    for customer in scope.all(Customer):
+        customer.pseudonym = f"cus_stale{customer.external_id}"
+    scope.session.flush()
+
+    with pytest.raises(LookupError, match="collection ingest"):
+        score_customers(scope, "default")
+
+
+@pytest.mark.db
+def test_two_tenants_ingesting_the_same_source_share_no_pseudonym(db, dataset):
+    """The pseudonym must not be a key that joins one tenant's customers to another's."""
+    mine = _scope(db, "one")
+    theirs = _scope(db, "two")
+
+    ingest(mine, _Fixed(dataset))
+    ingest(theirs, _Fixed(dataset))
+
+    assert {c.external_id for c in mine.all(Customer)} == {
+        c.external_id for c in theirs.all(Customer)
+    }
+    assert not {c.pseudonym for c in mine.all(Customer)} & {
+        c.pseudonym for c in theirs.all(Customer)
+    }
 
 
 @pytest.mark.db

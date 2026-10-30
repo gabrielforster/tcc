@@ -2,15 +2,17 @@
 
 Models are app-level: there is one propensity model and one default-risk model, versioned
 as platform artifacts. They are meant to be trained on pooled data; today a run fits one
-tenant's frames (recorded in `metrics["trained_on"]`) because pooling is pending id
-namespacing in the pseudonym. A tenant's pipeline
-run imports and indexes its own data and scores its receivables against the latest
-version; it never trains one. That is why `PlatformModel` has no `tenant_id` -- and,
-because it has none, no `TenantScoped` mixin and no guard: any session may read which
-model is current, and only a platform session writes one, by the same convention that
-keeps `tenants` out of a tenant's reach. The weights themselves are an object under the
-`platform/` prefix; the row is what the application can query (which version, how it
-scored, where the bytes are).
+tenant's frames (recorded in `metrics["trained_on"]`). Pooling is no longer blocked on the
+ids -- pseudonyms are keyed per tenant, so two tenants' frames stack without their keys
+colliding -- and what remains is the question of whose data may be fitted together, which
+is a contractual answer rather than a technical one. A tenant's pipeline run imports and
+indexes its own data and scores its receivables against the latest version; it never
+trains one. That is why `PlatformModel` has no `tenant_id` -- and, because it has none,
+no `TenantScoped` mixin and no guard: any session may read which model is current, and
+only a platform session writes one, by the same convention that keeps `tenants` out of a
+tenant's reach. The weights themselves are an object under the `platform/` prefix; the
+row is what the application can query (which version, how it scored, where the bytes
+are).
 
 `CustomerScore` is the opposite case. It is a fact about one tenant's customer, so it
 carries its own `tenant_id` and the composite foreign key that makes it agree with the

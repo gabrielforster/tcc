@@ -50,7 +50,7 @@ from datetime import UTC, datetime
 from threading import Lock, RLock
 from typing import TYPE_CHECKING, Any
 
-from collection.config import settings
+from collection.crypto import derive_key
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -117,15 +117,19 @@ class UnknownTenant(SessionError):
     """No tenant answers to that key. An identifier, not a secret, so it is simply wrong."""
 
 
-def _secret() -> str:
-    """The signing secret.
+def _signing_key() -> bytes:
+    """The key tokens are signed with.
 
-    Reuses `ANONYMIZATION_SALT` rather than introducing a second secret to manage. Both
-    are process-wide secrets that must never be committed and whose rotation invalidates
-    what came before; splitting them would double the number of things to get wrong for
-    no gain in isolation.
+    Derived from `ANONYMIZATION_SALT` rather than introducing a second secret to manage.
+    Both are process-wide secrets that must never be committed and whose rotation
+    invalidates what came before; splitting them would double the number of things to get
+    wrong for no gain in isolation.
+
+    Derived, not the salt itself: the same secret also stands behind every tenant's
+    pseudonyms, and if the two uses shared one key, anyone who could mint pseudonyms could
+    mint identity tokens too. `derive_key` makes them independent at the cost of one HMAC.
     """
-    return settings.anonymization_salt
+    return derive_key("session-token")
 
 
 def issue_token(customer_id: str, ttl_seconds: int = SESSION_TTL_SECONDS) -> str:
@@ -139,7 +143,7 @@ def issue_token(customer_id: str, ttl_seconds: int = SESSION_TTL_SECONDS) -> str
         raise TokenError(f"Invalid customer id for a token: {customer_id!r}")
     expires = int(time.time()) + ttl_seconds
     payload = f"{customer_id}{_TOKEN_SEPARATOR}{expires}"
-    signature = hmac.new(_secret().encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    signature = hmac.new(_signing_key(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{payload}{_TOKEN_SEPARATOR}{signature}"
 
 
@@ -155,7 +159,7 @@ def verify_token(token: str) -> str:
         raise TokenError("Malformed token") from error
 
     payload = f"{customer_id}{_TOKEN_SEPARATOR}{expires}"
-    expected = hmac.new(_secret().encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    expected = hmac.new(_signing_key(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(expected, signature):
         raise TokenError("Bad signature")
     if int(expires) < time.time():
@@ -614,7 +618,10 @@ class DatabaseSessionStore:
         existing = scope.all(Customer, Customer.external_id == external_id)
         if existing:
             return existing[0]
-        customer = Customer(external_id=external_id, pseudonym=pseudonym(external_id, "cus_"))
+        customer = Customer(
+            external_id=external_id,
+            pseudonym=pseudonym(external_id, "cus_", tenant=scope.tenant_id),
+        )
         scope.add(customer)
         scope.session.flush()
         return customer
