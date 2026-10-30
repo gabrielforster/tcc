@@ -8,6 +8,7 @@ says where the database is. A caller that needs another database (the test fixtu
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+import collection.db.models  # noqa: F401  (registers the models on the metadata)
 from collection.config import settings
 from collection.db.base import Base
 
