@@ -1,4 +1,10 @@
+import importlib.util
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from collection.db.models import (
@@ -11,6 +17,7 @@ from collection.db.models import (
 )
 from collection.db.repository import TenantScope
 from collection.db.transcripts import record_turn
+from collection.domain.intent import Intent
 from collection.rag.chunking import Chunk
 from collection.rag.index import Retrieved
 from collection.rag.store import publish_document
@@ -102,7 +109,7 @@ def test_a_retrieval_row_points_at_the_version_that_was_read_not_the_current_one
 
 
 @pytest.mark.db
-def test_a_passage_without_a_chunk_id_is_refused_and_leaves_no_turn(db):
+def test_a_passage_without_a_chunk_id_is_refused_by_pre_validation_before_anything_is_staged(db):
     scope = _scope(db)
     conversation = _conversation(scope)
     version = _publish(scope, "# A\n\nTexto.")
@@ -137,3 +144,41 @@ def test_a_conversation_keeps_its_turns_in_order_across_two_units_of_work(db):
     turns = third.all(Turn, Turn.conversation_id == conversation.id)
     turns.sort(key=lambda t: t.created_at)
     assert [t.text for t in turns] == ["primeira", "segunda", "terceira"]
+
+
+@pytest.mark.db
+def test_a_failure_mid_write_leaves_no_turn_and_no_partial_retrieval_rows(db):
+    scope = _scope(db)
+    conversation = _conversation(scope)
+    one = _publish(scope, "# A\n\nTexto da primeira versao.")
+    good = _passages(scope, one.id)[0]
+    two = _publish(scope, "# A\n\nTexto bem diferente da segunda versao.")
+    other = _passages(scope, two.id)[0]
+    # A real chunk, cited under a version it does not belong to.
+    liar = Retrieved(chunk=other.chunk, score=0.1, chunk_id=other.chunk_id, version_id=one.id)
+
+    with pytest.raises(IntegrityError):
+        record_turn(scope, conversation, role="agent", text="r", passages=[good, liar])
+
+    assert scope.all(Turn) == []
+    assert scope.all(TurnRetrieval) == []
+    # The session survived: the savepoint was rolled back, not the whole transaction.
+    assert len(scope.all(Conversation)) == 1
+
+
+def test_the_migration_intents_equal_the_live_enum():
+    path = Path(__file__).parent.parent / "migrations" / "versions" / "0005_conversations.py"
+    spec = importlib.util.spec_from_file_location("migration_0005", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    assert list(migration.INTENTS) == [m.value for m in Intent]
+
+
+def test_the_models_load_without_the_classifier_stack():
+    code = (
+        "import sys, collection.db.models;"
+        "bad = [m for m in sys.modules if m.startswith('collection.agents') or m == 'numpy'];"
+        "sys.exit(1 if bad else 0)"
+    )
+    assert subprocess.run([sys.executable, "-c", code]).returncode == 0

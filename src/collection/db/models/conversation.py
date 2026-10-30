@@ -20,7 +20,11 @@ models, and a console that cannot tell them apart cannot be used to compare them
 
 `created_at` on a turn defaults to `clock_timestamp()` rather than `now()`: `now()` is the
 start of the transaction, so turns written in one unit of work would tie and lose their
-order. Every table carries its own `tenant_id` with composite foreign keys, for the reason
+order. Order is by `created_at` alone, with no sequence column: `clock_timestamp()`
+advances per statement and a conversation's turns are written one after another, so a tie
+needs a clock adjustment mid-conversation. That was considered, not missed.
+
+Every table carries its own `tenant_id` with composite foreign keys, for the reason
 given in `customer.py`.
 """
 
@@ -39,8 +43,8 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
-from collection.agents.intent import Intent
 from collection.db.base import Base, TenantScoped
+from collection.domain.intent import Intent
 
 
 class ConversationState(enum.StrEnum):
