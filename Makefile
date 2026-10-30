@@ -55,7 +55,7 @@ voice:            ## sweep what recognition error costs; ARGS="--audio FILE" tra
 	uv run collection voice $(ARGS)
 
 contacts:         ## report what the outbound path decides (serve --seed-demo is the live demo)
-	uv run collection seed
+	uv run collection contacts
 
 migrate:          ## apply database migrations (alembic upgrade head)
 	uv run collection db upgrade

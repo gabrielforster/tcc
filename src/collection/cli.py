@@ -601,7 +601,7 @@ def voice(
 
 
 @app.command()
-def seed() -> None:
+def contacts() -> None:
     """Report what the outbound path decides for each overdue receivable.
 
     It runs the whole path in this process -- proactive agent, rules engine, composition,

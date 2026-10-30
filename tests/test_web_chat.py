@@ -610,7 +610,7 @@ def test_a_seeded_message_is_owned_by_the_session_that_picks_it_up(index):
 
 
 # ------------------------------------------------------- the one-process seeding demo
-# `collection seed` and `collection serve` are different processes and the mailbox is an
+# `collection contacts` and `collection serve` are different processes and the mailbox is an
 # in-memory dict, so the seeded message only reaches a widget when the server seeds the
 # channel it is itself serving. These pin that it does, and that it stays off by default.
 
