@@ -384,28 +384,46 @@ class DatabaseSessionStore:
         #: Live sessions, so the rate-limit counter and the thread survive between
         #: requests without a read. A session missing from here is read back from rows.
         self._sessions: dict[str, DatabaseSession] = {}
-        #: Reentrant: a unit of work may call a helper that takes the lock again.
+        #: Reentrant: a unit of work may call a helper that opens one of its own.
         self.lock = RLock()
+        #: How many `unit()` blocks are open. Only the outermost ends the transaction.
+        self._depth = 0
 
     # ------------------------------------------------------------ units of work
     @contextmanager
     def unit(self) -> "Iterator[TenantScope]":
-        """One short unit of work on this tenant's scope. See the class docstring."""
+        """One short unit of work on this tenant's scope. See the class docstring.
+
+        A nested `with` joins the one already open instead of ending it. Without that the
+        inner block's commit would split the outer one in two -- `open()` would check that
+        the tenant is servable in one transaction and insert the conversation in another,
+        so a tenant suspended between them would still get a conversation, and a failure
+        after the inner block would leave what it wrote behind. The lock makes the nesting
+        safe; the counter makes it invisible.
+        """
         with self.lock:
+            self._depth += 1
             try:
                 yield self._scope
-                self._scope.session.commit()
+                if self._depth == 1:
+                    self._scope.session.commit()
             except Exception:
-                self._scope.session.rollback()
+                if self._depth == 1:
+                    self._scope.session.rollback()
                 raise
+            finally:
+                self._depth -= 1
 
     # ------------------------------------------------------------------ the gate
     @property
     def servable(self) -> bool:
-        """Whether this tenant may be served at all (spec 6.2). Read, never cached.
+        """Whether this tenant may open a conversation or be scheduled into (spec 6.2).
 
-        A tenant suspended while the process is running must stop being served on the
-        next request, not on the next restart.
+        Read every time rather than cached, so a tenant suspended while the process is
+        running is refused on the next `open()` or `seed()` rather than on the next
+        restart. It is not asked again during a conversation: the spec puts the gate at
+        session open, so a thread already in progress runs to its TTL. Suspending a tenant
+        stops new conversations, not the sentence someone is in the middle of.
         """
         with self.unit() as scope:
             return self._tenant(scope).servable
@@ -423,7 +441,14 @@ class DatabaseSessionStore:
 
     # ------------------------------------------------------------------ sessions
     def open(self, token: str | None = None) -> DatabaseSession:
-        """Start or resume this customer's conversation; refuse one for a closed tenant."""
+        """Start a conversation; refuse one for a tenant that is not servable.
+
+        A new thread every time, as `SessionStore.open` does. Resuming the customer's last
+        one would put the greeting -- shown once, at the top -- in the middle of a restored
+        transcript, feed the whole of it back to the agent, and count the turn cap across
+        reopenings, so a returning visitor would be handed to a person sooner than a new
+        one for having come back.
+        """
         if token:
             customer_id, identified = verify_token(token), True
         else:
@@ -432,7 +457,8 @@ class DatabaseSessionStore:
         with self.unit() as scope:
             if not self._tenant(scope).servable:
                 raise TenantNotServable("This channel is not open for conversations yet.")
-            conversation = self.conversation_for(customer_id)
+            self._sweep()
+            conversation = self._new_conversation(scope, customer_id)
             session = DatabaseSession(
                 store=self,
                 conversation=conversation,
@@ -515,13 +541,15 @@ class DatabaseSessionStore:
             scope.session.flush()
 
     def conversation_for(self, customer_id: str) -> "Conversation":
-        """This customer's open thread, or a new one.
+        """The thread an outbound message for this customer belongs to.
 
-        The conversation is the durable thread, so a widget reopened within the session
-        TTL continues the one it left instead of orphaning it -- which is also what gives
-        a contact seeded before any session a conversation to be recorded in. A thread
-        that has gone past the TTL is closed here rather than resumed: that is the sweep
-        the in-memory store does on write.
+        Not a session: this is the seeding path, where a contact is recorded before
+        anyone has opened a widget. A message seeded while a thread is live belongs in
+        that thread, so an open and unexpired one is reused; otherwise a thread is
+        started to hold it, and whichever session finally shows the message takes the
+        delivery over (`DatabaseDeliveryLog.reassign`). An open thread that has gone past
+        the TTL is closed here rather than reused -- the sweep the in-memory store does
+        on write.
         """
         from collection.db.models.conversation import Conversation, ConversationState
 
@@ -537,10 +565,16 @@ class DatabaseSessionStore:
                 if self._last_seen(scope, latest) + self.ttl_seconds >= time.time():
                     return latest
                 self._close(latest)
-            conversation = Conversation(customer_id=customer.id, channel=self._channel)
-            scope.add(conversation)
-            scope.session.flush()
-            return conversation
+            return self._new_conversation(scope, customer_id)
+
+    def _new_conversation(self, scope: "TenantScope", customer_id: str) -> "Conversation":
+        from collection.db.models.conversation import Conversation
+
+        customer = self._customer(scope, customer_id)
+        conversation = Conversation(customer_id=customer.id, channel=self._channel)
+        scope.add(conversation)
+        scope.session.flush()
+        return conversation
 
     def conversation_of(self, owner: str) -> "Conversation":
         """The conversation an outbound message owned by `owner` belongs to.
@@ -661,6 +695,21 @@ class DatabaseSessionStore:
         delivery = scope.get(Delivery, key)
         if delivery is not None:
             delivery.turn_id = row.id
+
+    def _sweep(self) -> None:
+        """Drop the live sessions that have expired and close their threads.
+
+        On write, like `SessionStore._sweep`, and for the same reason: a store nobody is
+        writing to is a store whose memory nobody is growing. It matters more here,
+        because an abandoned session holds its whole transcript *and* leaves a
+        `conversations` row open for the life of the process -- a visitor who opens the
+        widget and walks away would otherwise never be closed by anything.
+
+        Call it inside a unit of work: it writes.
+        """
+        now = time.time()
+        for session_id in [key for key, s in self._sessions.items() if s.expired(now)]:
+            self._close(self._sessions.pop(session_id).conversation)
 
     def _close(self, conversation: "Conversation") -> None:
         from collection.db.models.conversation import ConversationState

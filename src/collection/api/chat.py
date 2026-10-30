@@ -188,6 +188,11 @@ class ChatService:
         with self._lock:
             self._sessions[session_id] = channel
 
+    def forget(self, session_id: str) -> None:
+        """Drop the routing for a session the caller has closed."""
+        with self._lock:
+            self._sessions.pop(session_id, None)
+
     def _build(self, tenant_key: str) -> ChatChannel:
         """The channel for a tenant key, or the in-memory one when there is no key.
 
@@ -334,6 +339,7 @@ def create_router(service: ChatService) -> APIRouter:
     @router.delete("/sessions/{session_id}", status_code=204)
     def close_session(session_id: str) -> None:
         service.of_session(session_id).store.close(session_id)
+        service.forget(session_id)
 
     @router.get("/widget.js", include_in_schema=False)
     def widget() -> FileResponse:

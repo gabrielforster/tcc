@@ -400,23 +400,24 @@ class ChatChannel:
         looked up again later -- by then the current version of a document may not be the
         one that was read. They come off the `reply_sent` payload because the channel
         talks to the orchestrator, not to the agent.
+
+        The responder is read from the same payload rather than from the channel's
+        configured one, because an LLM responder that fell back to the template says so on
+        its answer and a record that named the model would be a lie. It is deliberately
+        not put on the `ChatReply`: that is what the widget is sent, and what the customer
+        is sent does not change in this stage.
         """
-        passages = next(
-            (
-                event.payload.get("passages", [])
-                for event in produced
-                if event.type is EventType.REPLY_SENT
-            ),
-            [],
+        answered = next(
+            (event.payload for event in produced if event.type is EventType.REPLY_SENT), {}
         )
         session.record(
             "agent",
             reply.text,
             intent=reply.intent,
             escalated=reply.escalated,
-            passages=passages,
+            passages=answered.get("passages", []),
             confidence=reply.confidence,
-            responder=reply.responder,
+            responder=answered.get("responder", ""),
             latency_ms=reply.latency_ms,
             escalation_reason=reply.escalation_reason,
         )
@@ -493,7 +494,6 @@ class ChatChannel:
                 reply.confidence = float(event.payload.get("confidence", 0.0))
                 reply.citations = list(event.payload.get("citations", []))
                 reply.latency_ms = float(event.payload.get("latency_ms", 0.0))
-                reply.responder = str(event.payload.get("responder", ""))
                 transcript = event.payload.get("transcript")
                 if transcript is not None:
                     reply.transcript = str(transcript)

@@ -236,14 +236,36 @@ class DatabaseDeliveryLog:
 
         A row belongs to a conversation as well as an owner, and the two move together: a
         message seeded for a customer is re-owned by the session that finally shows it, and
-        it was shown in that session's thread, not in the one it was recorded against.
+        it was shown in that session's thread, not in the one it was recorded against. The
+        thread it leaves is closed if the message was the only thing in it, so a thread
+        opened to hold a contact nobody has read yet does not linger open once it has.
         """
         row = self._find(delivery_id)
+        vacated = row.conversation_id
         row.owner = owner
         if conversation is not None:
             row.conversation_id = conversation.id
         self._scope.session.flush()
+        if conversation is not None and vacated != conversation.id:
+            self._close_if_empty(vacated)
         return self._record(row)
+
+    def _close_if_empty(self, conversation_id: uuid.UUID) -> None:
+        """Close a thread that holds no turn and no delivery; leave any other alone."""
+        from collection.db.models.conversation import Conversation, ConversationState
+        from collection.db.models.conversation import Turn as TurnRow
+        from collection.db.models.delivery import Delivery
+
+        conversation = self._scope.get(Conversation, conversation_id)
+        if conversation is None or conversation.state is not ConversationState.OPEN:
+            return
+        if self._scope.all(TurnRow, TurnRow.conversation_id == conversation_id):
+            return
+        if self._scope.all(Delivery, Delivery.conversation_id == conversation_id):
+            return
+        conversation.state = ConversationState.CLOSED
+        conversation.closed_at = datetime.now(UTC)
+        self._scope.session.flush()
 
     def _now(self) -> datetime:
         return datetime.fromtimestamp(self._clock(), UTC)

@@ -12,6 +12,7 @@ a test asserts retrieval and not a download.
 
 import hashlib
 import re
+import time
 import uuid
 
 import numpy as np
@@ -26,6 +27,7 @@ from collection.channels.delivery import (
     DeliveryStatus,
 )
 from collection.channels.session import (
+    SESSION_TTL_SECONDS,
     DatabaseSessionStore,
     TenantNotServable,
     UnknownTenant,
@@ -211,6 +213,35 @@ def test_the_proactive_agent_schedules_nothing_for_a_non_active_tenant(db):
 
 
 @pytest.mark.db
+def test_reopening_the_widget_starts_a_new_thread_rather_than_resuming_the_old_one(db):
+    channel, scope = _serving(db)
+    first, _ = channel.open(issue_token("C7"))
+    channel.send(first.session_id, QUESTION)
+
+    second, _ = channel.open(issue_token("C7"))
+
+    assert second.session_id != first.session_id
+    # The greeting is shown once, at the top of a thread. Resuming would put it in the
+    # middle of a restored transcript, feed the old thread back to the agent, and count
+    # the turn cap across reopenings.
+    assert [turn["text"] for turn in channel.transcript(second.session_id)] == [GREETING]
+    assert len(channel.transcript(first.session_id)) == 3
+    assert len(scope.all(Conversation)) == 2
+
+
+@pytest.mark.db
+def test_an_abandoned_session_is_swept_and_its_thread_closed(db):
+    channel, scope = _serving(db)
+    stale, _ = channel.open()
+    stale.last_seen_at = time.time() - SESSION_TTL_SECONDS - 1
+
+    channel.open()  # a write sweeps
+
+    assert len(channel.store) == 1
+    assert scope.get(Conversation, uuid.UUID(stale.session_id)).state is ConversationState.CLOSED
+
+
+@pytest.mark.db
 def test_a_seeded_contact_is_shown_in_the_conversation_it_is_recorded_against(db):
     message = "Sua fatura venceu ontem."
     channel, scope = _serving(db)
@@ -228,6 +259,10 @@ def test_a_seeded_contact_is_shown_in_the_conversation_it_is_recorded_against(db
     row = scope.get(Delivery, uuid.UUID(delivery_id))
     assert str(row.conversation_id) == session.session_id
     assert row.owner == session.session_id
+    # The thread opened only to hold the contact is closed once the message has left it,
+    # rather than staying open for a conversation that will never happen there.
+    seeded = next(t for t in scope.all(Conversation) if str(t.id) != session.session_id)
+    assert seeded.state is ConversationState.CLOSED
 
 
 @pytest.mark.db
@@ -249,15 +284,22 @@ def test_a_customers_reply_advances_the_greeting_delivery_to_respondida(db):
 def test_an_anonymous_visitor_and_an_identified_one_each_get_their_own_conversation(db):
     channel, scope = _serving(db)
 
-    first, _ = channel.open()
-    second, _ = channel.open()
+    anonymous, _ = channel.open()
+    known, _ = channel.open(issue_token("C7"))
 
-    assert first.session_id != second.session_id
-    assert not first.identified
+    assert anonymous.session_id != known.session_id
+    assert anonymous.identified is False
+    assert known.identified is True
+    assert known.customer_id == "C7"
     assert len(scope.all(Conversation)) == 2
-    assert {row.external_id for row in scope.all(Customer)} == {
-        first.customer_id,
-        second.customer_id,
-    }
+    assert {row.external_id for row in scope.all(Customer)} == {anonymous.customer_id, "C7"}
     assert all(row.channel == "chat" for row in scope.all(Conversation))
     assert all(row.state is ConversationState.OPEN for row in scope.all(Conversation))
+
+    # Read back by a store that never opened them, identity is derived from the customer
+    # the thread belongs to. Getting that wrong would quietly de-identify a real customer
+    # or, worse, promote a visitor.
+    restored = _channel(_scope(db, scope.session.get(Tenant, scope.tenant_id))).store
+    assert restored.get(known.session_id).identified is True
+    assert restored.get(known.session_id).customer_id == "C7"
+    assert restored.get(anonymous.session_id).identified is False
