@@ -57,7 +57,7 @@ seed:             ## report what the outbound path decides (serve --seed-demo is
 migrate:          ## apply database migrations (alembic upgrade head)
 	uv run collection db upgrade
 
-pipeline:         ## the whole data pipeline, end to end
+pipeline:         ## the whole data pipeline, end to end (set COLLECTION_TENANT)
 	uv run collection pipeline
 
 test:

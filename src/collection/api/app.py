@@ -11,9 +11,11 @@ are selected on average precision.
 The models are the platform's, so the registry asks the record which version of each is
 current and fetches its weights from object storage. It never looks in a directory: a
 replica started on a machine that has never trained anything serves the same model as any
-other. If the record or the bucket cannot be reached at startup the registry comes up
-empty and says so, and `/score` answers 404 for every task, as it does when nothing has
-been trained; one dependency being down must not stop the chat from serving.
+other. If the record or the bucket cannot be reached the registry says so rather than
+pretending nothing was ever trained: `/health` reports `degraded` and `/score` answers 503
+with the reason, keeping that case distinct from the 404 a task with no published model
+gets. The load is retried on a later request, so the process recovers on its own; and one
+dependency being down must not stop the chat from serving.
 """
 
 import logging
