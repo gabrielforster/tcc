@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5-5"
     anthropic_api_key: str = ""
 
+    # Parallelism for training, search and permutation importance, passed as `n_jobs`.
+    # -1 takes every core, right for `make train`; the test suite lowers it so two runs
+    # side by side do not each claim the whole machine.
+    n_jobs: int = -1
+
     # Pipeline directories
     dir_raw: Path = ROOT / "data" / "raw"
     dir_interim: Path = ROOT / "data" / "interim"
