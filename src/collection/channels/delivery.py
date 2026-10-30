@@ -43,6 +43,9 @@ survive a restart. It stays because the tests and the demo run without a databas
 `DatabaseDeliveryLog` is the same contract on rows, so a status survives the process.
 Both compare the one `_RANK`: the monotonic rule is defined once, in Python, and the
 database version does not restate it in SQL, where the two could drift apart.
+`ConversationDeliveries` is the adapter that lets a channel written against the in-memory
+log drive the rows without knowing it, by resolving the owner of a message to the
+conversation it belongs to.
 
 Two reports can race for one row -- a client retrying `LIDA` while the customer's reply
 sets `RESPONDIDA` -- which the dictionary never had to face. `DatabaseDeliveryLog.advance`
@@ -67,6 +70,7 @@ from typing import TYPE_CHECKING
 from collection.domain.delivery import DeliveryStatus
 
 if TYPE_CHECKING:
+    from collection.channels.session import DatabaseSessionStore
     from collection.db.models.conversation import Conversation, Turn
     from collection.db.models.delivery import Delivery
     from collection.db.repository import TenantScope
@@ -225,6 +229,22 @@ class DatabaseDeliveryLog:
         """The current record; raise `KeyError` for an id this tenant never issued."""
         return self._record(self._find(delivery_id))
 
+    def reassign(
+        self, delivery_id: str, owner: str | None, *, conversation: "Conversation | None" = None
+    ) -> DeliveryRecord:
+        """Hand a record to a new owner; raise `KeyError` for an id this tenant never issued.
+
+        A row belongs to a conversation as well as an owner, and the two move together: a
+        message seeded for a customer is re-owned by the session that finally shows it, and
+        it was shown in that session's thread, not in the one it was recorded against.
+        """
+        row = self._find(delivery_id)
+        row.owner = owner
+        if conversation is not None:
+            row.conversation_id = conversation.id
+        self._scope.session.flush()
+        return self._record(row)
+
     def _now(self) -> datetime:
         return datetime.fromtimestamp(self._clock(), UTC)
 
@@ -253,3 +273,48 @@ class DatabaseDeliveryLog:
         return DeliveryRecord(
             id=str(row.id), status=row.status, at=stamp.timestamp(), owner=row.owner
         )
+
+
+class ConversationDeliveries:
+    """`DeliveryLog`'s contract for a channel, backed by `DatabaseDeliveryLog`'s rows.
+
+    `ChatChannel` was written against the in-memory log: an opaque owner string, and
+    `record`, `advance`, `reassign` and `of`. A row needs one thing the channel never had
+    to supply -- the conversation the message belongs to -- and only the session store can
+    turn an owner into one. So the translation lives here: the channel must not learn that
+    there is a database, and `DatabaseDeliveryLog` must not learn that there are sessions.
+
+    Each call is one short unit of work on the store's scope, because `advance` holds a
+    `FOR UPDATE` lock on the row until the transaction ends. See `DatabaseSessionStore`.
+    """
+
+    def __init__(self, log: DatabaseDeliveryLog, store: "DatabaseSessionStore") -> None:
+        self._log = log
+        self._store = store
+
+    def record(self, text: str, owner: str | None = None) -> DeliveryRecord:
+        """Register a message as sent, in the conversation its owner is talking in.
+
+        The owner is required here, unlike in memory: a row with no owner has no
+        conversation either, and a delivery belonging to no thread is not a record of
+        anything.
+        """
+        if not owner:
+            raise ValueError("a recorded delivery needs an owner: a row belongs to a conversation")
+        with self._store.unit():
+            return self._log.record(
+                text, owner=owner, conversation=self._store.conversation_of(owner)
+            )
+
+    def advance(self, delivery_id: str, status: DeliveryStatus) -> DeliveryRecord:
+        with self._store.unit():
+            return self._log.advance(delivery_id, status)
+
+    def reassign(self, delivery_id: str, owner: str | None) -> DeliveryRecord:
+        with self._store.unit():
+            conversation = self._store.conversation_of(owner) if owner else None
+            return self._log.reassign(delivery_id, owner, conversation=conversation)
+
+    def of(self, delivery_id: str) -> DeliveryRecord:
+        with self._store.unit():
+            return self._log.get(delivery_id)

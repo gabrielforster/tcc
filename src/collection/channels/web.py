@@ -26,6 +26,7 @@ the proactive ones that arrive through a different channel entirely.
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
+from typing import Protocol
 
 from collection.agents.base import Agent
 from collection.agents.conversation import Conversation
@@ -35,9 +36,21 @@ from collection.agents.responsive import Responder, ResponsiveAgent
 from collection.channels.base import ChannelCapabilities
 from collection.channels.delivery import DeliveryLog, DeliveryStatus
 from collection.channels.session import Session, SessionStore, clean_message
-from collection.rag.index import VectorIndex
+from collection.rag.index import Retrieved
 from collection.voice import audio
 from collection.voice.transcribe import Transcriber
+
+
+class Retriever(Protocol):
+    """What the channel needs of retrieval, and nothing more.
+
+    Structural on purpose: the in-memory `VectorIndex` fitted at startup and the
+    `PgVectorRetriever` reading one tenant's rows are the same thing to a channel, and
+    making the channel name either of them would make it choose.
+    """
+
+    def search(self, query: str, top_k: int = ...) -> list[Retrieved]: ...
+
 
 #: Shown when the conversation is handed over. The widget stops accepting input after it.
 HANDOVER_NOTICE = (
@@ -136,16 +149,19 @@ class ChatChannel:
 
     def __init__(
         self,
-        index: VectorIndex,
+        retriever: Retriever,
         responder: Responder | None = None,
         store: SessionStore | None = None,
+        delivery: DeliveryLog | None = None,
         opted_out: set[str] | None = None,
         transcriber: Transcriber | None = None,
     ) -> None:
-        self.index = index
-        self.store = store or SessionStore()
+        self.retriever = retriever
+        # `is not None`, not `or`: a store counts the conversations it holds, so an empty
+        # one is falsy and `or` would quietly swap a real store for an in-memory one.
+        self.store = store if store is not None else SessionStore()
         self.opted_out = opted_out if opted_out is not None else set()
-        self.delivery = DeliveryLog()
+        self.delivery = delivery if delivery is not None else DeliveryLog()
         # Outbound messages waiting for a customer to open the widget, keyed by customer.
         # Deliberately not on a `Session`: sessions expire after 30 minutes and are swept,
         # and a scheduled collection contact must not vanish because nobody opened a tab.
@@ -163,7 +179,7 @@ class ChatChannel:
         # One agent across all sessions: it counts consecutive unclear messages per
         # customer, and a fresh agent per message would reset that counter every turn,
         # so the "three unclear messages in a row" handover could never fire.
-        self.agent = ResponsiveAgent(index=index, responder=responder, transcriber=transcriber)
+        self.agent = ResponsiveAgent(index=retriever, responder=responder, transcriber=transcriber)
 
     def deliver(self, customer_id: str, text: str, **meta: object) -> str:
         """Record an outbound message and return the delivery id to track it by.
@@ -190,7 +206,15 @@ class ChatChannel:
         because suppression is the orchestrator's rule and a channel that re-implements it
         can come to disagree with it. A suppressed event is recorded on the orchestrator's
         trace, which is copied to `audit`.
+
+        A tenant that is not `ACTIVE` is the one refusal taken before the orchestrator:
+        the proactive agent schedules nothing for it (spec 6.2), and it is recorded as a
+        skip with a reason rather than raised, because the agent is running over a whole
+        portfolio and a closed tenant is an expected state, not an error.
         """
+        if not self.store.servable:
+            self.skipped.append(("tenant_not_servable", event))
+            return None
         orchestrator = Orchestrator(agents=[_Mailer(self)], opted_out=self.opted_out)
         orchestrator.submit(event)
         trace = orchestrator.run()
@@ -297,7 +321,8 @@ class ChatChannel:
         # labelled retroactively. Without this the transcript carries no intent on the
         # side that has one, and the next follow-up would have nothing to inherit.
         customer_turn.intent = reply.intent
-        session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
+        session.amend(customer_turn)
+        self._record_answer(session, reply, trace.produced)
         if reply.escalated:
             session.escalated = True
         self._track_reply(session, reply)
@@ -360,11 +385,41 @@ class ChatChannel:
         if reply.transcript and reply.escalation_reason != "audio_unintelligible":
             customer_turn.text = reply.transcript
         customer_turn.intent = reply.intent
-        session.record("agent", reply.text, intent=reply.intent, escalated=reply.escalated)
+        session.amend(customer_turn)
+        self._record_answer(session, reply, trace.produced)
         if reply.escalated:
             session.escalated = True
         self._track_reply(session, reply)
         return reply
+
+    def _record_answer(self, session: Session, reply: ChatReply, produced: list[Event]) -> None:
+        """Record the agent's turn with the evidence behind it.
+
+        The transcript keeps what was displayed; a store that keeps rows also keeps what
+        the answer was made from, so the passages travel with the turn rather than being
+        looked up again later -- by then the current version of a document may not be the
+        one that was read. They come off the `reply_sent` payload because the channel
+        talks to the orchestrator, not to the agent.
+        """
+        passages = next(
+            (
+                event.payload.get("passages", [])
+                for event in produced
+                if event.type is EventType.REPLY_SENT
+            ),
+            [],
+        )
+        session.record(
+            "agent",
+            reply.text,
+            intent=reply.intent,
+            escalated=reply.escalated,
+            passages=passages,
+            confidence=reply.confidence,
+            responder=reply.responder,
+            latency_ms=reply.latency_ms,
+            escalation_reason=reply.escalation_reason,
+        )
 
     def _mark_answered(self, session: Session) -> None:
         """The customer's turn arrived: the agent message before it was answered.
@@ -389,6 +444,7 @@ class ChatChannel:
         for turn in reversed(session.transcript):
             if turn.role == "agent":
                 turn.delivery_id = record.id
+                session.amend(turn)
                 break
         if not reply.escalated:
             self._awaiting_reply[session.session_id] = [record.id]
@@ -437,6 +493,7 @@ class ChatChannel:
                 reply.confidence = float(event.payload.get("confidence", 0.0))
                 reply.citations = list(event.payload.get("citations", []))
                 reply.latency_ms = float(event.payload.get("latency_ms", 0.0))
+                reply.responder = str(event.payload.get("responder", ""))
                 transcript = event.payload.get("transcript")
                 if transcript is not None:
                     reply.transcript = str(transcript)

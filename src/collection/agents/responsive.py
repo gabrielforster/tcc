@@ -380,6 +380,14 @@ class ResponsiveAgent(Agent):
                 intent=reply.classification.intent.value,
                 confidence=reply.classification.confidence,
                 citations=reply.answer.citations,
+                # The passages themselves, not only the documents they came from: a
+                # channel that keeps a retrieval record has to write the chunk and the
+                # version that were read, and nothing downstream can reconstruct those
+                # from a citation. The responder's name travels for the same reason the
+                # answer carries it -- a templated fallback must not be reported as the
+                # model's work.
+                passages=reply.passages,
+                responder=reply.answer.responder,
                 latency_ms=round(reply.latency_ms, 2),
                 **spoken,
             )

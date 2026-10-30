@@ -114,7 +114,7 @@ def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -
     """
     if channel is None:
         index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
-        channel = ChatChannel(index=index)
+        channel = ChatChannel(retriever=index)
 
     # The fixture names a customer who has opted out, and the whole point of including
     # them is to watch the contact be suppressed. A channel that had never heard of them
