@@ -9,14 +9,14 @@ transaction and rolled back with it.
 import uuid
 
 import pytest
-from sqlalchemy import ForeignKey, String, delete, select, update
+from sqlalchemy import ForeignKey, String, delete, insert, select, update
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship, sessionmaker
 
 from collection.db import session as session_module
 from collection.db.base import Base, TenantScoped
 from collection.db.models import Tenant
 from collection.db.repository import TenantScope
-from collection.db.session import CrossTenantWrite, UnscopedQuery, unit_of_work
+from collection.db.session import CrossTenantWrite, UnscopedQuery, bind_tenant, unit_of_work
 
 
 class ScopedProbe(TenantScoped, Base):
@@ -58,6 +58,23 @@ def _tenant(db, slug: str) -> Tenant:
     db.add(tenant)
     db.flush()
     return tenant
+
+
+def _seeded(db) -> tuple[Tenant, Tenant, dict[str, uuid.UUID]]:
+    """Two tenants, each with one probe and one note of its own."""
+    tenants = {slug: _tenant(db, slug) for slug in ("one", "other")}
+    probe_ids: dict[str, uuid.UUID] = {}
+    for slug, tenant in tenants.items():
+        _unbind(db)
+        scope = TenantScope(db, tenant.id)
+        probe = ScopedProbe(id=uuid.uuid4(), label=f"{slug}-probe")
+        scope.add(probe)
+        scope.add(ScopedNote(probe_id=probe.id, body=f"{slug}-note"))
+        db.flush()
+        probe_ids[slug] = probe.id
+    db.expunge_all()
+    _unbind(db)
+    return tenants["one"], tenants["other"], probe_ids
 
 
 def _unbind(db) -> None:
@@ -299,3 +316,155 @@ def _bind_unit_of_work_to(db, monkeypatch) -> None:
         bind=db.get_bind(), class_=Session, join_transaction_mode="create_savepoint"
     )
     monkeypatch.setattr(session_module, "session_factory", lambda: factory)
+
+
+@pytest.mark.db
+def test_an_orm_insert_naming_another_tenant_is_refused(db, probes):
+    """A predicate narrows a WHERE; it says nothing about what a statement writes."""
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(
+            insert(ScopedProbe).values(id=uuid.uuid4(), label="smuggled", tenant_id=other.id)
+        )
+
+
+@pytest.mark.db
+def test_an_orm_insert_that_names_no_tenant_is_refused(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(insert(ScopedProbe).values(id=uuid.uuid4(), label="orphan"))
+
+
+@pytest.mark.db
+def test_an_orm_insert_for_this_tenant_still_works(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    db.execute(insert(ScopedProbe).values(id=uuid.uuid4(), label="also-mine", tenant_id=one.id))
+
+    assert sorted(p.label for p in TenantScope(db, one.id).all(ScopedProbe)) == [
+        "also-mine",
+        "one-probe",
+    ]
+
+
+@pytest.mark.db
+def test_an_update_cannot_hand_a_row_to_another_tenant(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(update(ScopedProbe).values(tenant_id=other.id))
+
+    db.expunge_all()
+    assert [p.label for p in TenantScope(db, one.id).all(ScopedProbe)] == ["one-probe"]
+
+
+@pytest.mark.db
+def test_an_update_that_leaves_the_tenant_alone_still_works(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    db.execute(update(ScopedProbe).values(label="renamed"))
+
+    db.expunge_all()
+    assert [p.label for p in TenantScope(db, one.id).all(ScopedProbe)] == ["renamed"]
+
+
+@pytest.mark.db
+def test_flushing_a_row_stamped_with_another_tenant_is_refused(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    db.add(ScopedProbe(id=uuid.uuid4(), label="theirs", tenant_id=other.id))
+
+    with pytest.raises(CrossTenantWrite):
+        db.flush()
+
+
+@pytest.mark.db
+def test_moving_a_persistent_row_to_another_tenant_is_refused(db, probes):
+    one, other, _ = _seeded(db)
+    scope = TenantScope(db, one.id)
+    probe = scope.all(ScopedProbe)[0]
+
+    probe.tenant_id = other.id
+
+    with pytest.raises(CrossTenantWrite):
+        db.flush()
+
+
+@pytest.mark.db
+def test_a_platform_session_cannot_be_narrowed_to_a_tenant(db, probes):
+    """A scope over a platform session would look narrow and read everything."""
+    one, _other, _ = _seeded(db)
+    bind_tenant(db, None, platform=True)
+
+    with pytest.raises(CrossTenantWrite):
+        TenantScope(db, one.id)
+
+
+@pytest.mark.db
+def test_a_tenant_session_cannot_be_raised_to_the_platform_scope(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        bind_tenant(db, None, platform=True)
+
+
+@pytest.mark.db
+def test_a_join_to_a_scoped_entity_stays_in_one_tenant(db, probes):
+    one, other, probe_ids = _seeded(db)
+    # Attached to this tenant's probe but owned by the other one, so only the join side
+    # can tell them apart. Written through the Core gap below, which is the only way in.
+    db.execute(
+        ScopedNote.__table__.insert().values(
+            id=uuid.uuid4(), probe_id=probe_ids["one"], body="smuggled", tenant_id=other.id
+        )
+    )
+    TenantScope(db, one.id)
+
+    rows = db.execute(
+        select(ScopedProbe.label, ScopedNote.body).join(
+            ScopedNote, ScopedNote.probe_id == ScopedProbe.id
+        )
+    ).all()
+
+    assert [row.body for row in rows] == ["one-note"]
+
+
+@pytest.mark.db
+def test_a_subquery_stays_in_one_tenant(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    sub = select(ScopedNote.body).subquery()
+
+    assert list(db.scalars(select(sub.c.body))) == ["one-note"]
+
+
+@pytest.mark.db
+def test_a_cte_stays_in_one_tenant(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    cte = select(ScopedNote.body).cte("visible_notes")
+
+    assert list(db.scalars(select(cte.c.body))) == ["one-note"]
+
+
+@pytest.mark.db
+def test_a_core_statement_naming_the_table_is_not_guarded(db, probes):
+    """A known gap, pinned so it is visible rather than assumed.
+
+    The guard sees mapped classes. A statement built against `Model.__table__` is not an
+    ORM statement, so it is neither refused on an unbound session nor filtered on a bound
+    one. This test fails the day that changes, which is the point.
+    """
+    _seeded(db)
+
+    labels = db.scalars(select(ScopedProbe.__table__.c.label)).all()
+
+    assert sorted(labels) == ["one-probe", "other-probe"]

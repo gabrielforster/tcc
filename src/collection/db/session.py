@@ -19,17 +19,32 @@ injected predicate hangs off the `TenantScoped` mixin, so a model that declared 
 column by hand would be refused unscoped but not filtered when scoped; a test asserts
 every scoped mapper carries the mixin, which keeps the two halves in step.
 
+A predicate narrows a WHERE clause and says nothing about what is written into a row, so
+the same listener also reads the values of an ORM INSERT or UPDATE: an INSERT has to name
+this tenant, and an UPDATE may not move a row to another one. Without that, a row leaves
+its tenant through the front door -- `update(Model).values(tenant_id=...)` is correctly
+narrowed to our rows and then hands them away.
+
 `platform=True` is the deliberate exception, for the rows that belong to no tenant: the
 `tenants` table itself, and later anything a platform operator reads across tenants. It
 is never a default and never inferred; a caller has to write it down, which is what makes
-it auditable.
+it auditable. It is also exclusive: a session is a platform session or a tenant's, and
+`bind_tenant` refuses to turn one into the other, because a scope laid over a platform
+session would look narrow while reading everything.
 
-Two shapes the listener does not see, stated here rather than left to be discovered:
-`session.execute(text(...))` is not an ORM statement and reaches the database unfiltered,
-and `Session.get()` answered from the identity map issues no statement at all, so it can
-hand back an object loaded earlier on the same session. Raw SQL against a tenant-scoped
-table is therefore the one place a reviewer still has to look, and it is why
-`TenantScope.get` asks the database instead of the identity map.
+What the listener does not see, stated here rather than left to be discovered:
+
+* **A statement that names the table rather than the mapped class.** `text(...)` is the
+  obvious one, but `select(Model.__table__)`, `Model.__table__.insert()` and any Core
+  statement built against the table are the same hole and do not look like raw SQL. None
+  of them are ORM statements, so none reach this listener, on a bound session or an
+  unbound one. `tests/test_tenant_scope.py` pins this with a characterisation test, so
+  the gap is proven and visible rather than assumed. Going through the mapped class is
+  the rule; a Core statement over a tenant-scoped table is the one thing a reviewer still
+  has to look for.
+* **`Session.get()` answered from the identity map** issues no statement at all, so it can
+  hand back an object loaded earlier on the same session. That is why `TenantScope.get`
+  asks the database instead of the identity map.
 """
 
 import uuid
@@ -37,7 +52,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import cache
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import BindParameter, ClauseElement, Engine, create_engine, event
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Mapper, ORMExecuteState, Session, sessionmaker, with_loader_criteria
 
@@ -45,6 +60,10 @@ from collection.config import settings
 from collection.db.base import TenantScoped
 
 TENANT_COLUMN = "tenant_id"
+
+#: A written value that is an expression rather than a literal. It cannot be proved to
+#: stay inside the tenant, and "cannot prove" is refused rather than waved through.
+_UNRESOLVED = object()
 
 
 class UnscopedQuery(RuntimeError):
@@ -98,6 +117,15 @@ def bind_tenant(session: Session, tenant_id: uuid.UUID | None, *, platform: bool
         raise CrossTenantWrite(
             f"this session already serves tenant {bound}; it cannot also serve {tenant_id}"
         )
+    if tenant_id is not None and session.info.get("platform"):
+        raise CrossTenantWrite(
+            "this is a platform session, which reads across tenants; a scope laid over it "
+            f"would look like tenant {tenant_id} and not be one"
+        )
+    if platform and bound is not None:
+        raise CrossTenantWrite(
+            f"this session serves tenant {bound}; it cannot be raised to the platform scope"
+        )
     if tenant_id is not None:
         session.info[TENANT_COLUMN] = tenant_id
     if platform:
@@ -109,30 +137,84 @@ def is_tenant_scoped(mapper: Mapper) -> bool:
     return table is not None and TENANT_COLUMN in table.c
 
 
+def _column_key(column: object) -> object:
+    """The name an INSERT or UPDATE wrote under, whatever shape it was named by."""
+    return getattr(column, "key", column)
+
+
+def _literal(value: object) -> object:
+    """A written value if it can be resolved, `_UNRESOLVED` if it is an expression."""
+    if isinstance(value, BindParameter):
+        return value.value
+    if isinstance(value, ClauseElement):
+        return _UNRESOLVED
+    return value
+
+
+def _written_rows(state: ORMExecuteState) -> list[dict[object, object]]:
+    """Every column/value map an ORM INSERT or UPDATE will send, however it was spelled."""
+    rows: list[dict[object, object]] = []
+    values = getattr(state.statement, "_values", None)
+    if values:
+        rows.append({_column_key(k): _literal(v) for k, v in values.items()})
+    for group in getattr(state.statement, "_multi_values", ()) or ():
+        rows.extend({_column_key(k): _literal(v) for k, v in row.items()} for row in group)
+    parameters = state.parameters
+    if isinstance(parameters, dict):
+        rows.append({_column_key(k): v for k, v in parameters.items()})
+    elif isinstance(parameters, list | tuple):
+        rows.extend({_column_key(k): v for k, v in row.items()} for row in parameters)
+    return rows
+
+
+def _refuse_a_write_that_leaves_the_tenant(state: ORMExecuteState, bound: uuid.UUID) -> None:
+    """An INSERT must name this tenant; an UPDATE must not rename one."""
+    for row in _written_rows(state):
+        if TENANT_COLUMN not in row:
+            # An UPDATE that does not touch the column leaves the row where it is; an
+            # INSERT that omits it would land a row belonging to nobody.
+            if state.is_insert:
+                raise CrossTenantWrite(
+                    f"this INSERT names no {TENANT_COLUMN}, and this session serves {bound}"
+                )
+            continue
+        written = row[TENANT_COLUMN]
+        if written != bound:
+            raise CrossTenantWrite(
+                f"this statement writes {TENANT_COLUMN}={written!r}, "
+                f"and this session serves {bound}"
+            )
+
+
 @event.listens_for(Session, "do_orm_execute")
-def _scope_the_read_to_its_tenant(state: ORMExecuteState) -> None:
-    """Every ORM select, update and delete passes here, lazy loads and refreshes included.
+def _scope_the_statement_to_its_tenant(state: ORMExecuteState) -> None:
+    """Every ORM statement passes here: selects, bulk writes, lazy loads and refreshes.
 
     Refusing a session with no tenant is only half of it: a session that has one could
     still be handed a statement with no predicate. So the predicate is injected rather
     than assumed, and a hand-written `select(Model)` returns that tenant's rows or
-    nothing -- there is no spelling of a query that reads across the boundary.
+    nothing -- there is no spelling of an ORM query that reads across the boundary. A
+    written value is checked rather than narrowed, because narrowing an UPDATE's WHERE
+    says nothing about the tenant it sets.
     """
     info = state.session.info
     if info.get("platform"):
         return
     bound = info.get(TENANT_COLUMN)
+    scoped = [mapper for mapper in state.all_mappers if is_tenant_scoped(mapper)]
     if bound is None:
-        for mapper in state.all_mappers:
-            if is_tenant_scoped(mapper):
-                raise UnscopedQuery(
-                    f"{mapper.class_.__name__} is tenant-scoped and this session binds no "
-                    "tenant; go through TenantScope, or ask for the platform scope explicitly"
-                )
+        if scoped:
+            raise UnscopedQuery(
+                f"{scoped[0].class_.__name__} is tenant-scoped and this session binds no "
+                "tenant; go through TenantScope, or ask for the platform scope explicitly"
+            )
         return
-    # A column refresh reloads a row already filtered on its way in, and a relationship
-    # load inherits this criteria from the statement that loaded its parent.
-    if state.is_column_load or state.is_relationship_load:
+    if scoped and (state.is_insert or state.is_update):
+        _refuse_a_write_that_leaves_the_tenant(state, bound)
+    # A column refresh reloads a row already filtered on its way in, a relationship load
+    # inherits this criteria from the statement that loaded its parent, and an INSERT has
+    # no rows to narrow -- it was checked above instead.
+    if state.is_column_load or state.is_relationship_load or state.is_insert:
         return
     state.statement = state.statement.options(
         with_loader_criteria(TenantScoped, lambda cls: cls.tenant_id == bound, include_aliases=True)
