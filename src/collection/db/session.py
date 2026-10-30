@@ -23,7 +23,10 @@ A predicate narrows a WHERE clause and says nothing about what is written into a
 the same listener also reads the values of an ORM INSERT or UPDATE: an INSERT has to name
 this tenant, and an UPDATE may not move a row to another one. Without that, a row leaves
 its tenant through the front door -- `update(Model).values(tenant_id=...)` is correctly
-narrowed to our rows and then hands them away.
+narrowed to our rows and then hands them away. Where the values cannot be read -- an
+upsert's `SET`, `insert().from_select()`, a value that is an expression, a column whose
+name cannot be resolved -- the statement is refused rather than waved through, because
+the cost of being wrong is one-sided: a refusal is a traceback, and a pass is a leak.
 
 `platform=True` is the deliberate exception, for the rows that belong to no tenant: the
 `tenants` table itself, and later anything a platform operator reads across tenants. It
@@ -64,6 +67,11 @@ TENANT_COLUMN = "tenant_id"
 #: A written value that is an expression rather than a literal. It cannot be proved to
 #: stay inside the tenant, and "cannot prove" is refused rather than waved through.
 _UNRESOLVED = object()
+
+#: A written column whose name could not be read. It is a key no statement can legitimately
+#: carry, so a row holding it is refused -- the alternative is an UPDATE whose `tenant_id`
+#: went unnoticed and passed.
+_UNNAMED = object()
 
 
 class UnscopedQuery(RuntimeError):
@@ -112,6 +120,11 @@ def bind_tenant(session: Session, tenant_id: uuid.UUID | None, *, platform: bool
     map belong to the old tenant, so letting the binding move would leave them reachable
     under the new one.
     """
+    if platform and tenant_id is not None:
+        raise CrossTenantWrite(
+            "a session is a platform session or a tenant's, never both: the platform scope "
+            f"reads across tenants, which would make the scope on {tenant_id} a label only"
+        )
     bound = session.info.get(TENANT_COLUMN)
     if tenant_id is not None and bound is not None and bound != tenant_id:
         raise CrossTenantWrite(
@@ -138,8 +151,14 @@ def is_tenant_scoped(mapper: Mapper) -> bool:
 
 
 def _column_key(column: object) -> object:
-    """The name an INSERT or UPDATE wrote under, whatever shape it was named by."""
-    return getattr(column, "key", column)
+    """The name an INSERT or UPDATE wrote under, whatever shape it was named by.
+
+    A shape with no readable name becomes `_UNNAMED` rather than itself: an unrecognised
+    key would otherwise read as "this statement does not touch `tenant_id`", which is the
+    one wrong answer to give.
+    """
+    key = column if isinstance(column, str) else getattr(column, "key", None)
+    return key if isinstance(key, str) else _UNNAMED
 
 
 def _literal(value: object) -> object:
@@ -168,8 +187,31 @@ def _written_rows(state: ORMExecuteState) -> list[dict[object, object]]:
 
 
 def _refuse_a_write_that_leaves_the_tenant(state: ORMExecuteState, bound: uuid.UUID) -> None:
-    """An INSERT must name this tenant; an UPDATE must not rename one."""
-    for row in _written_rows(state):
+    """An INSERT must name this tenant; an UPDATE must not rename one.
+
+    Three shapes are refused outright rather than read, because nothing here can prove
+    where their rows end up: an upsert, whose SET clause can rewrite any row it collides
+    with; `insert().from_select()`, whose values are a query rather than a list; and a
+    statement whose written columns cannot be named.
+    """
+    conflict = getattr(state.statement, "_post_values_clause", None)
+    if conflict is not None and type(conflict).__name__ != "OnConflictDoNothing":
+        raise CrossTenantWrite(
+            f"an upsert can rewrite a row this session never saw, and it serves {bound}; "
+            "read the row through TenantScope and write it back"
+        )
+    rows = _written_rows(state)
+    if state.is_insert and not rows:
+        raise CrossTenantWrite(
+            f"this INSERT takes its rows from a query rather than from values, so the "
+            f"{TENANT_COLUMN} it writes cannot be proved to be {bound}"
+        )
+    for row in rows:
+        if _UNNAMED in row:
+            raise CrossTenantWrite(
+                f"this statement writes a column that cannot be named, so the "
+                f"{TENANT_COLUMN} it writes cannot be proved to be {bound}"
+            )
         if TENANT_COLUMN not in row:
             # An UPDATE that does not touch the column leaves the row where it is; an
             # INSERT that omits it would land a row belonging to nobody.
@@ -211,10 +253,10 @@ def _scope_the_statement_to_its_tenant(state: ORMExecuteState) -> None:
         return
     if scoped and (state.is_insert or state.is_update):
         _refuse_a_write_that_leaves_the_tenant(state, bound)
-    # A column refresh reloads a row already filtered on its way in, a relationship load
-    # inherits this criteria from the statement that loaded its parent, and an INSERT has
-    # no rows to narrow -- it was checked above instead.
-    if state.is_column_load or state.is_relationship_load or state.is_insert:
+    # A column refresh reloads a row already filtered on its way in, and a relationship
+    # load inherits this criteria from the statement that loaded its parent. An INSERT is
+    # not skipped: it carries no rows of its own, but it can carry a SELECT that does.
+    if state.is_column_load or state.is_relationship_load:
         return
     state.statement = state.statement.options(
         with_loader_criteria(TenantScoped, lambda cls: cls.tenant_id == bound, include_aliases=True)

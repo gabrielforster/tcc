@@ -9,7 +9,8 @@ transaction and rolled back with it.
 import uuid
 
 import pytest
-from sqlalchemy import ForeignKey, String, delete, insert, select, update
+from sqlalchemy import ForeignKey, String, delete, insert, literal, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship, sessionmaker
 
 from collection.db import session as session_module
@@ -468,3 +469,153 @@ def test_a_core_statement_naming_the_table_is_not_guarded(db, probes):
     labels = db.scalars(select(ScopedProbe.__table__.c.label)).all()
 
     assert sorted(labels) == ["one-probe", "other-probe"]
+
+
+@pytest.mark.db
+def test_one_call_cannot_ask_for_a_tenant_and_the_platform_at_once(db, probes):
+    one, _other, _ = _seeded(db)
+
+    with pytest.raises(CrossTenantWrite):
+        bind_tenant(db, one.id, platform=True)
+
+    assert "tenant_id" not in db.info
+    assert "platform" not in db.info
+
+
+@pytest.mark.db
+def test_a_unit_of_work_cannot_ask_for_a_tenant_and_the_platform_at_once(db, probes, monkeypatch):
+    one, _other, _ = _seeded(db)
+    _bind_unit_of_work_to(db, monkeypatch)
+
+    with pytest.raises(CrossTenantWrite), unit_of_work(one.id, platform=True):
+        pass
+
+
+@pytest.mark.db
+def test_an_insert_from_a_select_is_refused(db, probes):
+    """Its values are a query, so the tenant it writes cannot be read off the statement."""
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(
+            insert(ScopedProbe).from_select(
+                ["id", "label", "tenant_id"],
+                select(ScopedProbe.id, ScopedProbe.label, literal(other.id)),
+            )
+        )
+
+
+@pytest.mark.db
+def test_an_upsert_is_refused(db, probes):
+    """Its SET clause rewrites whatever row it collides with, ours or not."""
+    one, other, probe_ids = _seeded(db)
+    TenantScope(db, one.id)
+
+    for set_ in ({"label": "rewritten"}, {"tenant_id": other.id}):
+        with pytest.raises(CrossTenantWrite):
+            db.execute(
+                pg_insert(ScopedProbe)
+                .values(id=probe_ids["other"], label="x", tenant_id=one.id)
+                .on_conflict_do_update(index_elements=["id"], set_=set_)
+            )
+
+
+@pytest.mark.db
+def test_a_multi_values_insert_is_refused_when_any_row_names_another_tenant(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(
+            insert(ScopedProbe).values(
+                [
+                    {"id": uuid.uuid4(), "label": "mine", "tenant_id": one.id},
+                    {"id": uuid.uuid4(), "label": "theirs", "tenant_id": other.id},
+                ]
+            )
+        )
+
+
+@pytest.mark.db
+def test_a_multi_values_insert_for_this_tenant_still_works(db, probes):
+    one, _other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    db.execute(
+        insert(ScopedProbe).values(
+            [
+                {"id": uuid.uuid4(), "label": "first", "tenant_id": one.id},
+                {"id": uuid.uuid4(), "label": "second", "tenant_id": one.id},
+            ]
+        )
+    )
+
+    assert sorted(p.label for p in TenantScope(db, one.id).all(ScopedProbe)) == [
+        "first",
+        "one-probe",
+        "second",
+    ]
+
+
+@pytest.mark.db
+def test_an_executemany_is_refused_when_one_of_its_rows_names_another_tenant(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(
+            insert(ScopedProbe),
+            [
+                {"id": uuid.uuid4(), "label": "mine", "tenant_id": one.id},
+                {"id": uuid.uuid4(), "label": "theirs", "tenant_id": other.id},
+            ],
+        )
+
+
+@pytest.mark.db
+def test_returning_does_not_change_what_a_write_may_do(db, probes):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(
+            insert(ScopedProbe)
+            .values(id=uuid.uuid4(), label="theirs", tenant_id=other.id)
+            .returning(ScopedProbe.id)
+        )
+    with pytest.raises(CrossTenantWrite):
+        db.execute(update(ScopedProbe).values(tenant_id=other.id).returning(ScopedProbe.id))
+
+    labels = db.scalars(
+        update(ScopedProbe).values(label="renamed").returning(ScopedProbe.label)
+    ).all()
+    assert list(labels) == ["renamed"]
+
+
+@pytest.mark.db
+def test_a_written_value_that_is_an_expression_is_refused(db, probes):
+    """It cannot be read off the statement, and "cannot prove" is refused."""
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    theirs = select(Tenant.id).where(Tenant.id == other.id).scalar_subquery()
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(update(ScopedProbe).values(tenant_id=theirs))
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("strategy", ["auto", "fetch", "evaluate", False])
+def test_no_synchronize_strategy_lets_a_write_leave_the_tenant(db, probes, strategy):
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    options = {"synchronize_session": strategy}
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(update(ScopedProbe).values(tenant_id=other.id), execution_options=options)
+
+    db.execute(update(ScopedProbe).values(label="renamed"), execution_options=options)
+    db.expunge_all()
+    assert [p.label for p in TenantScope(db, one.id).all(ScopedProbe)] == ["renamed"]
+    _unbind(db)
+    assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
