@@ -4,8 +4,8 @@ import sys
 
 import pytest
 from alembic import command
-from sqlalchemy import text
-from sqlalchemy.engine import make_url
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 
 from collection.config import ROOT, settings
 from collection.db.base import TenantScoped
@@ -20,28 +20,44 @@ def test_pgvector_extension_is_installed(db):
     )
 
 
-def _same_database(a: str, b: str) -> bool:
-    def key(url: str):
-        u = make_url(url)
-        host = "localhost" if u.host in (None, "127.0.0.1", "::1") else u.host
-        return host, u.port or 5432, u.database
+def _identity(url: str) -> tuple:
+    """Which database a URL really reaches: its name and its cluster's identifier."""
+    engine = create_engine(url, connect_args={"connect_timeout": 3})
+    try:
+        with engine.connect() as conn:
+            return tuple(
+                conn.execute(
+                    text(
+                        "select current_database(), "
+                        "(select system_identifier from pg_control_system())"
+                    )
+                ).one()
+            )
+    finally:
+        engine.dispose()
 
-    return key(a) == key(b)
 
+def _skip_unless_provably_separate() -> None:
+    """Skip unless the test database is shown to differ from the development one.
 
-_SHARED_OR_UNSET = not settings.test_database_url or _same_database(
-    settings.test_database_url, settings.database_url
-)
+    The server answers the question, so no spelling of a host (an alias, a compose service
+    name, a LAN address) can fool it. Anything that stops the proof, such as a failed
+    connection or an unusable URL, also skips: not knowing is not the same as different.
+    """
+    if not settings.test_database_url:
+        pytest.skip("downgrades to base: set TEST_DATABASE_URL to a separate throwaway database")
+    try:
+        same = _identity(settings.test_database_url) == _identity(settings.database_url)
+    except (SQLAlchemyError, ArgumentError, ValueError) as exc:
+        pytest.skip(f"cannot prove TEST_DATABASE_URL differs from DATABASE_URL: {exc}")
+    if same:
+        pytest.skip(
+            "downgrades to base: TEST_DATABASE_URL is the same database as DATABASE_URL; "
+            "point it at a separate throwaway database"
+        )
 
 
 @pytest.mark.db
-@pytest.mark.skipif(
-    _SHARED_OR_UNSET,
-    reason=(
-        "downgrades to base: TEST_DATABASE_URL is unset or the same database as "
-        "DATABASE_URL; point it at a separate throwaway database"
-    ),
-)
 def test_migrations_run_to_head_and_back(db_engine):
     """Round-trip the migrations.
 
@@ -49,6 +65,7 @@ def test_migrations_run_to_head_and_back(db_engine):
     created. Without a dedicated test database the fixture falls back to DATABASE_URL, and
     this test would wipe a developer's own data.
     """
+    _skip_unless_provably_separate()
     cfg = alembic_config(db_engine.url.render_as_string(hide_password=False))
 
     def installed() -> bool:
