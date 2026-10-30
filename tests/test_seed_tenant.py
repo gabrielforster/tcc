@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from collection.config import settings
+from collection.data.sources.synthetic import SyntheticSource
 from collection.db import session as session_module
 from collection.db.models import (
     Audience,
@@ -31,6 +32,8 @@ CUSTOMER_FACING = {
     "tabela-de-parcelamento.csv",
 }
 INTERNAL = "limites-de-alcada.md"
+#: The dataset the `seeding` fixture shrinks the synthetic source down to.
+CUSTOMERS, INVOICES = 20, 60
 
 
 @pytest.fixture
@@ -43,8 +46,20 @@ def seeding(db, bucket, monkeypatch):
         join_transaction_mode="create_savepoint",
     )
     monkeypatch.setattr(session_module, "session_factory", lambda: factory)
-    monkeypatch.setattr(settings, "synthetic_n_customers", 20)
-    monkeypatch.setattr(settings, "synthetic_n_invoices", 60)
+    monkeypatch.setattr(settings, "synthetic_n_customers", CUSTOMERS)
+    monkeypatch.setattr(settings, "synthetic_n_invoices", INVOICES)
+
+
+def _seeded_customer_ids() -> set[str]:
+    """The external ids the shrunk source describes, which is what seeding must write.
+
+    Named rather than counted: ingestion matches customers on `external_id` and leaves the
+    ones the source does not mention alone, so a tenant that was seeded before this test
+    ran legitimately holds more customers than the source carries. Counting the table
+    would make the test pass only against a database nobody had ever seeded.
+    """
+    source = SyntheticSource(n_customers=CUSTOMERS, n_invoices=INVOICES)
+    return {str(cid) for cid in source.extract().customers["customer_id"]}
 
 
 def _scope(db, tenant_id) -> TenantScope:
@@ -61,7 +76,7 @@ def test_seeding_produces_an_active_tenant_that_can_answer(seeding, db):
     assert tenant.state is TenantState.ACTIVE
     assert tenant.servable is True
     scope = _scope(db, tenant.id)
-    assert len(scope.all(Customer)) == 20
+    assert _seeded_customer_ids() <= {c.external_id for c in scope.all(Customer)}
     assert scope.all(Receivable)
     hits = PgVectorRetriever(scope).search("em quantas vezes posso parcelar a minha divida?")
     assert hits, "a seeded tenant retrieves nothing, so it has nothing to answer from"
@@ -97,4 +112,4 @@ def test_seeding_twice_does_not_duplicate_documents_or_versions(seeding, db):
     after = _scope(db, first.id)
     assert {d.path: d.current_version_id for d in after.all(KnowledgeDocument)} == documents
     assert len(after.all(KnowledgeVersion)) == versions
-    assert len(after.all(Customer)) == 20
+    assert _seeded_customer_ids() <= {c.external_id for c in after.all(Customer)}

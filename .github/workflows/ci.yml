@@ -12,10 +12,72 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The suite trains real models and now also exercises Postgres and object storage,
+    # and the first run on a cold cache downloads the embedding model.
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        # pgvector rather than a stock postgres image: the knowledge chunks are a vector
+        # column, so the migrations do not even apply without the extension. Published on
+        # 5433, the port docker-compose.yml uses, so one set of URLs works here and on a
+        # laptop -- the credentials below match that file for the same reason.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: collection
+          POSTGRES_PASSWORD: collection
+          POSTGRES_DB: collection
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U collection"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://collection:collection@localhost:5433/collection
+      TEST_DATABASE_URL: postgresql+psycopg://collection:collection@localhost:5433/collection_test
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_BUCKET: collection
+      S3_ACCESS_KEY: collection
+      S3_SECRET_KEY: collection-secret
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start MinIO
+        # Not a `services:` container. A service entry can set an image, environment and
+        # ports but cannot pass a command, and this image's entrypoint does nothing
+        # without `server /data`. The image is the Chainguard build docker-compose.yml
+        # uses, because minio/minio is no longer published to Docker Hub; it ships no
+        # shell and no curl, so there is no in-container health check for the Docker
+        # daemon to run either. Starting it as a step solves both: the command is passed
+        # normally, and readiness is polled from the runner, which does have curl.
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=collection \
+            -e MINIO_ROOT_PASSWORD=collection-secret \
+            cgr.dev/chainguard/minio:latest server /data
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 2
+          done
+          echo "MinIO never became ready:"
+          docker logs minio
+          exit 1
+
+      - name: Create the test database
+        # The fixtures migrate this database but cannot create it: the service container
+        # only ever creates POSTGRES_DB, and creating another one is a server operation.
+        # Keeping the suite off DATABASE_URL is the same rule as on a laptop -- the
+        # migration round-trip test downgrades to base, which is not something to do to
+        # the database the pipeline steps below are using.
+        run: |
+          PGPASSWORD=collection psql -v ON_ERROR_STOP=1 \
+            -h localhost -p 5433 -U collection -d collection \
+            -c 'create database collection_test'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -32,6 +94,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --frozen
 
+      - name: Cache the embedding model
+        # Everything that publishes or retrieves knowledge encodes it with the
+        # sentence-transformer, so the first step that touches `knowledge/` pulls a few
+        # hundred megabytes from Hugging Face. Keyed on the settings module, which is
+        # where the model name and its dimension live.
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('src/collection/config.py') }}
+
       - name: Lint
         run: uv run ruff check src tests
 
@@ -41,18 +113,30 @@ jobs:
       - name: Tests
         # The suite trains real models, so it is slower than a unit-test suite and the
         # timeout above is set accordingly.
+        env:
+          # Turns the `db_engine` and `bucket` fixtures' skip into a failure. Without it a
+          # misconfigured service here would skip every @pytest.mark.db test and the run
+          # would go green with the tenant guard, the retrieval path, the conversation
+          # record and object storage all unexercised.
+          COLLECTION_REQUIRE_DB: "1"
         run: uv run pytest -q -p no:warnings
 
       - name: Pipeline smoke test
         # Runs the data pipeline end to end on the synthetic source, which needs no
         # credentials and no network. Catches breakage that unit tests can miss, such as
         # a report template referring to a column the features no longer produce.
+        # The commands are tenant-scoped and read and write the record and object storage,
+        # so a tenant has to exist first: `tenant seed` creates it, publishes `knowledge/`
+        # into it and activates it, which is exactly what a fresh clone runs.
         env:
           DATA_SOURCE: synthetic
           SYNTHETIC_N_CUSTOMERS: "150"
           SYNTHETIC_N_INVOICES: "1500"
           ANONYMIZATION_SALT: ci-salt
+          COLLECTION_TENANT: desenvolvimento
         run: |
+          uv run collection db upgrade
+          uv run collection tenant seed
           uv run collection extract
           uv run collection ingest
           uv run collection dictionary
@@ -61,6 +145,8 @@ jobs:
 
       - name: Retrieval evaluation
         # Fails if a change to the knowledge base or the retriever drops retrieval quality.
+        # The lexical arm, which reads `knowledge/` as files and needs no tenant; the
+        # pgvector arm that actually serves is covered by the database suite above.
         run: uv run collection rag
 
       - name: Responder evaluation

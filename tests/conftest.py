@@ -94,7 +94,9 @@ def bucket(monkeypatch_session):
     try:
         client.list_buckets()
     except Exception as exc:
-        message = f"MinIO is unreachable at {settings.s3_endpoint_url}: {exc}"
+        # Not "unreachable": bad credentials land here too, and a CI run that says
+        # unreachable when the keys are wrong sends the reader to the wrong file.
+        message = f"MinIO at {settings.s3_endpoint_url} is unusable: {exc}"
         if os.environ.get("COLLECTION_REQUIRE_DB") == "1":
             pytest.fail(message, pytrace=False)
         pytest.skip(message)

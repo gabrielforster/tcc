@@ -158,7 +158,10 @@ def test_a_platform_session_reads_platform_rows(db, bucket):
         "m.bin", b"m", kind="models", content_type="text/plain"
     )
 
-    assert session.scalars(select(StoredObject.key)).all() == [stored.key]
+    # Scoped to the key this test wrote: a platform session deliberately sees every row,
+    # so listing the table would also return whatever a seeded tenant left behind.
+    rows = session.scalars(select(StoredObject).where(StoredObject.key == stored.key)).all()
+    assert [(row.key, row.tenant_id) for row in rows] == [(stored.key, None)]
 
 
 @pytest.mark.db
@@ -183,7 +186,8 @@ def test_a_platform_store_without_a_session_commits_through_its_own_unit_of_work
 
     assert stored.key == "platform/models/m.bin" and stored.tenant_id is None
     check = _platform_session(db)
-    assert check.scalars(select(StoredObject.key)).all() == [stored.key]
+    keys = select(StoredObject.key).where(StoredObject.key == stored.key)
+    assert check.scalars(keys).all() == [stored.key]
 
 
 @pytest.mark.db
