@@ -6,11 +6,9 @@ its own column, that a delivery cannot point at another tenant's conversation, a
 reports racing for one row cannot leave it contradicting itself.
 """
 
-import importlib.util
 import threading
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -185,15 +183,6 @@ def test_a_delivery_cannot_point_at_another_tenants_conversation(db):
     mine.add(row)
     with pytest.raises(IntegrityError):
         mine.session.flush()
-
-
-def test_the_migration_statuses_equal_the_live_enum():
-    path = Path(__file__).parent.parent / "migrations" / "versions" / "0006_deliveries.py"
-    spec = importlib.util.spec_from_file_location("migration_0006", path)
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-
-    assert list(migration.STATUSES) == [m.value for m in DeliveryStatus]
 
 
 @pytest.fixture

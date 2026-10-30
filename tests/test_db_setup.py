@@ -1,4 +1,6 @@
+import importlib.util
 import os
+import re
 import subprocess
 import sys
 
@@ -9,6 +11,12 @@ from sqlalchemy import create_engine, text
 from collection.config import ROOT, settings
 from collection.db.base import TenantScoped
 from collection.db.migrations import alembic_config
+from collection.db.models.conversation import ConversationState
+from collection.db.models.customer import ReceivableStatus
+from collection.db.models.knowledge import Audience
+from collection.db.models.tenant import TenantState
+from collection.domain.delivery import DeliveryStatus
+from collection.domain.intent import Intent
 
 
 @pytest.mark.db
@@ -94,6 +102,50 @@ def test_db_session_is_rolled_back_between_tests(db):
 def test_db_session_starts_clean(db):
     exists = db.execute(text("select to_regclass('pg_temp.scratch')")).scalar()
     assert exists is None
+
+
+def _migration(name: str):
+    """A migration module loaded by path, since `migrations/versions` is not a package."""
+    path = ROOT / "migrations" / "versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(f"migration_{name}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+#: Every native enum, as the migration froze it against the enum the application uses.
+#: A migration must keep its literal -- it describes the database as it was created -- so
+#: the agreement is asserted here instead, and a member added to one of these enums fails
+#: in CI rather than at the first INSERT against an already-migrated database.
+FROZEN_ENUMS = [
+    ("0002_tenants", "STATES", TenantState),
+    ("0003_domain", "STATUSES", ReceivableStatus),
+    ("0004_knowledge", "AUDIENCES", Audience),
+    ("0005_conversations", "STATES", ConversationState),
+    ("0005_conversations", "INTENTS", Intent),
+    ("0006_deliveries", "STATUSES", DeliveryStatus),
+]
+
+
+@pytest.mark.parametrize(
+    ("module", "frozen", "enum"), FROZEN_ENUMS, ids=[f"{m}.{f}" for m, f, _ in FROZEN_ENUMS]
+)
+def test_the_frozen_migration_enums_equal_the_live_enums(module, frozen, enum):
+    assert list(getattr(_migration(module), frozen)) == [m.value for m in enum]
+
+
+def test_the_frozen_vector_dimension_equals_the_configured_one():
+    """0004's `Vector(384)` and EMBEDDING_DIMENSIONS have to agree.
+
+    They are two statements of one fact: the column was created at that width, and the
+    runtime guard in `rag/store.py` checks the embedder against the setting, not against
+    the column. Raising the setting for a wider model therefore passes every check and
+    fails at the INSERT. Changing the dimension is a migration that re-embeds; this is
+    what says so before the first row is written.
+    """
+    source = (ROOT / "migrations" / "versions" / "0004_knowledge.py").read_text()
+    frozen = re.findall(r"Vector\((\d+)\)", source)
+    assert frozen == [str(settings.embedding_dimensions)]
 
 
 def test_tenant_scoped_declares_an_indexed_required_foreign_key():

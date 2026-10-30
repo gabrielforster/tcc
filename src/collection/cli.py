@@ -753,12 +753,33 @@ def db_upgrade(revision: str = typer.Argument("head", help="Target revision.")) 
 
 
 @db_app.command("downgrade")
-def db_downgrade(revision: str = typer.Argument("-1", help="Target revision.")) -> None:
-    """Roll migrations back to a revision (default: one step)."""
+def db_downgrade(
+    revision: str = typer.Argument("-1", help="Target revision."),
+    yes: bool = typer.Option(False, "--yes", help="Answer the confirmation in advance."),
+) -> None:
+    """Drop what the migrations created, back to a revision (default: one step).
+
+    Every migration in this chain is additive, so a downgrade is a `DROP TABLE`, not an
+    edit: one step from head takes `platform_models` and `customer_scores` with their
+    rows, and `base` takes the whole record -- tenants, knowledge, conversations and all.
+
+    It runs against DATABASE_URL, which is the development database and never the test
+    one, so it names that database and asks before it does anything. `--yes` answers in
+    advance, for a script that means it.
+    """
     from alembic import command
+    from sqlalchemy import make_url
 
     from collection.db.migrations import alembic_config
 
+    url = make_url(settings.database_url)
+    console.print(
+        f"[red]downgrade[/] to {revision} on [bold]{url.database}[/] at "
+        f"{url.host}:{url.port} drops the tables the migrations above it created, "
+        "and the rows in them."
+    )
+    if not yes:
+        typer.confirm("Drop them?", abort=True)
     command.downgrade(alembic_config(), revision)
     console.print(f"[green]ok[/] database at {revision}")
 

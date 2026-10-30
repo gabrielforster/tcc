@@ -1,7 +1,5 @@
-import importlib.util
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +15,6 @@ from collection.db.models import (
 )
 from collection.db.repository import TenantScope
 from collection.db.transcripts import record_turn
-from collection.domain.intent import Intent
 from collection.rag.chunking import Chunk
 from collection.rag.index import Retrieved
 from collection.rag.store import publish_document
@@ -164,15 +161,6 @@ def test_a_failure_mid_write_leaves_no_turn_and_no_partial_retrieval_rows(db):
     assert scope.all(TurnRetrieval) == []
     # The session survived: the savepoint was rolled back, not the whole transaction.
     assert len(scope.all(Conversation)) == 1
-
-
-def test_the_migration_intents_equal_the_live_enum():
-    path = Path(__file__).parent.parent / "migrations" / "versions" / "0005_conversations.py"
-    spec = importlib.util.spec_from_file_location("migration_0005", path)
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-
-    assert list(migration.INTENTS) == [m.value for m in Intent]
 
 
 def test_the_models_load_without_the_classifier_stack():
