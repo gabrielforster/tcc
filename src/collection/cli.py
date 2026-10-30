@@ -267,7 +267,7 @@ def serve(
 
     import uvicorn
 
-    from collection.api.app import available_models
+    from collection.api.app import load_published
 
     if seed_demo:
         # uvicorn is started by import string (so `--reload` can re-import the app in a
@@ -278,11 +278,20 @@ def serve(
         os.environ["CHAT_SEED_DEMO"] = "1"
         settings.chat_seed_demo = True
 
-    models = available_models()
-    if not models:
+    # Asked of the registry's own loader, so this line reports what the server will serve
+    # rather than a second opinion about it -- and keeps the two cases the API keeps
+    # apart: a task the record or the bucket could not answer for is not a task nobody
+    # has trained.
+    loaded = load_published()
+    if loaded.bundles:
+        console.print(f"[green]models[/] {', '.join(sorted(loaded.bundles))}")
+    if loaded.problems:
+        console.print(
+            f"[yellow]warning[/] unavailable: {', '.join(sorted(loaded.problems))}; "
+            "/score will answer 503 for those until the load succeeds."
+        )
+    elif not loaded.bundles:
         console.print("[yellow]warning[/] no trained models found; /score will return 404.")
-    else:
-        console.print(f"[green]models[/] {', '.join(models)}")
     if settings.chat_enabled:
         console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
         console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")

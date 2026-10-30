@@ -36,8 +36,8 @@ score:            ## score the tenant's customers against the latest platform mo
 explain:          ## permutation importance and SHAP for the champion (COLLECTION_TENANT=<slug>)
 	uv run collection explain
 
-serve:            ## run the scoring API on http://127.0.0.1:8000
-	uv run collection serve
+serve:            ## run the scoring API on http://127.0.0.1:8000; ARGS="--seed-demo" is the live demo
+	uv run collection serve $(ARGS)
 
 demo:             ## route a mix of events through the orchestrator
 	uv run collection demo
