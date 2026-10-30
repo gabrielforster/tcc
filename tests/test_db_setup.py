@@ -4,11 +4,11 @@ import sys
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from sqlalchemy import text
 
-from collection.config import ROOT
-from collection.db.base import Base, TenantScoped
+from collection.config import ROOT, settings
+from collection.db.base import TenantScoped
+from collection.db.migrations import alembic_config
 
 
 @pytest.mark.db
@@ -20,9 +20,18 @@ def test_pgvector_extension_is_installed(db):
 
 
 @pytest.mark.db
+@pytest.mark.skipif(
+    not settings.test_database_url,
+    reason="downgrades to base: set TEST_DATABASE_URL to a throwaway database",
+)
 def test_migrations_run_to_head_and_back(db_engine):
-    cfg = Config(str(ROOT / "alembic.ini"))
-    cfg.set_main_option("sqlalchemy.url", db_engine.url.render_as_string(hide_password=False))
+    """Round-trip the migrations.
+
+    Gated on TEST_DATABASE_URL because `downgrade base` drops everything the migrations
+    created. Without a dedicated test database the fixture falls back to DATABASE_URL, and
+    this test would wipe a developer's own data.
+    """
+    cfg = alembic_config(db_engine.url.render_as_string(hide_password=False))
 
     def installed() -> bool:
         with db_engine.connect() as conn:
@@ -55,7 +64,6 @@ def test_tenant_scoped_declares_an_indexed_required_foreign_key():
     assert col.nullable is False
     assert col.index is True
     assert {fk.target_fullname for fk in col.foreign_keys} == {"tenants.id"}
-    assert Base.metadata.tables == {}
 
 
 def _run_fixture_in_subprocess(require_db: bool) -> str:

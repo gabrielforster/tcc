@@ -10,13 +10,13 @@ os.environ.setdefault("N_JOBS", _THREADS)
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from collection.config import ROOT, settings  # noqa: E402
+from collection.config import settings  # noqa: E402
 from collection.data.sources.synthetic import SyntheticSource  # noqa: E402
+from collection.db.migrations import alembic_config  # noqa: E402
 from collection.rag.documents import load_directory  # noqa: E402
 from collection.rag.index import VectorIndex  # noqa: E402
 
@@ -50,9 +50,7 @@ def db_engine():
         if os.environ.get("COLLECTION_REQUIRE_DB") == "1":
             pytest.fail(message, pytrace=False)
         pytest.skip(message)
-    cfg = Config(str(ROOT / "alembic.ini"))
-    cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
-    command.upgrade(cfg, "head")
+    command.upgrade(alembic_config(url), "head")
     yield engine
     engine.dispose()
 

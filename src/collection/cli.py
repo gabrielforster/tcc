@@ -546,20 +546,14 @@ def seed() -> None:
     )
 
 
-def _alembic_config():
-    from alembic.config import Config
-
-    from collection.config import ROOT
-
-    return Config(str(ROOT / "alembic.ini"))
-
-
 @db_app.command("upgrade")
 def db_upgrade(revision: str = typer.Argument("head", help="Target revision.")) -> None:
     """Apply migrations up to a revision (default: head)."""
     from alembic import command
 
-    command.upgrade(_alembic_config(), revision)
+    from collection.db.migrations import alembic_config
+
+    command.upgrade(alembic_config(), revision)
     console.print(f"[green]ok[/] database at {revision}")
 
 
@@ -568,7 +562,9 @@ def db_downgrade(revision: str = typer.Argument("-1", help="Target revision.")) 
     """Roll migrations back to a revision (default: one step)."""
     from alembic import command
 
-    command.downgrade(_alembic_config(), revision)
+    from collection.db.migrations import alembic_config
+
+    command.downgrade(alembic_config(), revision)
     console.print(f"[green]ok[/] database at {revision}")
 
 
