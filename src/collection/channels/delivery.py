@@ -38,26 +38,35 @@ An unknown delivery id raises `KeyError` rather than creating a record: a status
 for a message nobody sent is a bug in the caller, and conjuring the record would turn it
 into a fabricated history.
 
-The log is in-memory, like the session store, and shares its limits: it does not survive a
-restart. It lives in its own module, not in the web adapter, because it is channel-neutral
-and the voice channel reuses it.
+`DeliveryLog` is in-memory, like the session store, and shares its limits: it does not
+survive a restart. It stays because the tests and the demo run without a database.
+`DatabaseDeliveryLog` is the same contract on rows, so a status survives the process.
+Both compare the one `_RANK`: the monotonic rule is defined once, in Python, and the
+database version does not restate it in SQL, where the two could drift apart.
+
+Two reports can race for one row -- a client retrying `LIDA` while the customer's reply
+sets `RESPONDIDA` -- which the dictionary never had to face. `DatabaseDeliveryLog.advance`
+therefore reads the row `FOR UPDATE` before comparing ranks, so the second writer waits for
+the first and then judges against what it committed. A late report that loses the race is
+refused with `BackwardsStatus`, exactly as it would be had it arrived afterwards. The lock
+lasts until the caller's transaction ends, so a caller should commit promptly.
+
+The module lives apart from the web adapter because it is channel-neutral and the voice
+channel reuses it.
 """
 
 import secrets
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import StrEnum
+from datetime import UTC, datetime
 from threading import Lock
 
-
-class DeliveryStatus(StrEnum):
-    """The ladder, lowest rung first. Names are the schedule's vocabulary, in Portuguese."""
-
-    ENVIADA = "enviada"
-    ENTREGUE = "entregue"
-    LIDA = "lida"
-    RESPONDIDA = "respondida"
+from collection.db.models.conversation import Conversation, Turn
+from collection.db.models.delivery import Delivery
+from collection.db.repository import TenantScope
+from collection.domain.delivery import DeliveryStatus
 
 
 class BackwardsStatus(ValueError):
@@ -146,3 +155,91 @@ class DeliveryLog:
         """The current record; raise `KeyError` for an id this log never issued."""
         with self._lock:
             return self._records[delivery_id]
+
+
+#: The column each rung stamps. `ENVIADA` is stamped by `record`, never by `advance`.
+_STAMP = {
+    DeliveryStatus.ENVIADA: "sent_at",
+    DeliveryStatus.ENTREGUE: "delivered_at",
+    DeliveryStatus.LIDA: "read_at",
+    DeliveryStatus.RESPONDIDA: "replied_at",
+}
+
+
+class DatabaseDeliveryLog:
+    """`DeliveryLog`'s contract on rows, within one tenant.
+
+    The caller owns the transaction, as with every other write through a `TenantScope`:
+    nothing here commits.
+    """
+
+    def __init__(self, scope: TenantScope, clock: Callable[[], float] = time.time) -> None:
+        self._scope = scope
+        self._clock = clock
+
+    def record(
+        self,
+        text: str,
+        owner: str | None = None,
+        *,
+        conversation: Conversation,
+        turn: Turn | None = None,
+    ) -> DeliveryRecord:
+        """Register a message as sent. The text is not kept: the log tracks status only.
+
+        A row has to belong to a conversation, which the in-memory log never needed, so
+        the conversation is required and the turn it is tied to is optional.
+        """
+        row = Delivery(
+            conversation_id=conversation.id,
+            turn_id=turn.id if turn is not None else None,
+            status=DeliveryStatus.ENVIADA,
+            owner=owner,
+            sent_at=self._now(),
+        )
+        self._scope.add(row)
+        self._scope.session.flush()
+        return self._record(row)
+
+    def advance(self, delivery_id: str, status: DeliveryStatus) -> DeliveryRecord:
+        """Move a message up the ladder; raise `BackwardsStatus` (a `ValueError`) on a step back."""
+        row = self._lock(delivery_id)
+        if _RANK[status] < _RANK[row.status]:
+            raise BackwardsStatus(delivery_id, row.status, status)
+        if status is row.status:
+            return self._record(row)
+        row.status = status
+        setattr(row, _STAMP[status], self._now())
+        self._scope.session.flush()
+        return self._record(row)
+
+    def get(self, delivery_id: str) -> DeliveryRecord:
+        """The current record; raise `KeyError` for an id this tenant never issued."""
+        return self._record(self._find(delivery_id))
+
+    def _now(self) -> datetime:
+        return datetime.fromtimestamp(self._clock(), UTC)
+
+    def _find(self, delivery_id: str, *, lock: bool = False) -> Delivery:
+        try:
+            key = uuid.UUID(delivery_id)
+        except ValueError:
+            raise KeyError(delivery_id) from None
+        query = self._scope.select(Delivery).where(Delivery.id == key)
+        # `populate_existing` because a waiter that was blocked on the lock must see what
+        # the winner committed, not the row its session loaded before it waited.
+        query = query.with_for_update().execution_options(populate_existing=True) if lock else query
+        row = self._scope.session.scalars(query).first()
+        if row is None:
+            raise KeyError(delivery_id)
+        return row
+
+    def _lock(self, delivery_id: str) -> Delivery:
+        return self._find(delivery_id, lock=True)
+
+    @staticmethod
+    def _record(row: Delivery) -> DeliveryRecord:
+        stamp = getattr(row, _STAMP[row.status])
+        return DeliveryRecord(
+            id=str(row.id), status=row.status, at=stamp.timestamp(), owner=row.owner
+        )

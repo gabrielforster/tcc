@@ -11,6 +11,7 @@ from collection.db.models.conversation import (
     TurnRetrieval,
 )
 from collection.db.models.customer import Customer, Receivable, ReceivableStatus, days_overdue
+from collection.db.models.delivery import Delivery
 from collection.db.models.internal_user import InternalUser
 from collection.db.models.knowledge import (
     Audience,
@@ -25,6 +26,7 @@ __all__ = [
     "Conversation",
     "ConversationState",
     "Customer",
+    "Delivery",
     "InternalUser",
     "InvalidTransition",
     "KnowledgeChunk",
