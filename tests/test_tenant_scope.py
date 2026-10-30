@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship, session
 
 from collection.db import session as session_module
 from collection.db.base import Base, TenantScoped
-from collection.db.models import Tenant
+from collection.db.models import Tenant, TenantState
 from collection.db.repository import TenantScope
 from collection.db.session import CrossTenantWrite, UnscopedQuery, bind_tenant, unit_of_work
 
@@ -636,6 +636,9 @@ def test_a_write_hidden_in_a_cte_is_refused(db, probes):
     with pytest.raises(CrossTenantWrite):
         db.execute(select(smuggled.c.id))
 
+    _unbind(db)
+    assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
+
 
 @pytest.mark.db
 @pytest.mark.parametrize("dml", ["update", "delete"])
@@ -650,6 +653,11 @@ def test_an_update_or_delete_hidden_in_a_cte_is_refused(db, probes, dml):
     with pytest.raises(CrossTenantWrite):
         db.execute(select(smuggled.c.id))
 
+    db.expunge_all()
+    assert [p.label for p in TenantScope(db, one.id).all(ScopedProbe)] == ["one-probe"]
+    _unbind(db)
+    assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
+
 
 @pytest.mark.db
 def test_the_select_inside_an_insert_is_scoped_too(db, probes):
@@ -659,6 +667,9 @@ def test_the_select_inside_an_insert_is_scoped_too(db, probes):
     free. It is not: the INSERT can carry a SELECT, and an unscoped SELECT reads every
     tenant. Here the subquery picks the last label in descending order, which is the other
     tenant's unless the predicate reached it.
+
+    That last sentence is the whole test: it depends on `_seeded` labelling the probes so
+    that the other tenant's sorts after this one's. Rename them and this passes vacuously.
     """
     one, _other, _ = _seeded(db)
     TenantScope(db, one.id)
@@ -683,5 +694,36 @@ def test_a_bulk_delete_on_a_bound_session_cannot_touch_another_tenants_row(db, p
 
     db.expunge_all()
     assert TenantScope(db, one.id).all(ScopedProbe) == []
+    _unbind(db)
+    assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]
+
+
+@pytest.mark.db
+def test_a_decoy_write_does_not_cover_a_second_one(db, probes):
+    """Every embedded write is inspected, not just the first one found."""
+    one, other, _ = _seeded(db)
+    TenantScope(db, one.id)
+    decoy = (
+        insert(Tenant)
+        .values(
+            id=uuid.uuid4(),
+            name="Decoy",
+            slug="decoy",
+            tenant_key="decoy-key",
+            state=TenantState.PROVISIONED,
+        )
+        .returning(Tenant.id)
+        .cte("decoy")
+    )
+    smuggled = (
+        insert(ScopedProbe)
+        .values(id=uuid.uuid4(), label="smuggled", tenant_id=other.id)
+        .returning(ScopedProbe.id)
+        .cte("smuggled")
+    )
+
+    with pytest.raises(CrossTenantWrite):
+        db.execute(select(literal(1)).add_cte(decoy).add_cte(smuggled))
+
     _unbind(db)
     assert [p.label for p in TenantScope(db, other.id).all(ScopedProbe)] == ["other-probe"]

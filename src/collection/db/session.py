@@ -45,6 +45,10 @@ What the listener does not see, stated here rather than left to be discovered:
   the gap is proven and visible rather than assumed. Going through the mapped class is
   the rule; a Core statement over a tenant-scoped table is the one thing a reviewer still
   has to look for.
+* **A child table of a mapped hierarchy.** "Tenant-scoped" is asked of the table a
+  statement names, so a scoped model whose `tenant_id` lived on a parent table would not
+  be recognised through its child. Nothing here uses mapped inheritance, which is why it
+  is a note rather than a branch.
 * **`on_conflict_do_nothing` as an existence oracle.** Its values go through the same row
   loop, so it cannot write across the boundary -- but an insert naming this tenant whose
   key collides with another tenant's row reports `rowcount=0` instead of 1, which tells
@@ -193,19 +197,22 @@ def _written_rows(state: ORMExecuteState) -> list[dict[object, object]]:
     return rows
 
 
-def _embedded_dml(statement: ClauseElement) -> UpdateBase | None:
+def _embedded_dml(statement: ClauseElement) -> Iterator[UpdateBase]:
     """An INSERT, UPDATE or DELETE carried *inside* another statement, usually in a CTE.
 
     `WITH w AS (INSERT INTO scoped ... RETURNING *) SELECT * FROM w` is a write that
     arrives looking like a read: the listener is handed a `Select` whose `is_insert` is
     false and whose mappers are empty, so neither half of the guard sees it. Postgres runs
     it. Finding it means walking the tree.
+
+    Every one of them is yielded, not just the first: a statement may carry several, and
+    an innocent write to an unscoped table placed first would otherwise be the whole
+    inspection while a second CTE writes wherever it likes.
     """
     for root in (statement, *(getattr(statement, "_independent_ctes", ()) or ())):
         for element in visitors.iterate(root):
             if element is not statement and isinstance(element, UpdateBase):
-                return element
-    return None
+                yield element
 
 
 def _refuse_a_write_that_leaves_the_tenant(state: ORMExecuteState, bound: uuid.UUID) -> None:
@@ -267,8 +274,10 @@ def _scope_the_statement_to_its_tenant(state: ORMExecuteState) -> None:
     bound = info.get(TENANT_COLUMN)
     # Before anything else, and whether or not a tenant is bound: a write hidden inside a
     # read is a write nothing here can read the values of.
-    carried = _embedded_dml(state.statement)
-    if carried is not None and TENANT_COLUMN in carried.table.c:
+    carried = next(
+        (dml for dml in _embedded_dml(state.statement) if TENANT_COLUMN in dml.table.c), None
+    )
+    if carried is not None:
         raise CrossTenantWrite(
             f"this statement carries a write to {carried.table.name} inside it, and where "
             "it lands cannot be proved; write through TenantScope instead"
