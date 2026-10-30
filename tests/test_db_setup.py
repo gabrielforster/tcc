@@ -5,6 +5,7 @@ import sys
 import pytest
 from alembic import command
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 
 from collection.config import ROOT, settings
 from collection.db.base import TenantScoped
@@ -19,10 +20,27 @@ def test_pgvector_extension_is_installed(db):
     )
 
 
+def _same_database(a: str, b: str) -> bool:
+    def key(url: str):
+        u = make_url(url)
+        host = "localhost" if u.host in (None, "127.0.0.1", "::1") else u.host
+        return host, u.port or 5432, u.database
+
+    return key(a) == key(b)
+
+
+_SHARED_OR_UNSET = not settings.test_database_url or _same_database(
+    settings.test_database_url, settings.database_url
+)
+
+
 @pytest.mark.db
 @pytest.mark.skipif(
-    not settings.test_database_url,
-    reason="downgrades to base: set TEST_DATABASE_URL to a throwaway database",
+    _SHARED_OR_UNSET,
+    reason=(
+        "downgrades to base: TEST_DATABASE_URL is unset or the same database as "
+        "DATABASE_URL; point it at a separate throwaway database"
+    ),
 )
 def test_migrations_run_to_head_and_back(db_engine):
     """Round-trip the migrations.
