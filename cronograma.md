@@ -139,7 +139,7 @@ ele aparece no topo do fio quando o widget é aberto.
 **Por quê.** Não há transporte de *push* sem a conta de um provedor — que é exatamente o
 que 2.1 removeu. A alternativa seria afirmar uma entrega que o sistema não realiza. A
 composição, a checagem de conformidade, a supressão por *opt-out* e o rastreamento de
-status são os pedaços difíceis e estão todos construídos. O comando `make seed` executa o
+status são os pedaços difíceis e estão todos construídos. O comando `make contacts` executa o
 caminho inteiro — agente proativo, regras, composição, conformidade e caixa de entrada — e
 relata quantos contatos foram semeados, suprimidos ou recusados por serem de outro canal;
 a demonstração ao vivo é `make serve ARGS="--seed-demo"`, em que o próprio servidor semeia

@@ -141,15 +141,17 @@ make test lint
 `make seed` is what makes a fresh clone usable. Everything the serving path reads lives in
 the database now — the tenant, the knowledge, the conversations — so a clone with an empty
 database has nothing to answer from. The command creates a tenant called *Desenvolvimento*,
-publishes every file under `knowledge/` into it as a versioned document (the authority
+publishes each document under `knowledge/` into it as a versioned document (the authority
 limits as `internal`, the rest as `customer`), ingests the synthetic dataset, and advances
 the tenant through `ingesting → ready → active`, which is the only state the chat serves.
 It climbs that ladder one rung at a time, so a run that fails half way leaves a tenant that
 is honestly not servable rather than one that claims to be.
 
-Run it again whenever a file under `knowledge/` changes: unchanged bytes keep their
-version, an edited document mints the next one, and ingestion replaces the tenant's rows
-instead of adding to them. It prints the tenant's `tenant_key`; put that in
+Run it again whenever a document under `knowledge/` changes: unchanged bytes keep their
+version, an edited document mints the next one, and ingestion matches each customer by its
+external id and replaces that tenant's receivables as a set, instead of adding to them.
+The labelled `.json` question sets are evaluation fixtures, not knowledge, and are not
+published. It prints the tenant's `tenant_key`; put that in
 `DEFAULT_TENANT_KEY` in `.env` to have the chat widget serve this tenant.
 
 `make pipeline` runs schedule deliverables 3-5 end to end and produces:
