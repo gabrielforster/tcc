@@ -442,12 +442,11 @@ def rag(
         f"({stats['embedder']}, {stats['dimensions']} dims, "
         f"mean {stats['mean_words_per_chunk']} words/chunk)"
     )
+    # Deliberately not saved. Nothing loads it: `collection answer` builds its own index
+    # from `knowledge/` so it can never answer from a stale one, and the serving path
+    # retrieves from the database. A file written on every run and read by nothing is an
+    # artefact that only ever goes out of date.
     _report_retrieval(index, query, top_k, evaluate_only, customer_only)
-    # A corpus-restricted index is a different artefact and must not overwrite the full
-    # one: `collection answer` loads the full corpus and would otherwise answer from a
-    # knowledge base with the authority limits silently missing.
-    suffix = "_customer_only" if customer_only else ""
-    index.save(settings.dir_processed / f"rag_index_{embedder}{suffix}.joblib")
 
 
 @app.command()

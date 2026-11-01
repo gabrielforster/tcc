@@ -10,10 +10,10 @@ __pycache__/
 *.egg-info/
 
 # Data (LGPD: never commit the real dataset)
+data/*
+!data/raw/
 data/raw/*
-data/interim/*
-data/processed/*
-!data/*/.gitkeep
+!data/raw/.gitkeep
 
 # Secrets
 .env

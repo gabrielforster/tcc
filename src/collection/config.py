@@ -72,10 +72,14 @@ class Settings(BaseSettings):
     # is all the reporting needs, and the words are a liability without a purpose.
     transcript_retention_days: int = 180
 
-    # Pipeline directories
+    # `dir_raw` is a download cache, not pipeline output: the public sources read local
+    # files, so a fetched Kaggle or UCI archive is kept here rather than downloaded
+    # again. Everything the pipeline produces -- frames, splits, preprocessors, models,
+    # metrics -- is an object under the tenant prefix. `data/interim` and
+    # `data/processed` are gone with the paths that named them: nothing had written to
+    # either since the move, and a configured path nothing writes is a claim about where
+    # the data lives that is no longer true.
     dir_raw: Path = ROOT / "data" / "raw"
-    dir_interim: Path = ROOT / "data" / "interim"
-    dir_processed: Path = ROOT / "data" / "processed"
     dir_docs: Path = ROOT / "docs"
     dir_knowledge: Path = ROOT / "knowledge"
 
@@ -84,7 +88,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.chat_allowed_origins.split(",") if origin.strip()]
 
     def prepare_directories(self) -> None:
-        for d in (self.dir_raw, self.dir_interim, self.dir_processed, self.dir_docs / "eda"):
+        for d in (self.dir_raw, self.dir_docs / "eda"):
             d.mkdir(parents=True, exist_ok=True)
 
 

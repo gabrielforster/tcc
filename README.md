@@ -158,9 +158,8 @@ published. It prints the tenant's `tenant_key`; put that in
 
 | Output | Contents |
 |---|---|
-| `data/raw/` | Only for sources that read local files (e.g. Home Credit CSVs). Pipeline output no longer goes here: raw and anonymized frames are objects under the tenant prefix |
-| `data/interim/` | Unused by the pipeline; kept for a developer who asks for a file |
-| `data/processed/` | Nothing from the pipeline. `collection features --out DIR` writes the splits and preprocessor as files if you ask for them |
+| Objects under `tenants/<id>/` | Everything the pipeline produces: raw and anonymized frames, splits, preprocessors, models, metrics |
+| `data/raw/` | A download cache, not pipeline output: sources that read local files (e.g. Home Credit CSVs) keep the fetched archive here rather than fetch it again |
 | `docs/data-dictionary.md` | Dictionary generated from the domain schema |
 | `docs/eda-<source>.md` + `docs/eda/<source>/*.png` | Exploratory report and charts, one set per data source |
 
