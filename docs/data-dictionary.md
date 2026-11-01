@@ -92,44 +92,44 @@ Primary key: `agreement_id`
 
 ## LGPD treatment per field
 
-| table             | field             | sensitivity   | treatment                          |
-|:------------------|:------------------|:--------------|:-----------------------------------|
-| customers         | customer_id       | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| customers         | name              | identifier    | dropped                            |
-| customers         | tax_id            | identifier    | dropped                            |
-| customers         | email             | identifier    | dropped                            |
-| customers         | phone             | identifier    | dropped                            |
-| customers         | city              | quasi_id      | generalized                        |
-| customers         | state             | quasi_id      | generalized                        |
-| customers         | signup_date       | quasi_id      | generalized                        |
-| customers         | segment           | operational   | kept                               |
-| customers         | size_tier         | operational   | kept                               |
-| customers         | credit_limit      | operational   | kept                               |
-| customers         | preferred_channel | operational   | kept                               |
-| customers         | opt_out           | operational   | kept                               |
-| invoices          | invoice_id        | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| invoices          | customer_id       | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| invoices          | document_number   | quasi_id      | generalized                        |
-| invoices          | amount            | operational   | kept                               |
-| invoices          | issue_date        | operational   | kept                               |
-| invoices          | due_date          | operational   | kept                               |
-| invoices          | payment_date      | operational   | kept                               |
-| invoices          | days_late         | operational   | kept                               |
-| invoices          | status            | operational   | kept                               |
-| invoices          | payment_method    | operational   | kept                               |
-| collection_events | event_id          | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| collection_events | invoice_id        | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| collection_events | customer_id       | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| collection_events | event_time        | operational   | kept                               |
-| collection_events | channel           | operational   | kept                               |
-| collection_events | kind              | operational   | kept                               |
-| collection_events | delinquency_stage | operational   | kept                               |
-| collection_events | outcome           | operational   | kept                               |
-| collection_events | contact_cost      | operational   | kept                               |
-| agreements        | agreement_id      | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| agreements        | customer_id       | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| agreements        | invoice_id        | identifier    | pseudonymized (HMAC-SHA256 + salt) |
-| agreements        | agreement_date    | operational   | kept                               |
-| agreements        | agreement_amount  | operational   | kept                               |
-| agreements        | installments      | operational   | kept                               |
-| agreements        | status            | operational   | kept                               |
+| table             | field             | sensitivity   | treatment                                   |
+|:------------------|:------------------|:--------------|:--------------------------------------------|
+| customers         | customer_id       | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| customers         | name              | identifier    | dropped                                     |
+| customers         | tax_id            | identifier    | dropped                                     |
+| customers         | email             | identifier    | dropped                                     |
+| customers         | phone             | identifier    | dropped                                     |
+| customers         | city              | quasi_id      | generalized                                 |
+| customers         | state             | quasi_id      | generalized                                 |
+| customers         | signup_date       | quasi_id      | generalized                                 |
+| customers         | segment           | operational   | kept                                        |
+| customers         | size_tier         | operational   | kept                                        |
+| customers         | credit_limit      | operational   | kept                                        |
+| customers         | preferred_channel | operational   | kept                                        |
+| customers         | opt_out           | operational   | kept                                        |
+| invoices          | invoice_id        | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| invoices          | customer_id       | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| invoices          | document_number   | quasi_id      | generalized                                 |
+| invoices          | amount            | operational   | kept                                        |
+| invoices          | issue_date        | operational   | kept                                        |
+| invoices          | due_date          | operational   | kept                                        |
+| invoices          | payment_date      | operational   | kept                                        |
+| invoices          | days_late         | operational   | kept                                        |
+| invoices          | status            | operational   | kept                                        |
+| invoices          | payment_method    | operational   | kept                                        |
+| collection_events | event_id          | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| collection_events | invoice_id        | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| collection_events | customer_id       | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| collection_events | event_time        | operational   | kept                                        |
+| collection_events | channel           | operational   | kept                                        |
+| collection_events | kind              | operational   | kept                                        |
+| collection_events | delinquency_stage | operational   | kept                                        |
+| collection_events | outcome           | operational   | kept                                        |
+| collection_events | contact_cost      | operational   | kept                                        |
+| agreements        | agreement_id      | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| agreements        | customer_id       | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| agreements        | invoice_id        | identifier    | pseudonymized (HMAC-SHA256, per-tenant key) |
+| agreements        | agreement_date    | operational   | kept                                        |
+| agreements        | agreement_amount  | operational   | kept                                        |
+| agreements        | installments      | operational   | kept                                        |
+| agreements        | status            | operational   | kept                                        |

@@ -11,9 +11,9 @@ from collection.features.preprocess import fit_and_save
 
 
 @pytest.fixture(scope="module")
-def tables(dataset):
+def tables(dataset, tenant_id):
     """The anonymized frames, in memory: building features needs no directory."""
-    return anonymize(dataset)
+    return anonymize(dataset, tenant=tenant_id)
 
 
 @pytest.mark.parametrize("task", ["propensity", "default"])

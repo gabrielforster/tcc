@@ -32,6 +32,17 @@ def dataset():
 
 
 @pytest.fixture(scope="session")
+def tenant_id():
+    """A tenant to pseudonymize under, for the tests that are not about tenancy.
+
+    Pseudonyms are keyed per tenant, so anonymizing frames outside a `TenantScope` -- as
+    the feature and model tests do -- still needs one. Fixed rather than random so a
+    failure is reproducible.
+    """
+    return uuid.UUID("44444444-4444-4444-4444-444444444444")
+
+
+@pytest.fixture(scope="session")
 def index():
     return VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
 

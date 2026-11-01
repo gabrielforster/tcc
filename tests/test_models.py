@@ -17,9 +17,9 @@ from collection.models.train import _best_threshold, fit_task
 
 
 @pytest.fixture(scope="module")
-def tables(dataset):
+def tables(dataset, tenant_id):
     """The anonymized frames, in memory: training needs no directory and no services."""
-    return anonymize(dataset)
+    return anonymize(dataset, tenant=tenant_id)
 
 
 # ------------------------------------------------------------------------------ metrics

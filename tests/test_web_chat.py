@@ -11,6 +11,8 @@ pass its own tests while breaking the compliance story. `test_a_message_goes_thr
 _orchestrator` is the guard on that.
 """
 
+import hashlib
+import hmac
 import time
 from pathlib import Path
 
@@ -83,6 +85,21 @@ def test_a_token_signed_with_another_secret_is_rejected(monkeypatch):
     monkeypatch.setattr(settings, "anonymization_salt", "a-different-secret")
     with pytest.raises(TokenError, match="Bad signature"):
         verify_token(token)
+
+
+def test_the_signature_is_not_the_raw_salt(monkeypatch):
+    """One secret, but not one key: a pseudonym and a token signature must not share one.
+
+    Signing with the salt itself would mean that anyone who could mint pseudonyms could
+    also mint identity tokens, and the other way round.
+    """
+    monkeypatch.setattr(settings, "anonymization_salt", "a-known-salt")
+    token = issue_token("cus_42")
+    payload, _, signature = token.rpartition(".")
+    direct = hmac.new(
+        settings.anonymization_salt.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()[:32]
+    assert signature != direct
 
 
 def test_an_expired_token_is_rejected():
