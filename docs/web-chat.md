@@ -52,8 +52,8 @@ the events the run produced, which is only true if the orchestrator ran.
 If the page could name the customer, anyone could name any customer. So:
 
 - The host application's **backend** mints a token with `issue_token(customer_id)`, signed
-  with HMAC-SHA256 under the existing `ANONYMIZATION_SALT`. The browser never sees the
-  secret and cannot mint one.
+  with HMAC-SHA256 under a key derived for that purpose from `ANONYMIZATION_SALT`
+  (`derive_key("session-token")`). The browser never sees the secret and cannot mint one.
 - The widget presents the token; `verify_token` checks the signature with
   `hmac.compare_digest` and the expiry. A plain `==` leaks the signature one byte at a
   time to anyone willing to measure.
@@ -64,9 +64,14 @@ If the page could name the customer, anyone could name any customer. So:
   IP or a fingerprint: an id that could be recomputed from the visitor would not be
   anonymous.
 
-Reusing `ANONYMIZATION_SALT` rather than adding a second secret is deliberate. Both are
-process-wide secrets that must never be committed and whose rotation invalidates what came
-before; splitting them doubles what can go wrong for no gain in isolation.
+Starting from `ANONYMIZATION_SALT` rather than adding a second secret is deliberate, and
+so is not using it directly. There is one secret to manage, never committed, and rotating
+it invalidates everything that came before — a second would double what can go wrong for
+no gain in isolation. But the salt itself is never a key: `src/collection/crypto.py`
+derives one per purpose, so the signature on a token and the pseudonym standing in for a
+customer do not share a key, and a leak from either is not a leak from both. The purpose
+is length-framed rather than joined on a separator, so `("a:b",)` and `("a", "b")` cannot
+derive the same key. `test_the_signature_is_not_the_raw_salt` pins it.
 
 ## Limits, and what each one is for
 
