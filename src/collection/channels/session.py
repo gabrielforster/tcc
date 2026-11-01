@@ -478,7 +478,7 @@ class DatabaseSessionStore:
                 identified=identified,
             )
             self._read_transcript(session)
-            self._sessions[session.session_id] = session
+            self._track(session)
         return session
 
     def get(self, session_id: str) -> DatabaseSession:
@@ -491,10 +491,10 @@ class DatabaseSessionStore:
                 # Closed and committed, then refused: an expired thread that stayed open
                 # would be resumed by the next `open()` for the same customer.
                 self._close(session.conversation)
-                self._sessions.pop(session_id, None)
+                self._forget(session_id)
                 expired = True
             else:
-                self._sessions[session_id] = session
+                self._track(session)
         if expired:
             raise SessionNotFound("This conversation expired. Start a new one.")
         if session.turns >= MAX_TURNS:
@@ -503,12 +503,13 @@ class DatabaseSessionStore:
 
     def close(self, session_id: str) -> None:
         with self.unit():
-            session = self._sessions.pop(session_id, None)
+            session = self._sessions.get(session_id)
             conversation = (
                 session.conversation if session is not None else self._conversation(session_id)
             )
             if conversation is not None:
                 self._close(conversation)
+            self._forget(session_id)
 
     def __len__(self) -> int:
         with self.lock:
@@ -710,6 +711,25 @@ class DatabaseSessionStore:
         if delivery is not None:
             delivery.turn_id = row.id
 
+    # --------------------------------------------------------------- the map
+    # Every change to `_sessions` goes through these two, and both wait for the commit.
+    # The map is a claim about the rows -- this session is live, that conversation is
+    # open -- so a change made before the write it belongs to is a claim the record may
+    # never back. Both directions fail: a session held after its insert rolled back is
+    # one `get` will hand out for a conversation that does not exist, and a session
+    # dropped before its closing committed leaves a row `OPEN` with nothing in the
+    # process tracking it. Waiting costs a lambda and makes the two agree by
+    # construction rather than by review.
+
+    def _track(self, session: DatabaseSession) -> None:
+        """Hold this session once the writes it belongs to are committed."""
+        session_id = session.session_id
+        self._on_commit.append(lambda: self._sessions.__setitem__(session_id, session))
+
+    def _forget(self, session_id: str) -> None:
+        """Stop holding it once the writes it belongs to are committed."""
+        self._on_commit.append(lambda: self._sessions.pop(session_id, None))
+
     def _sweep(self) -> None:
         """Drop the live sessions that have expired and close their threads.
 
@@ -719,25 +739,14 @@ class DatabaseSessionStore:
         `conversations` row open for the life of the process -- a visitor who opens the
         widget and walks away would otherwise never be closed by anything.
 
-        Call it inside a unit of work: it writes.
-
-        The live sessions go only once those writes are committed. Dropping them here
-        would part company with the rows if the unit of work later rolled back -- `open()`
-        sweeps before it inserts, so a refused insert would leave those conversations
-        `OPEN` in the record with nothing in the process tracking them.
+        Call it inside a unit of work: it writes, and so drops the sessions through
+        `_forget` rather than directly -- see the note on the map above.
         """
         now = time.time()
-        expired = [key for key, s in self._sessions.items() if s.expired(now)]
-        for session_id in expired:
-            self._close(self._sessions[session_id].conversation)
-        if not expired:
-            return
-
-        def forget() -> None:
-            for session_id in expired:
-                self._sessions.pop(session_id, None)
-
-        self._on_commit.append(forget)
+        for session_id, session in list(self._sessions.items()):
+            if session.expired(now):
+                self._close(session.conversation)
+                self._forget(session_id)
 
     def _close(self, conversation: "Conversation") -> None:
         from collection.db.models.conversation import ConversationState
