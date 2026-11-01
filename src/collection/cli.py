@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from collection.channels.sweep import ABANDONED_AFTER_SECONDS
 from collection.config import settings
 from collection.db.repository import TenantScope
 from collection.db.session import unit_of_work
@@ -21,6 +22,9 @@ app.add_typer(db_app, name="db")
 
 tenant_app = typer.Typer(help="Tenants: provisioning and seeding.", no_args_is_help=True)
 app.add_typer(tenant_app, name="tenant")
+
+conversations_app = typer.Typer(help="Conversations: the record of threads.", no_args_is_help=True)
+app.add_typer(conversations_app, name="conversations")
 
 
 TenantOption = Annotated[
@@ -795,6 +799,46 @@ def pipeline(tenant: TenantOption) -> None:
     dictionary()
     eda(tenant=tenant)
     features(tenant=tenant, task="both", out=None)
+
+
+@conversations_app.command("sweep")
+def conversations_sweep(
+    tenant: TenantOption,
+    after_hours: float = typer.Option(
+        ABANDONED_AFTER_SECONDS / 3600,
+        help="Close open threads silent for longer than this. Must stay well above the "
+        "session TTL, or a live conversation is closed under the person having it.",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="report what would be closed and write nothing"
+    ),
+) -> None:
+    """Close the threads nothing is tracking any more.
+
+    Meant to be run on a schedule. The store closes a thread when the session holding it
+    expires, which leaves behind every thread a restarted or crashed process was holding;
+    this is what closes those. Escalated threads are a person's queue and are never swept.
+    """
+    from collection.channels.sweep import close_abandoned, find_abandoned
+
+    after_seconds = int(after_hours * 3600)
+    with _tenant_scope(tenant) as scope:
+        found = (find_abandoned if dry_run else close_abandoned)(scope, after_seconds=after_seconds)
+        if not found:
+            console.print(f"[green]nothing to close[/] for {tenant} (window {after_hours}h)")
+            return
+        table = Table(title=f"{'Would close' if dry_run else 'Closed'} for {tenant}")
+        table.add_column("conversation")
+        table.add_column("channel")
+        table.add_column("opened at")
+        for conversation in found:
+            table.add_row(
+                str(conversation.id),
+                conversation.channel,
+                conversation.opened_at.isoformat(timespec="seconds"),
+            )
+        console.print(table)
+        console.print(f"[green]{len(found)}[/] abandoned thread(s), silent for over {after_hours}h")
 
 
 if __name__ == "__main__":

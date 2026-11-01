@@ -102,3 +102,93 @@ def test_db_downgrade_takes_yes_in_advance(downgrades):
 
     assert result.exit_code == 0, result.output + str(result.exception)
     assert downgrades == ["base"]
+
+
+@pytest.fixture
+def swept(db, monkeypatch):
+    """`conversations sweep` against the test transaction instead of its own connection.
+
+    The command opens a unit of work of its own, which cannot see rows a rolled-back test
+    transaction holds. Handing it this scope is what lets the body -- the window
+    arithmetic, the dry run, the table -- run over rows a test can set up.
+    """
+    from contextlib import contextmanager
+
+    from sqlalchemy.orm import Session
+
+    from collection.db.models import Tenant, TenantState
+    from collection.db.repository import TenantScope
+
+    tenant = Tenant(name="swept", slug="swept", state=TenantState.ACTIVE)
+    db.add(tenant)
+    db.flush()
+    scope = TenantScope(
+        Session(bind=db.connection(), join_transaction_mode="create_savepoint"), tenant.id
+    )
+
+    @contextmanager
+    def _scope(slug: str):
+        assert slug == "swept"
+        yield scope
+
+    monkeypatch.setattr("collection.cli._tenant_scope", _scope)
+    return scope
+
+
+def _abandoned(scope, hours: float):
+    """An open thread whose last word was `hours` ago, through its customer."""
+    import uuid
+    from datetime import UTC, datetime, timedelta
+
+    from collection.db.models import Conversation, Customer
+
+    customer = Customer(external_id=f"cus-{uuid.uuid4().hex[:8]}", pseudonym=uuid.uuid4().hex)
+    scope.add(customer)
+    scope.session.flush()
+    conversation = Conversation(
+        customer_id=customer.id,
+        channel="chat",
+        opened_at=datetime.now(UTC) - timedelta(hours=hours),
+    )
+    scope.add(conversation)
+    scope.session.flush()
+    return conversation
+
+
+@pytest.mark.db
+def test_conversations_sweep_closes_an_abandoned_thread(swept):
+    from collection.db.models import ConversationState
+
+    conversation = _abandoned(swept, hours=48)
+
+    result = runner.invoke(app, ["conversations", "sweep", "--tenant", "swept"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "1" in result.output
+    assert conversation.state is ConversationState.CLOSED
+
+
+@pytest.mark.db
+def test_conversations_sweep_dry_run_writes_nothing(swept):
+    from collection.db.models import ConversationState
+
+    conversation = _abandoned(swept, hours=48)
+
+    result = runner.invoke(app, ["conversations", "sweep", "--tenant", "swept", "--dry-run"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "Would close" in result.output
+    assert conversation.state is ConversationState.OPEN
+
+
+@pytest.mark.db
+def test_conversations_sweep_leaves_a_live_thread_alone(swept):
+    from collection.db.models import ConversationState
+
+    conversation = _abandoned(swept, hours=1)
+
+    result = runner.invoke(app, ["conversations", "sweep", "--tenant", "swept"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "nothing to close" in result.output
+    assert conversation.state is ConversationState.OPEN
