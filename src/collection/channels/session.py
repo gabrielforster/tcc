@@ -518,6 +518,7 @@ class DatabaseSessionStore:
     # ------------------------------------------------------------------- writing
     def write_turn(self, session: DatabaseSession, turn: Turn, **extra: object) -> "TurnRow":
         """Write a turn and, in the same savepoint, every passage it was answered from."""
+        from collection.channels.handover import QUEUE
         from collection.db.models.conversation import ConversationState
         from collection.db.transcripts import record_turn
 
@@ -534,8 +535,12 @@ class DatabaseSessionStore:
                 latency_ms=_milliseconds(extra.get("latency_ms")),
             )
             if turn.escalated:
-                # The thread is a person's now; the record has to say so, and why.
+                # The thread is a person's now; the record has to say so, and why. It
+                # goes to the queue rather than to a name -- nobody has taken it yet,
+                # and leaving `holder` at `agent` would say the agent is still
+                # answering what it has just handed over.
                 session.conversation.state = ConversationState.ESCALATED
+                session.conversation.holder = QUEUE
                 session.conversation.escalation_reason = extra.get("escalation_reason")  # type: ignore[assignment]
             self._link_delivery(scope, turn, row)
             scope.session.flush()

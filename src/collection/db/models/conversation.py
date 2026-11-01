@@ -75,7 +75,9 @@ class Conversation(TenantScoped, Base):
         ),
         default=ConversationState.OPEN,
     )
-    #: Who currently answers: the agent, or the operator who took over.
+    #: Who currently answers: `agent`, `queue` for an escalation nobody has taken, or
+    #: the operator's email once one has. See `collection.channels.handover`; an address
+    #: contains an `@` and neither constant does, so the three never collide.
     holder: Mapped[str] = mapped_column(String(100), default="agent")
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

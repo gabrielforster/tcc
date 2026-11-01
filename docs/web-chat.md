@@ -77,6 +77,31 @@ before; splitting them doubles what can go wrong for no gain in isolation.
 | Rate | 20 msg/min per session | A public endpoint gets hammered |
 | Message | 1000 chars | Longer is a paste or a probe, not a question |
 
+## Handing a thread to a person
+
+When the agent escalates, the thread stops being its own: `state` becomes `escalated` and
+`holder` moves from `agent` to `queue`. The queue is the backlog — escalated threads
+nobody has taken — and `collection conversations queue` (`make queue`) is how a person
+reads it, oldest first.
+
+| `holder` | Meaning |
+|---|---|
+| `agent` | The agent is answering. Every open thread |
+| `queue` | Escalated, not yet taken |
+| an email | That operator has it |
+
+The three never collide, because an address contains an `@` and neither constant does.
+`collection conversations claim <id> --user <email>` takes a thread, and refuses one
+someone else already holds, naming them. The email must belong to an active
+`internal_users` row for the tenant — identity, not authentication: that table is still
+schema-only, and what it decides about hashing and roles lands with the console.
+
+`collection conversations resolve <id>` is the exit, and the only path that closes an
+escalated thread. The holder stays on the closed row, because the question a finished
+thread answers is who dealt with this customer. Closing is also what starts the retention
+clock, so an escalation nobody resolved keeps its transcript — which is the right way
+round.
+
 ## Closing a thread, and the threads nothing closes
 
 A conversation is closed when the session holding it expires. That covers a visitor who
