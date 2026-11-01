@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     # side by side do not each claim the whole machine.
     n_jobs: int = -1
 
+    # How long a closed conversation's transcript is kept. LGPD art. 15-16: processing
+    # ends and the data is eliminated, so a transcript needs a window rather than a
+    # default of forever. Six months is the span in which a complaint about how a
+    # collection was conducted is still live and the transcript is still the evidence
+    # for it; past that the thread's shape (when, which channel, whether it escalated)
+    # is all the reporting needs, and the words are a liability without a purpose.
+    transcript_retention_days: int = 180
+
     # Pipeline directories
     dir_raw: Path = ROOT / "data" / "raw"
     dir_interim: Path = ROOT / "data" / "interim"

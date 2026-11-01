@@ -841,5 +841,56 @@ def conversations_sweep(
         console.print(f"[green]{len(found)}[/] abandoned thread(s), silent for over {after_hours}h")
 
 
+@conversations_app.command("purge")
+def conversations_purge(
+    tenant: TenantOption,
+    older_than_days: int = typer.Option(
+        settings.transcript_retention_days,
+        help="Erase the transcripts of threads closed longer ago than this.",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="report what would be erased and delete nothing"
+    ),
+    yes: bool = typer.Option(False, "--yes", help="skip the confirmation"),
+) -> None:
+    """Erase the transcripts of threads past their retention window.
+
+    LGPD art. 15-16: the words are kept while they have a purpose and eliminated after.
+    The conversation row survives -- when it happened, on which channel, whether it
+    escalated -- carrying `purged_at` so an erasure stays distinguishable from a thread
+    nobody ever spoke in. Open and escalated threads are never touched.
+
+    This deletes rows and cannot be undone. Use `--dry-run` first.
+    """
+    from collection.channels.retention import find_expired, purge_transcripts
+
+    with _tenant_scope(tenant) as scope:
+        expired = find_expired(scope, older_than_days=older_than_days)
+        if not expired:
+            console.print(
+                f"[green]nothing to erase[/] for {tenant} "
+                f"(threads closed over {older_than_days} days ago)"
+            )
+            return
+        table = Table(title=f"{'Would erase' if dry_run else 'Erasing'} for {tenant}")
+        table.add_column("conversation")
+        table.add_column("channel")
+        table.add_column("closed at")
+        for conversation in expired:
+            table.add_row(
+                str(conversation.id),
+                conversation.channel,
+                conversation.closed_at.isoformat(timespec="seconds"),
+            )
+        console.print(table)
+        if dry_run:
+            console.print(f"[yellow]{len(expired)}[/] transcript(s) would be erased")
+            return
+        if not yes:
+            typer.confirm(f"Erase {len(expired)} transcript(s)? This cannot be undone.", abort=True)
+        purged = purge_transcripts(scope, older_than_days=older_than_days)
+        console.print(f"[green]{len(purged)}[/] transcript(s) erased")
+
+
 if __name__ == "__main__":
     app()

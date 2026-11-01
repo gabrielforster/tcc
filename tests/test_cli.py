@@ -192,3 +192,72 @@ def test_conversations_sweep_leaves_a_live_thread_alone(swept):
     assert result.exit_code == 0, result.output + str(result.exception)
     assert "nothing to close" in result.output
     assert conversation.state is ConversationState.OPEN
+
+
+def _closed(scope, days_ago: float, turns: int = 2):
+    """A closed thread with a transcript, closed `days_ago`."""
+    import uuid
+    from datetime import UTC, datetime, timedelta
+
+    from collection.db.models import Conversation, ConversationState, Customer, Turn
+
+    closed_at = datetime.now(UTC) - timedelta(days=days_ago)
+    customer = Customer(external_id=f"cus-{uuid.uuid4().hex[:8]}", pseudonym=uuid.uuid4().hex)
+    scope.add(customer)
+    scope.session.flush()
+    conversation = Conversation(
+        customer_id=customer.id,
+        channel="chat",
+        state=ConversationState.CLOSED,
+        opened_at=closed_at - timedelta(hours=1),
+        closed_at=closed_at,
+    )
+    scope.add(conversation)
+    scope.session.flush()
+    for index in range(turns):
+        scope.add(Turn(conversation_id=conversation.id, role="customer", text=f"t{index}"))
+    scope.session.flush()
+    return conversation
+
+
+@pytest.mark.db
+def test_conversations_purge_erases_a_transcript_past_the_window(swept):
+    conversation = _closed(swept, days_ago=400)
+
+    result = runner.invoke(app, ["conversations", "purge", "--tenant", "swept", "--yes"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "1" in result.output
+    assert conversation.purged_at is not None
+
+
+@pytest.mark.db
+def test_conversations_purge_does_nothing_without_an_answer(swept):
+    conversation = _closed(swept, days_ago=400)
+
+    result = runner.invoke(app, ["conversations", "purge", "--tenant", "swept"], input="n\n")
+
+    assert result.exit_code != 0
+    assert conversation.purged_at is None
+
+
+@pytest.mark.db
+def test_conversations_purge_dry_run_deletes_nothing(swept):
+    conversation = _closed(swept, days_ago=400)
+
+    result = runner.invoke(app, ["conversations", "purge", "--tenant", "swept", "--dry-run"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "Would erase" in result.output
+    assert conversation.purged_at is None
+
+
+@pytest.mark.db
+def test_conversations_purge_leaves_a_recently_closed_thread_alone(swept):
+    conversation = _closed(swept, days_ago=2)
+
+    result = runner.invoke(app, ["conversations", "purge", "--tenant", "swept", "--yes"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "nothing to erase" in result.output
+    assert conversation.purged_at is None

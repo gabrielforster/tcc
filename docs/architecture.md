@@ -96,6 +96,31 @@ the key is derived per tenant from `ANONYMIZATION_SALT` (`src/collection/crypto.
 a pseudonym means "this tenant's customer 7" rather than "customer 7". The salt itself is
 never a key: the chat token signature derives its own, so neither use can forge the other.
 
+## The transcript has a window, not a default of forever
+
+Pseudonymization is about who the data is *about*. Retention is about how long it is held
+at all, and a transcript is the most revealing thing this system stores: a debtor
+explaining why they have not paid says things no invoice row contains. LGPD art. 15 and
+16 end processing when its purpose is met and eliminate the data afterwards, and nothing
+exempts a conversation. Keeping one forever is a decision, so the system makes the
+opposite one explicitly: `transcript_retention_days`, six months by default, which is
+about how long a complaint over the conduct of a collection stays live and the transcript
+is the evidence for it.
+
+`collection conversations purge` (`make purge`) deletes the turns and the retrieval rows
+that cite them. The conversation row survives, because what reporting needs from an old
+thread is its shape — when, which channel, whether it escalated — not its words. The
+surviving row carries `purged_at`, and that column is load-bearing: a thread whose
+transcript was erased and a thread nobody ever spoke in both end up with no turns, and a
+controller who cannot tell them apart cannot demonstrate that anything was erased.
+Erasure has to leave a mark.
+
+Only `CLOSED` threads age. An open one is still being had, so a window can never catch
+it; an escalated one is a person's unanswered queue item, and handing them a case with
+its contents missing would be worse than keeping it. `collection conversations sweep` is
+what closes an abandoned thread and starts its clock, which is why the two commands
+belong on the same schedule, in that order.
+
 ## The event contract
 
 Every interaction is an immutable `Event`. Agents never mutate what they receive; they emit
