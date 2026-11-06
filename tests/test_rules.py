@@ -78,6 +78,26 @@ def test_the_next_opening_skips_a_closed_sunday():
     assert opening.hour == 8
 
 
+def test_a_time_without_a_zone_is_read_as_the_customers_wall_clock_not_utc():
+    """Read as UTC, 21:00 would be 18:00 local and allowed; 09:00 would be 06:00 and not."""
+    window = ContactWindow()
+    assert not window.allows(datetime(2026, 9, 10, 21, 0))
+    assert window.allows(datetime(2026, 9, 10, 9, 0))
+
+
+def test_sunday_contact_is_an_explicit_opt_in_that_uses_weekday_hours():
+    sunday = local(day=13, hour=10)
+    assert not ContactWindow().allows(sunday)
+    assert ContactWindow(contact_on_sunday=True).allows(sunday)
+    assert not ContactWindow(contact_on_sunday=True).allows(local(day=13, hour=21))
+
+
+def test_no_opening_within_the_horizon_is_reported_as_none_not_a_guess():
+    start = local(hour=22)
+    closed = frozenset(start.date() + timedelta(days=n) for n in range(40))
+    assert ContactWindow(holidays=closed).next_opening(start, horizon_days=30) is None
+
+
 # -------------------------------------------------------------------- legal blocks
 def test_an_opted_out_customer_is_never_contacted():
     decision = ContactPolicy().evaluate(ContactHistory(opted_out=True), local())
@@ -152,6 +172,8 @@ def test_the_response_rate_curve_matches_the_measured_data():
     assert response_rate_for_attempt(6) == pytest.approx(0.055)
     # Beyond the measured range the last observed value is carried, not extrapolated down.
     assert response_rate_for_attempt(9) == pytest.approx(0.055)
+    # A first contact has no earlier attempt; it is attempt one, not an error.
+    assert response_rate_for_attempt(0) == response_rate_for_attempt(1)
 
 
 def test_expected_value_falls_with_each_attempt():
