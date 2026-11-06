@@ -304,6 +304,9 @@ class LLMRewriter(QueryRewriter):
 
         self.client = client or get_client()
         self.fallback = fallback or ConcatRewriter()
+        #: Generation failures, so a run against an unreachable model is not reported as
+        #: the model's own rewrites -- every one of them would be the baseline's.
+        self.failures: list[str] = []
 
     def queries(self, message: str, conversation: Conversation | None) -> list[str]:
         from collection.llm.client import LLMError
@@ -317,7 +320,8 @@ class LLMRewriter(QueryRewriter):
         )
         try:
             rewritten = self.client.complete(self.SYSTEM, prompt).text.strip()
-        except LLMError:
+        except LLMError as error:
+            self.failures.append(str(error))
             return self.fallback.queries(message, conversation)
         # An empty or runaway rewrite is worse than the baseline's noise.
         if not rewritten or len(words(rewritten)) > 60:
