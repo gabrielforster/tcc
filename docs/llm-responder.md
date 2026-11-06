@@ -100,8 +100,12 @@ keep the control.
 
 ```bash
 make answer                        # template arm, no key needed
-make answer ARGS="--compare"       # both arms; needs ANTHROPIC_API_KEY
+make answer ARGS="--compare"       # both arms; needs a provider (below)
 uv run collection answer --message "posso parcelar em 6 vezes?" --responder llm
+
+# the LLM arm with no account: a local model through Ollama
+make ollama
+LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b make answer ARGS="--compare"
 ```
 
 `--compare` writes `docs/responder-comparison.md`: the summary table, every unsupported
@@ -116,15 +120,54 @@ paid API on every pull request is a step that gets deleted the first week it is 
 
 | Setting | Default | Notes |
 |---|---|---|
-| `LLM_PROVIDER` | `anthropic` | |
-| `LLM_MODEL` | `claude-sonnet-5-5` | |
+| `LLM_PROVIDER` | `anthropic` | `anthropic`, or `openai` for any OpenAI-compatible server |
+| `LLM_MODEL` | `claude-sonnet-5-5` | `qwen2.5:3b` for the local model |
 | `ANTHROPIC_API_KEY` | empty | From the environment or `.env`; never committed |
+| `LLM_BASE_URL` | `http://localhost:11434/v1` | The `openai` provider's server; the default is `make ollama` |
+| `LLM_API_KEY` | empty | Sent as a bearer token only when set; a local server needs none |
+| `LLM_TIMEOUT` | `180` | Seconds, `openai` only: a CPU model is slow, and a cut-off reply would be scored as the template's |
 
 Temperature is fixed at zero. The same question must not produce a different instalment
 plan on a second reading, and an evaluation has to be reproducible to be reportable.
 `max_tokens` is 512: a collection reply that runs past a few sentences is already a bad
 reply, and the budget also caps the cost per contact, which is one of the operational
 indicators the final evaluation reports.
+
+## The first measured LLM arm: a 3B model on a CPU
+
+Measured 2026-11-06 against `qwen2.5:3b` served by Ollama on this machine (CPU only, no
+GPU), because no hosted key was available. It is a floor, not the system's LLM: a
+three-billion-parameter model, chosen because it runs with no account.
+The hosted arm is the same command with a different `LLM_PROVIDER`.
+
+| responder | grounded | faithful | citation | p50 | p95 |
+|---|---|---|---|---|---|
+| template | 0.875 | 1.000 | 0.857 | 2 ms | 2 ms |
+| qwen2.5:3b | 0.813 | 0.692 | 0.846 | 4.5 s | 11.1 s |
+
+**The run found a defect before it found a number.** The prompt says to write `NAO_SEI`
+"and nothing else". Asked whether it could call on a Sunday, the model wrote
+`NAO_SEI Fonte: (politica-de-cobranca.md)`: the refusal plus the citation line the same
+prompt asks every answer to end with. `_is_refusal` matched the token only as the whole
+reply, so this scored as an *answer*, and the customer would have read the raw token. It
+now matches the token anywhere; the case is pinned in the refusal test. A hosted model may
+never have produced that shape, which is the argument for running a weak model at all.
+
+**Of the four answers flagged unfaithful, two are real and two are the measure.**
+
+- *Real, and the dangerous kind:* asked about a debt 45 days late, it offered "até 12
+  vezes". Twelve instalments is the 60+ day tier. An invented figure in a commercial term
+  is the failure this whole comparison exists to catch, and the number check caught it.
+- *Real, but harmless:* asked "posso parcelar minha divida?", it echoed the question back
+  with `Fonte: [1]`. It is scored grounded because it does not refuse, which is a gap in
+  what "grounded" means rather than a hallucination.
+- *The measure:* the Pix and opt-out answers paraphrase their passage faithfully and lose
+  on sentence support, the same cosine-against-a-long-chunk effect described above. They
+  are counted as written; the strictness is the conservative side to err on.
+
+**Latency is over the 5 s budget by a factor of two at p95**, and that is CPU inference,
+not the design. It is the number that rules a local 3B model out of the live chat path,
+and it is reported rather than tuned away.
 
 ## What this does not yet answer
 
