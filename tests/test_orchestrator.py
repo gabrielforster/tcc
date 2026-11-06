@@ -90,6 +90,32 @@ def test_the_same_event_is_not_queued_twice():
     assert len(queue) == 1
 
 
+def test_peeking_shows_the_next_event_without_taking_it():
+    queue = EventQueue()
+    assert queue.peek() is None
+    assert queue.pop() is None
+    queue.push(make_event(EventType.OVERDUE_DETECTED))
+    queue.push(make_event(EventType.MESSAGE_RECEIVED))
+    assert queue.peek().type is EventType.MESSAGE_RECEIVED
+    assert len(queue) == 2
+
+
+def test_draining_empties_the_queue_in_priority_order_and_allows_a_requeue():
+    queue = EventQueue()
+    campaign = make_event(EventType.OVERDUE_DETECTED)
+    for event in (campaign, make_event(EventType.ESCALATED_TO_HUMAN)):
+        queue.push(event)
+    queue.push(make_event(EventType.MESSAGE_RECEIVED))
+    assert [e.priority for e in queue.drain()] == [
+        Priority.RESPONSIVE,
+        Priority.ESCALATION,
+        Priority.PROACTIVE,
+    ]
+    assert len(queue) == 0
+    # A drained event is no longer "seen", so a retry of it is accepted.
+    assert queue.push(campaign) is True
+
+
 # ----------------------------------------------------------------------------- routing
 def test_each_event_reaches_the_agent_that_handles_it(responsive, proactive):
     orchestrator = Orchestrator([responsive, proactive])
@@ -100,6 +126,8 @@ def test_each_event_reaches_the_agent_that_handles_it(responsive, proactive):
     assert [e.type for e in responsive.seen] == [EventType.MESSAGE_RECEIVED]
     assert [e.type for e in proactive.seen] == [EventType.OVERDUE_DETECTED]
     assert trace.counts()["processed"] == 2
+    # By type, of what an agent handled: the stubs' outputs go unrouted, not processed.
+    assert trace.by_type() == {"message_received": 1, "overdue_detected": 1}
 
 
 def test_an_event_nobody_handles_is_recorded_rather_than_dropped_silently(responsive):
