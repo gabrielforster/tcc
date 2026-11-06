@@ -261,3 +261,125 @@ def test_conversations_purge_leaves_a_recently_closed_thread_alone(swept):
     assert result.exit_code == 0, result.output + str(result.exception)
     assert "nothing to erase" in result.output
     assert conversation.purged_at is None
+
+
+def _escalated(scope, holder: str = "queue", reason: str = "dispute"):
+    """A thread the agent handed over, waiting for a person."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from collection.db.models import Conversation, ConversationState, Customer
+
+    customer = Customer(external_id=f"cus-{uuid.uuid4().hex[:8]}", pseudonym=uuid.uuid4().hex)
+    scope.add(customer)
+    scope.session.flush()
+    conversation = Conversation(
+        customer_id=customer.id,
+        channel="chat",
+        state=ConversationState.ESCALATED,
+        holder=holder,
+        escalation_reason=reason,
+        opened_at=datetime.now(UTC),
+    )
+    scope.add(conversation)
+    scope.session.flush()
+    return conversation
+
+
+def _operator(scope, email: str):
+    from collection.db.models import InternalUser
+
+    user = InternalUser(email=email, password_hash="x", role="operator", active=True)
+    scope.add(user)
+    scope.session.flush()
+    return user
+
+
+@pytest.mark.db
+def test_conversations_queue_lists_what_is_waiting(swept):
+    conversation = _escalated(swept)
+
+    result = runner.invoke(app, ["conversations", "queue", "--tenant", "swept"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "dispute" in result.output
+    assert str(conversation.id)[:8] in result.output
+
+
+@pytest.mark.db
+def test_conversations_queue_says_so_when_nothing_is_waiting(swept):
+    result = runner.invoke(app, ["conversations", "queue", "--tenant", "swept"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert "nothing waiting" in result.output
+
+
+@pytest.mark.db
+def test_conversations_claim_puts_the_operator_on_the_thread(swept):
+    _operator(swept, "ana@cobranca.example")
+    conversation = _escalated(swept)
+
+    result = runner.invoke(
+        app,
+        [
+            "conversations",
+            "claim",
+            str(conversation.id),
+            "--tenant",
+            "swept",
+            "--user",
+            "ana@cobranca.example",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert conversation.holder == "ana@cobranca.example"
+
+
+@pytest.mark.db
+def test_conversations_claim_reports_an_unknown_operator_without_a_traceback(swept):
+    conversation = _escalated(swept)
+
+    result = runner.invoke(
+        app,
+        [
+            "conversations",
+            "claim",
+            str(conversation.id),
+            "--tenant",
+            "swept",
+            "--user",
+            "ninguem@cobranca.example",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "No active operator" in result.output
+    assert conversation.holder == "queue"
+
+
+@pytest.mark.db
+def test_conversations_resolve_closes_the_thread(swept):
+    from collection.db.models import ConversationState
+
+    conversation = _escalated(swept, holder="ana@cobranca.example")
+
+    result = runner.invoke(
+        app, ["conversations", "resolve", str(conversation.id), "--tenant", "swept"]
+    )
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert conversation.state is ConversationState.CLOSED
+    assert conversation.holder == "ana@cobranca.example"
+
+
+@pytest.mark.db
+def test_conversations_resolve_refuses_a_thread_that_was_never_escalated(swept):
+    conversation = _abandoned(swept, hours=1)
+
+    result = runner.invoke(
+        app, ["conversations", "resolve", str(conversation.id), "--tenant", "swept"]
+    )
+
+    assert result.exit_code == 1
+    assert "not escalated" in result.output

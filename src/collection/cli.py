@@ -891,5 +891,74 @@ def conversations_purge(
         console.print(f"[green]{len(purged)}[/] transcript(s) erased")
 
 
+@conversations_app.command("queue")
+def conversations_queue(tenant: TenantOption) -> None:
+    """The escalated threads nobody has taken, oldest first."""
+    from collection.channels.handover import queued
+
+    with _tenant_scope(tenant) as scope:
+        waiting = queued(scope)
+        if not waiting:
+            console.print(f"[green]nothing waiting[/] for {tenant}")
+            return
+        table = Table(title=f"Waiting for a person ({tenant})")
+        table.add_column("conversation")
+        table.add_column("channel")
+        table.add_column("escalated because")
+        table.add_column("opened at")
+        for conversation in waiting:
+            table.add_row(
+                str(conversation.id),
+                conversation.channel,
+                conversation.escalation_reason or "[dim]-[/]",
+                conversation.opened_at.isoformat(timespec="seconds"),
+            )
+        console.print(table)
+        console.print(f"[yellow]{len(waiting)}[/] thread(s) waiting")
+
+
+@conversations_app.command("claim")
+def conversations_claim(
+    conversation_id: Annotated[str, typer.Argument(help="The conversation to take over.")],
+    tenant: TenantOption,
+    user: str = typer.Option(..., help="Email of the operator taking it, on this tenant's staff."),
+) -> None:
+    """Take an escalated thread, putting your name on it."""
+    import uuid as _uuid
+
+    from collection.channels.handover import HandoverError, claim
+
+    with _tenant_scope(tenant) as scope:
+        try:
+            conversation = claim(scope, _uuid.UUID(conversation_id), email=user)
+        except (HandoverError, LookupError, ValueError) as error:
+            console.print(f"[red]{error}[/]")
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]{conversation.id}[/] is now held by {conversation.holder}")
+
+
+@conversations_app.command("resolve")
+def conversations_resolve(
+    conversation_id: Annotated[str, typer.Argument(help="The conversation to finish.")],
+    tenant: TenantOption,
+) -> None:
+    """Close an escalated thread. The holder stays on it: it records who handled it.
+
+    This is the only path that closes an escalated thread, and closing it is what starts
+    its retention clock -- an unresolved escalation keeps its transcript.
+    """
+    import uuid as _uuid
+
+    from collection.channels.handover import HandoverError, resolve
+
+    with _tenant_scope(tenant) as scope:
+        try:
+            conversation = resolve(scope, _uuid.UUID(conversation_id))
+        except (HandoverError, LookupError, ValueError) as error:
+            console.print(f"[red]{error}[/]")
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]{conversation.id}[/] closed, handled by {conversation.holder}")
+
+
 if __name__ == "__main__":
     app()

@@ -371,3 +371,19 @@ def test_a_close_whose_unit_of_work_fails_keeps_tracking_the_session(db):
 
     assert len(channel.store) == 1
     assert scope.get(Conversation, uuid.UUID(session.session_id)).state is ConversationState.OPEN
+
+
+@pytest.mark.db
+def test_an_escalation_puts_the_thread_in_the_queue_rather_than_leaving_it_with_the_agent(db):
+    """`holder` has to stop saying `agent` the moment the agent hands the thread over."""
+    from collection.channels.handover import QUEUE
+
+    channel, scope = _serving(db)
+    session, _ = channel.open()
+
+    reply = channel.send(session.session_id, "esse valor ta errado, nao e isso que eu devo")
+
+    assert reply.escalated
+    conversation = scope.get(Conversation, uuid.UUID(session.session_id))
+    assert conversation.state is ConversationState.ESCALATED
+    assert conversation.holder == QUEUE
