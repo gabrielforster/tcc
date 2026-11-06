@@ -186,10 +186,16 @@ class _FakeWhisperModel:
             raise type(self).load_error
         type(self).loads.append((size, compute_type))
 
-    def transcribe(self, path: str, language: str, beam_size: int):
+    def transcribe(self, audio, language: str, beam_size: int):
         from types import SimpleNamespace
 
-        assert Path(path).suffix == ".wav", "the model is handed the decoded clip"
+        import numpy as np
+
+        # Samples, never a path: given a path, faster-whisper 1.2 decodes through PyAV, and
+        # PyAV 19 rejects the argument it passes, which failed every real clip.
+        assert isinstance(audio, np.ndarray), "the model is handed decoded samples"
+        assert audio.dtype == np.float32 and audio.ndim == 1
+        assert audio.size and np.abs(audio).max() <= 1.0
         if type(self).fails_with is not None:
             raise type(self).fails_with
         # A generator, as the real one is: decoding errors surface while iterating.
