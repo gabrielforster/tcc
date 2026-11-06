@@ -71,9 +71,10 @@ def _skip_unless_provably_separate() -> None:
 def test_migrations_run_to_head_and_back(db_engine):
     """Round-trip the migrations.
 
-    Gated on TEST_DATABASE_URL because `downgrade base` drops everything the migrations
-    created. Without a dedicated test database the fixture falls back to DATABASE_URL, and
-    this test would wipe a developer's own data.
+    Gated on proof that TEST_DATABASE_URL is a separate database, because `downgrade base`
+    drops everything the migrations created. The fixture no longer falls back to
+    DATABASE_URL, but the two can still be set to the same database, and then this test
+    would wipe a developer's own data.
     """
     _skip_unless_provably_separate()
     cfg = alembic_config(db_engine.url.render_as_string(hide_password=False))
