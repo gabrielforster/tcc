@@ -115,11 +115,11 @@ def test_ingest_stores_the_raw_frame_as_an_object_and_writes_no_file(
     db, dataset, fitted, tmp_path, monkeypatch
 ):
     """The window covers a whole run: ingest, publishing a model, and scoring with it."""
-    directories = {}
-    for name in ("dir_raw", "dir_interim", "dir_processed"):
-        directories[name] = tmp_path / name
-        directories[name].mkdir()
-        monkeypatch.setattr(settings, name, directories[name])
+    # `dir_raw` is the only path left, and it is a download cache: a pipeline run must
+    # not write there either.
+    cache = tmp_path / "dir_raw"
+    cache.mkdir()
+    monkeypatch.setattr(settings, "dir_raw", cache)
     scope = _scope(db, "one")
 
     ingest(scope, _Fixed(dataset))
@@ -138,8 +138,7 @@ def test_ingest_stores_the_raw_frame_as_an_object_and_writes_no_file(
     assert {"raw", "interim"} <= kinds
     assert source_metadata(scope)["source"] == "fixed"
     assert set(load_interim(scope)) == {"customers", "invoices", "collection_events", "agreements"}
-    for name, directory in directories.items():
-        assert list(directory.iterdir()) == [], f"{name} was written to"
+    assert list(cache.iterdir()) == [], "dir_raw was written to"
     assert not (tmp_path / "data").exists()
 
 
