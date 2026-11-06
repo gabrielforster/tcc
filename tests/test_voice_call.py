@@ -331,3 +331,33 @@ def test_resampling_keeps_the_duration():
     pcm = tone(1.0)
     out = resample(pcm, 16_000, 48_000)
     assert len(out) // 2 == 48_000
+
+
+# ---------------------------------------------------------------- the benchmark
+def test_trailing_silence_is_measured_from_the_last_voiced_frame():
+    from collection.channels.call_bench import trailing_silence_s
+
+    assert trailing_silence_s(tone(1.0) + silence(0.4), RATE) == pytest.approx(0.4, abs=0.02)
+    assert trailing_silence_s(tone(1.0), RATE) == 0
+
+
+@needs_ffmpeg
+def test_the_pipeline_benchmark_times_every_stage(index, tmp_path):
+    from collection.channels.call_bench import run_pipeline, write_report
+    from collection.voice.evaluate import VoiceMessage
+
+    line = VoiceMessage(id="b1", text="preciso da segunda via do boleto", intent="second_copy")
+    channel = VoiceCallChannel(
+        retriever=index,
+        responder=TemplateResponder(),
+        transcriber=ScriptedTranscriber(transcripts={"b1": line.text, "warmup": line.text}),
+        audio_dir=tmp_path / "calls",
+    )
+    rows = run_pipeline(channel, ToneSynthesizer(), ToneSynthesizer(), [line])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.endpointing_ms == 700
+    assert row.intent == "second_copy" and row.wer == 0
+    assert row.reply_s and row.reply_s > 0
+    report = write_report(rows, tmp_path / "report.md", "scripted", "pipeline")
+    assert "| End-of-turn wait (hangover) | 700 |" in report

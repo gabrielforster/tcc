@@ -26,6 +26,9 @@ app.add_typer(tenant_app, name="tenant")
 conversations_app = typer.Typer(help="Conversations: the record of threads.", no_args_is_help=True)
 app.add_typer(conversations_app, name="conversations")
 
+call_app = typer.Typer(help="The voice call over WebRTC (LiveKit).", no_args_is_help=True)
+app.add_typer(call_app, name="call")
+
 
 TenantOption = Annotated[
     str,
@@ -1009,3 +1012,60 @@ def conversations_resolve(
 
 if __name__ == "__main__":
     app()
+
+
+@call_app.command("serve")
+def call_serve(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8100),
+    whisper_model: str = typer.Option("small", help="faster-whisper checkpoint"),
+) -> None:
+    """Serve the voice-call page; needs `docker compose up -d livekit` and `make voices`."""
+    import uvicorn
+
+    from collection.api.call import create_call_app
+
+    console.print(f"[green]call[/] open http://{host}:{port}/call/demo and press Ligar")
+    console.print(f"[dim]livekit[/] {settings.livekit_url}")
+    uvicorn.run(create_call_app(whisper_model=whisper_model), host=host, port=port)
+
+
+@call_app.command("bench")
+def call_bench(
+    live: bool = typer.Option(False, help="go through a LiveKit room over WebRTC"),
+    whisper_model: str = typer.Option("small", help="faster-whisper checkpoint"),
+    limit: int = typer.Option(None, help="only the first N lines"),
+) -> None:
+    """Measure the turn-time budget on synthesised speech and write the report."""
+    from collection.agents.responsive import get_responder
+    from collection.channels import call_bench as bench
+    from collection.channels.voice_call import VoiceCallChannel
+    from collection.rag.documents import load_directory
+    from collection.rag.index import VectorIndex
+    from collection.voice.evaluate import load_messages
+    from collection.voice.speak import AGENT_VOICE, CUSTOMER_VOICE, PiperSynthesizer
+    from collection.voice.transcribe import WhisperTranscriber
+
+    index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="call-bench-audio-") as audio_dir:
+        channel = VoiceCallChannel(
+            retriever=index,
+            responder=get_responder("template"),
+            transcriber=WhisperTranscriber(model=whisper_model),
+            # The benchmark's clips are synthetic and thrown away with the run.
+            audio_dir=Path(audio_dir),
+        )
+        customer, agent = PiperSynthesizer(CUSTOMER_VOICE), PiperSynthesizer(AGENT_VOICE)
+        messages = load_messages()[:limit] if limit else load_messages()
+        rows = (
+            bench.run_live(channel, customer, agent, messages)
+            if live
+            else bench.run_pipeline(channel, customer, agent, messages)
+        )
+    name = "voice-call-report-live.md" if live else "voice-call-report.md"
+    text = bench.write_report(
+        rows, settings.dir_docs / name, whisper_model, "live" if live else "pipeline"
+    )
+    console.print(text)
