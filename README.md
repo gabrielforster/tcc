@@ -370,12 +370,14 @@ through a pull request; `master` is never committed to directly.
 
 ## Status
 
-📚 Artigo e planejamento completos. Implementação em andamento: o pipeline de dados, o
-módulo preditivo, a arquitetura multiagente, o RAG e o módulo responsivo — agora com
-geração por LLM e medição de fidelidade — estão prontos, e o agente é acessível por um
-widget de chat embedável que já recebe áudios, rastreia status de entrega e abre conversas
-iniciadas pelo sistema, atrás de um contrato de canal explícito. O próximo passo é o canal
-de voz em tempo real (WebRTC/LiveKit).
+📚 Planejamento completo; o artigo ainda está na versão de proposta e é reescrito com os
+resultados nas entregas 17 e 18. Implementado: o pipeline de dados, o módulo preditivo, a
+arquitetura multiagente, o RAG e o módulo responsivo — com geração por LLM e medição de
+fidelidade —, o módulo proativo com composição e checagem de conformidade, e o widget de
+chat embedável que recebe áudios, rastreia status de entrega e abre conversas iniciadas pelo
+sistema, atrás de um contrato de canal explícito. Tudo isso grava num registro durável
+multi-inquilino (Postgres + pgvector), com retenção de transcrições e fila de escalação para
+humanos. Falta o canal de voz em tempo real (WebRTC/LiveKit) e a fase de avaliação.
 
 ---
 

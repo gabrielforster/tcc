@@ -201,7 +201,8 @@ candidata a virar prova de conceito reduzida, com a limitação documentada no a
 ---
 
 <!--
-Gerar o PDF (fontes DejaVu porque Latin Modern nao tem os glifos >= e <):
+Gerar o PDF: `make cronograma` (pandoc + xelatex num container, sem TeX local).
+O comando equivalente, com TeX local (fontes DejaVu porque Latin Modern nao tem os glifos >= e <):
 
   pandoc cronograma.md -o cronograma.pdf --pdf-engine=xelatex \
     -V mainfont="DejaVu Serif" -V sansfont="DejaVu Sans" -V monofont="DejaVu Sans Mono" \

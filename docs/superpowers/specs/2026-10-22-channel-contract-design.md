@@ -2,6 +2,10 @@
 
 Design document — 2026-10-22.
 
+> **Status (2026-11-05).** The channel contract and the chat channel shipped in #18. The
+> LiveKit voice channel, the TTS decision and the two measurements in §6 have not been
+> built; they are being re-planned with the rest of the remaining work.
+
 ## 1. Intent
 
 The system can already answer a customer. It can answer in writing, it can answer a voice
