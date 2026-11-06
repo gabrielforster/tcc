@@ -193,7 +193,9 @@ And thirteen dialogues is a small set; the follow-up column rests on fifteen tur
 
 ```bash
 make answer ARGS="--conversations"               # none vs concat, no key needed
-make answer ARGS="--conversations --compare"     # adds the LLM arm
+make answer ARGS="--conversations --compare"     # adds the LLM arm (needs a provider)
+make ollama && LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b \
+  make answer ARGS="--conversations --compare"   # the LLM arm on a local model
 ```
 
 Writes `docs/conversation-comparison.md`: the summary, and for every follow-up the query
@@ -222,4 +224,14 @@ system's own words is not context, it is an echo.
 otherwise treat the customer's own words as a source — and a customer saying *"então são 6
 parcelas?"* must not license an answer confirming it.
 
-**The LLM arm is unmeasured.** It needs a key; the numbers above are the lexical arms only.
+**The LLM arm has only been measured against a 3B local model.** On 2026-11-06, with no
+hosted key available, it ran against `qwen2.5:3b` through Ollama on a CPU. It tied the
+lexical baseline exactly, follow-up hit rate 0.800 for both with no generation failures,
+and the tie is not two strategies converging: the model mostly did not rewrite. Of fifteen
+follow-ups, it returned eleven unchanged or merely capitalised ("aceita pix?" → "Aceita
+Pix?"). It produced a standalone question only on the courtesy-turn dialogue, where
+`"sim"` became *"Como envio o comprovante de pagamento?"*, which is the behaviour the arm
+exists for. `"e em 6 vezes?"`, the follow-up the oracle rewrite recovers, came back
+untouched. So the hypothesis above, that query formulation needs a model, is still
+untested: a 3B model told to rewrite mostly copies. The hosted arm is the same command
+with `LLM_PROVIDER=anthropic`.
