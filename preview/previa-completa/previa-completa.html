@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Prévia — Sistema Multiagente de Cobrança</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  :root { --green: #17423a; --accent: #2e8b6e; --mint: #bfe3d6; --ink: #1d2623; --muted: #5f6e68; --soft: #f3f6f5; }
+  * { box-sizing: border-box; }
+  html { font-family: "Noto Sans", "DejaVu Sans", sans-serif; color: var(--ink); }
+  body { margin: 0; }
+  .page { width: 297mm; height: 210mm; padding: 13mm 15mm 11mm; display: flex; flex-direction: column; break-after: page; position: relative; overflow: hidden; }
+  .page:last-child { break-after: auto; }
+  .page::after { content: attr(data-n); position: absolute; right: 15mm; bottom: 6mm; font-size: 9pt; color: #9aa7a2; }
+  .kicker { font-size: 9.5pt; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--accent); margin-bottom: 2mm; }
+  h1 { font-size: 22pt; margin: 0 0 2mm; color: var(--green); letter-spacing: -.3px; }
+  .lead { font-size: 12pt; color: #3a4642; margin: 0 0 6mm; max-width: 235mm; line-height: 1.45; }
+  .imgs { flex: 1; min-height: 0; display: flex; gap: 8mm; align-items: flex-start; justify-content: center; }
+  .imgs figure { margin: 0; flex: 1 1 0; height: 100%; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .imgs img { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 3mm; box-shadow: 0 1mm 4mm rgba(0,0,0,.16); }
+  .imgs figcaption { font-size: 10pt; color: var(--muted); margin-top: 3mm; text-align: center; max-width: 120mm; }
+  .imgs.one figure { flex: 0 1 auto; }
+  .imgs.one img { height: 100%; width: auto; }
+  /* cover */
+  .cover { background: var(--green); color: #fff; justify-content: center; padding: 0 26mm; }
+  .cover::after { color: #6f9d8e; }
+  .cover h1 { color: #fff; font-size: 34pt; margin-bottom: 4mm; }
+  .cover .sub { font-size: 15pt; color: var(--mint); margin-bottom: 14mm; }
+  .cover .meta { font-size: 11pt; color: #d6ece4; }
+  .stats { display: flex; gap: 8mm; margin-bottom: 14mm; }
+  .stat { background: rgba(255,255,255,.08); border-radius: 4mm; padding: 6mm 8mm; min-width: 48mm; }
+  .stat b { display: block; font-size: 26pt; line-height: 1.1; }
+  .stat span { font-size: 10.5pt; color: var(--mint); }
+  /* section divider */
+  .divider { background: var(--soft); justify-content: center; padding-left: 26mm; }
+  .divider .num { font-size: 60pt; font-weight: 800; color: var(--accent); line-height: 1; }
+  .divider h1 { font-size: 32pt; }
+  .divider .lead { font-size: 14pt; }
+  /* text pages */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; flex: 1; }
+  .box { background: var(--soft); border-radius: 4mm; padding: 7mm 8mm; font-size: 12pt; line-height: 1.5; }
+  .box h3 { margin: 0 0 3mm; color: var(--green); font-size: 13.5pt; }
+  .box ul { margin: 0; padding-left: 5mm; } .box li { margin: 1.6mm 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 11.5pt; }
+  th { background: var(--green); color: #fff; text-align: left; padding: 2.4mm 3.5mm; font-weight: 600; }
+  td { padding: 2.2mm 3.5mm; border-bottom: 1px solid #dde6e2; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--accent); font-weight: 700; } .no { color: #c94a3d; font-weight: 700; } .mid { color: #b07f0f; font-weight: 700; }
+  /* video pages */
+  .video { flex: 1; display: grid; grid-template-columns: 1.6fr 1fr; gap: 10mm; align-items: center; min-height: 0; }
+  .video img { width: 100%; border-radius: 3mm; box-shadow: 0 1mm 4mm rgba(0,0,0,.18); }
+  .video .info { font-size: 12pt; line-height: 1.55; }
+  .video .file { font-family: "Noto Sans Mono", monospace; font-size: 10pt; background: var(--soft); padding: 2.5mm 3.5mm; border-radius: 2mm; display: block; margin: 3mm 0; word-break: break-all; }
+  .video a { color: var(--accent); font-weight: 700; text-decoration: none; }
+  .tag { display: inline-block; font-size: 9.5pt; font-weight: 700; padding: .6mm 2.4mm; border-radius: 1.5mm; background: #fdf3cf; color: #6c5612; }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<section class="page cover" data-n="1">
+  <div class="kicker" style="color:var(--mint)">Pré-apresentação · TCC · Engenharia de Software</div>
+  <h1>Sistema Multiagente Inteligente de Cobrança</h1>
+  <div class="sub">com LLM, RAG e Machine Learning — como o projeto está hoje</div>
+  <div class="stats">
+    <div class="stat"><b>14 / 19</b><span>entregas do cronograma</span></div>
+    <div class="stat"><b>689</b><span>testes automatizados</span></div>
+    <div class="stat"><b>1.167</b><span>clientes pontuados pelos modelos</span></div>
+    <div class="stat"><b>3</b><span>agentes coordenados</span></div>
+  </div>
+  <div class="meta">Gabriel Forster Rocha · 06/11/2026</div>
+</section>
+
+<!-- 2 -->
+<section class="page" data-n="2">
+  <div class="kicker">Visão geral</div>
+  <h1>O que o sistema faz</h1>
+  <p class="lead">Três agentes, coordenados por um orquestrador central, conduzem a cobrança dentro das regras
+    legais. O cliente conversa por chat (e, em breve, por voz); a equipe acompanha por um console interno.</p>
+  <div class="cols">
+    <div class="box"><h3>Os três agentes</h3><ul>
+      <li><b>Responsivo:</b> atende o cliente com respostas tiradas da base de conhecimento (RAG).</li>
+      <li><b>Proativo:</b> decide quem contatar, quando e por qual canal, respeitando horário, limite de tentativas e <i>opt-out</i>.</li>
+      <li><b>Preditivo:</b> estima quem vai pagar e quem vai ficar inadimplente, e ordena a fila.</li></ul></div>
+    <div class="box"><h3>Garantias que valem para todos</h3><ul>
+      <li>O <i>opt-out</i> é aplicado <b>antes</b> de qualquer agente agir.</li>
+      <li>Horário de contato sempre no fuso de São Paulo.</li>
+      <li>Contestação de valor vai para uma pessoa, nunca para a campanha.</li>
+      <li>Dados pessoais pseudonimizados (LGPD); conversas guardadas por 180 dias.</li></ul></div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="page divider" data-n="3">
+  <div class="num">1</div><h1>O chat com o cliente</h1>
+  <p class="lead">Funcionando de ponta a ponta. Um widget que qualquer site pode embutir.</p>
+</section>
+
+<!-- 4 -->
+<section class="page" data-n="4">
+  <div class="kicker">Chat</div>
+  <h1>O sistema puxa a conversa e responde dúvidas</h1>
+  <p class="lead">O agente proativo deixa uma mensagem com valor, atraso e condições. Quando o cliente pergunta, a resposta vem da base de conhecimento.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06/img/01-chat-mensagem-proativa.png"><figcaption>A mensagem proativa esperando a cliente</figcaption></figure>
+    <figure><img src="../2026-11-06/img/02-chat-resposta-juros.png"><figcaption>Juros e multa, respondidos pelo FAQ</figcaption></figure>
+    <figure><img src="../2026-11-06/img/03-chat-resposta-parcelamento.png"><figcaption>Parcelamento pela faixa de atraso dela</figcaption></figure>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="page" data-n="5">
+  <div class="kicker">Chat</div>
+  <h1>Quando parar e quando chamar uma pessoa</h1>
+  <p class="lead">Se o cliente contesta o valor, o agente não discute: transfere para a equipe. Se pede para não receber mais mensagens, o pedido é registrado na hora.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06/img/04-chat-escalacao-humano.png"><figcaption>Contestação → transferida para uma pessoa</figcaption></figure>
+    <figure><img src="../2026-11-06/img/05-chat-opt-out.png"><figcaption><i>Opt-out</i> registrado</figcaption></figure>
+    <figure><img src="../2026-11-06/img/06-chat-celular.png"><figcaption>O mesmo widget no celular</figcaption></figure>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="page" data-n="6">
+  <div class="kicker">Vídeo · 49 s</div>
+  <h1>Demonstração do chat</h1>
+  <div class="video">
+    <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06/video/00-demo-completo.mp4"><img src="thumbs/chat.jpg"></a>
+    <div class="info">Contato proativo, dúvidas respondidas, contestação escalada, <i>opt-out</i> e a versão no celular.
+      <span class="file">preview/2026-11-06/video/00-demo-completo.mp4</span>
+      <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06/video/00-demo-completo.mp4">Abrir no GitHub →</a>
+      <p style="font-size:10pt;color:var(--muted)">Nesta demonstração o texto das respostas foi gerado por um modelo simulado (sem chave de LLM na máquina). Busca na base, intenção, escalação e <i>opt-out</i> são o código real.</p></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="page divider" data-n="7">
+  <div class="num">2</div><h1>Os modelos preditivos</h1>
+  <p class="lead">Quem vai pagar? Quem vai ficar inadimplente? Dois modelos treinados, avaliados e servidos por uma API.</p>
+</section>
+
+<!-- 8 -->
+<section class="page" data-n="8">
+  <div class="kicker">Modelos</div>
+  <h1>Melhores que o acaso, medidos do jeito certo</h1>
+  <p class="lead">O campeão é escolhido pela precisão média, não pela acurácia: com 17% de inadimplentes, “ninguém vai inadimplir” já acerta 83% e não diz nada.</p>
+  <div class="cols" style="grid-template-columns: 1fr 1.35fr; align-items:start">
+    <table>
+      <tr><th>Tarefa</th><th class="n">Modelo</th><th class="n">Acaso</th></tr>
+      <tr><td>Propensão a pagar</td><td class="n ok">0,85</td><td class="n">0,69</td></tr>
+      <tr><td>Inadimplência futura</td><td class="n ok">0,40</td><td class="n">0,17</td></tr>
+      <tr><td colspan="3" style="font-size:10pt;color:var(--muted);border:0;padding-top:3mm">Precisão média no conjunto de teste. XGBoost nas duas tarefas, escolhido entre seis candidatos. Na inadimplência, o modelo multiplica por 2,4 o resultado do acaso.</td></tr>
+    </table>
+    <div class="imgs one" style="height:118mm"><figure><img src="../2026-11-06/img/11-modelo-inadimplencia-curvas.png"><figcaption>Curvas ROC e precisão–revocação, inadimplência futura</figcaption></figure></div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="page" data-n="9">
+  <div class="kicker">Modelos e regras</div>
+  <h1>O que pesa na decisão, e quando parar de insistir</h1>
+  <p class="lead">O histórico de atraso é o que mais pesa no risco. E a taxa de resposta cai de 13% para 5,5% ao longo de seis tentativas, por isso o sistema para na quarta.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06/img/12-modelo-inadimplencia-shap.png"><figcaption>Importância de cada variável (SHAP)</figcaption></figure>
+    <figure><img src="../2026-11-06/img/13-resposta-por-tentativa.png"><figcaption>Taxa de resposta por tentativa (base pública Bank Marketing)</figcaption></figure>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="page divider" data-n="10">
+  <div class="num">3</div><h1>A chamada de voz</h1>
+  <p class="lead">Protótipo da próxima entrega. Vozes geradas localmente; transcrição, intenção e tempos medidos com o código do projeto.</p>
+</section>
+
+<!-- 11 -->
+<section class="page" data-n="11">
+  <div class="kicker">Voz · protótipo</div>
+  <h1>Uma chamada no navegador</h1>
+  <p class="lead">O aviso de gravação vem primeiro e não pode ser pulado. Se o cliente interrompe, o agente para de falar.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06-voz-console/img/31-voz-agente-abertura.png"><figcaption>Abertura com o aviso de gravação</figcaption></figure>
+    <figure><img src="../2026-11-06-voz-console/img/32-voz-interrupcao.png"><figcaption>O cliente interrompe; o agente para</figcaption></figure>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="page" data-n="12">
+  <div class="kicker">Voz · protótipo</div>
+  <h1>Todo valor falado é confirmado</h1>
+  <p class="lead">Um valor ouvido por voz nunca vira ação direto: o agente lê de volta e espera a confirmação. A chamada termina com um acordo dentro dos limites da operação.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06-voz-console/img/33-voz-leitura-de-volta.png"><figcaption>“R$ 450,00 de entrada” — lido de volta</figcaption></figure>
+    <figure><img src="../2026-11-06-voz-console/img/35-voz-encerrada.png"><figcaption>Acordo: entrada de R$ 450 + 3 × R$ 130</figcaption></figure>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="page" data-n="13">
+  <div class="kicker">Voz · medido</div>
+  <h1>Quanto tempo o agente leva para responder</h1>
+  <p class="lead">Do fim da fala do cliente ao primeiro som da resposta: <b>cerca de 2,5 s</b>. Quase metade é a transcrição.</p>
+  <div class="cols" style="grid-template-columns: 1.1fr 1fr; align-items:start">
+    <table>
+      <tr><th>Etapa</th><th class="n">Tempo</th><th></th></tr>
+      <tr><td>Esperar o cliente terminar</td><td class="n">500 ms</td><td style="color:var(--muted)">configurado</td></tr>
+      <tr><td>Transcrever a fala (Whisper)</td><td class="n mid">~1.300 ms</td><td style="color:var(--muted)">medido</td></tr>
+      <tr><td>Entender e consultar a base</td><td class="n">~3 ms</td><td style="color:var(--muted)">medido</td></tr>
+      <tr><td>Escrever a resposta</td><td class="n">600 ms</td><td><span class="tag">simulado</span></td></tr>
+      <tr><td>Começar a falar (Piper)</td><td class="n ok">21–101 ms</td><td style="color:var(--muted)">medido</td></tr>
+    </table>
+    <div class="box"><h3>O que aprendemos</h3><ul>
+      <li>A voz local é quase instantânea; <b>o gargalo é a transcrição</b>.</li>
+      <li>Erros de reconhecimento atingem os <b>valores</b>, não a intenção. Por isso a leitura de volta.</li>
+      <li>Um “sim” isolado foi mal interpretado. A correção já está definida para a entrega de voz.</li></ul></div>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="page" data-n="14">
+  <div class="kicker">Vídeo · 69 s · com áudio</div>
+  <h1>A chamada completa</h1>
+  <div class="video">
+    <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06-voz-console/video/02-chamada-de-voz.mp4"><img src="thumbs/voz.jpg"></a>
+    <div class="info">A chamada inteira, com as duas vozes e o painel “por dentro do agente” mostrando o que foi ouvido, entendido e quanto tempo levou.
+      <span class="file">preview/2026-11-06-voz-console/video/02-chamada-de-voz.mp4</span>
+      <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06-voz-console/video/02-chamada-de-voz.mp4">Abrir no GitHub →</a></div>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="page divider" data-n="15">
+  <div class="num">4</div><h1>O console interno</h1>
+  <p class="lead">Protótipo de tela para a equipe de cobrança, com as probabilidades reais dos modelos para cada cliente.</p>
+</section>
+
+<!-- 16 -->
+<section class="page" data-n="16">
+  <div class="kicker">Console · probabilidades reais</div>
+  <h1>Como os modelos enxergam a carteira</h1>
+  <p class="lead">Cada ponto é um cliente. Os modelos separam a carteira em quatro grupos com comportamentos realmente diferentes.</p>
+  <div class="imgs one"><figure><img src="../2026-11-06-voz-console/img/20-console-painel.png"></figure></div>
+</section>
+
+<!-- 17 -->
+<section class="page" data-n="17">
+  <div class="kicker">Console</div>
+  <h1>Os quatro grupos</h1>
+  <p class="lead">Ninguém desenhou esses grupos à mão: eles saem das duas probabilidades. O histórico confirma a diferença.</p>
+  <table style="max-width:220mm">
+    <tr><th>Grupo</th><th class="n">Clientes</th><th class="n">Chance de pagar</th><th class="n">Risco de inadimplência</th><th class="n">Atraso médio no histórico</th></tr>
+    <tr><td class="no">Alto risco</td><td class="n">268</td><td class="n">32%</td><td class="n">67%</td><td class="n">178 dias</td></tr>
+    <tr><td style="color:#4a4c8a;font-weight:700">Baixa propensão</td><td class="n">45</td><td class="n">38%</td><td class="n">56%</td><td class="n">113 dias</td></tr>
+    <tr><td class="mid">Atenção</td><td class="n">540</td><td class="n">53%</td><td class="n">43%</td><td class="n">41 dias</td></tr>
+    <tr><td class="ok">Bom pagador</td><td class="n">314</td><td class="n">74%</td><td class="n">21%</td><td class="n">7 dias</td></tr>
+  </table>
+  <p class="lead" style="margin-top:8mm;font-size:11pt;color:var(--muted)">Os bons pagadores ficam fora da fila de cobrança e recebem só lembretes antes do vencimento.
+    A fila de contato é ordenada por risco de inadimplência × valor em aberto.</p>
+</section>
+
+<!-- 18 -->
+<section class="page" data-n="18">
+  <div class="kicker">Console · explicação por cliente</div>
+  <h1>Por que o modelo diz isso sobre este cliente?</h1>
+  <p class="lead">Para cada cliente, o console mostra o que pesou a favor e contra, e qual é a próxima ação permitida pelas regras.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06-voz-console/img/22-console-cliente-alto-risco.png"><figcaption><b>Alto risco:</b> 683 dias de atraso. A tabela permitiria 18 parcelas, mas acima de 12 precisa de uma pessoa.</figcaption></figure>
+    <figure><img src="../2026-11-06-voz-console/img/24-console-cliente-bom-pagador.png"><figcaption><b>Bom pagador:</b> atraso médio de 7 dias, nada vencido. Só lembrete preventivo.</figcaption></figure>
+  </div>
+</section>
+
+<!-- 19 -->
+<section class="page" data-n="19">
+  <div class="kicker">Console</div>
+  <h1>Quando o agente passa a conversa para uma pessoa</h1>
+  <p class="lead">A fila mostra por que cada conversa foi escalada. A operadora assume, o agente pausa, e só ela pode encerrar.</p>
+  <div class="imgs">
+    <figure><img src="../2026-11-06-voz-console/img/26-console-fila-escalacao.png"><figcaption>Fila de escalação</figcaption></figure>
+    <figure><img src="../2026-11-06-voz-console/img/28-console-conversa-resolvida.png"><figcaption>Conversa assumida e resolvida</figcaption></figure>
+  </div>
+</section>
+
+<!-- 20 -->
+<section class="page" data-n="20">
+  <div class="kicker">Vídeo · 40 s</div>
+  <h1>Percurso pelo console</h1>
+  <div class="video">
+    <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06-voz-console/video/01-console.mp4"><img src="thumbs/console.jpg"></a>
+    <div class="info">Painel → carteira de alto risco → um cliente → um bom pagador → fila de escalação → a operadora assume e resolve → o registro da chamada de voz.
+      <span class="file">preview/2026-11-06-voz-console/video/01-console.mp4</span>
+      <a href="https://github.com/gabrielforster/tcc/blob/docs/preview-2026-11-06/preview/2026-11-06-voz-console/video/01-console.mp4">Abrir no GitHub →</a>
+      <p style="font-size:10pt;color:var(--muted)">Versão com voz e console juntos, com cartelas:<br><span class="file" style="display:inline">preview/2026-11-06-voz-console/video/00-demo-voz-e-console.mp4</span></p></div>
+  </div>
+</section>
+
+<!-- 21 -->
+<section class="page" data-n="21">
+  <div class="kicker">Próximos passos</div>
+  <h1>O que falta até a defesa</h1>
+  <div class="cols" style="margin-top:4mm;align-items:start">
+    <table>
+      <tr><th>Data</th><th>Entrega</th><th>Estado</th></tr>
+      <tr><td>05/11</td><td>Chamada de voz em tempo real</td><td class="mid">protótipo pronto</td></tr>
+      <tr><td>12/11</td><td>Testes + experimento controlado</td><td class="mid">testes prontos</td></tr>
+      <tr><td>19/11</td><td>Resultados consolidados</td><td class="mid">metade medida</td></tr>
+      <tr><td>26/11</td><td>Artigo completo revisado</td><td class="no">a escrever</td></tr>
+      <tr><td>03/12</td><td>Versão final e defesa</td><td>—</td></tr>
+    </table>
+    <div class="box"><h3>Sobre esta prévia</h3><ul>
+      <li>Os dados são <b>sintéticos ou públicos</b>; nenhum dado real de cliente.</li>
+      <li>As <b>probabilidades e explicações</b> do console são dos modelos treinados.</li>
+      <li>Voz e console são <b>protótipos de tela</b>; nomes fictícios.</li>
+      <li>O texto gerado pelo agente foi <b>simulado</b> (sem chave de LLM na máquina).</li></ul></div>
+  </div>
+</section>
+
+</body>
+</html>
