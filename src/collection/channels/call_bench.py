@@ -24,6 +24,7 @@ a floor, not an estimate; `docs/voice-call.md` says so beside the table.
 import asyncio
 import os
 import platform
+import re
 import statistics
 import tempfile
 import time
@@ -75,6 +76,19 @@ def speak_as_customer(voice: Synthesizer, text: str) -> bytes:
     return (
         b"\x00\x00" * int(LEAD_SILENCE_S * RATE) + speech + b"\x00\x00" * int(TAIL_SILENCE_S * RATE)
     )
+
+
+def spoken_wer(reference: str, transcript: str) -> float:
+    """Word error rate with punctuation removed from the transcript first.
+
+    Whisper punctuates and the labelled references do not, so "boleto." against "boleto"
+    would count as a miss the classifier -- which tokenises on words -- never experiences.
+    Digits are left alone on purpose: "6" for "seis" is a real difference downstream,
+    because the figure read-back and the instalment parser see it.
+    """
+    if not transcript:
+        return 1.0
+    return wer(reference, re.sub(r"[^\w\s]", " ", transcript))
 
 
 def trailing_silence_s(pcm: bytes, rate: int) -> float:
@@ -151,7 +165,7 @@ def _turn(
 
     row.transcript = turn.transcript or ""
     row.intent = turn.intent
-    row.wer = wer(message.text, row.transcript) if row.transcript else 1.0
+    row.wer = spoken_wer(message.text, row.transcript)
     row.end_reason = turn.end_reason
     row.endpointing_ms = turn.timing.endpointing_ms
     row.stt_ms = turn.timing.stt_ms
@@ -288,7 +302,7 @@ async def _live_turn(channel, customer_voice, agent_voice, message: VoiceMessage
 
     row.transcript = str(heard.get("transcript") or "")
     row.intent = heard.get("intent")  # type: ignore[assignment]
-    row.wer = wer(message.text, row.transcript) if row.transcript else 1.0
+    row.wer = spoken_wer(message.text, row.transcript)
     row.endpointing_ms = float(timing.get("endpointing_ms") or 0.0)
     row.stt_ms = float(timing.get("stt_ms") or 0.0)
     row.agent_ms = float(timing.get("agent_ms") or 0.0)
@@ -418,6 +432,9 @@ def write_report(rows: list[BenchRow], path: Path | str, whisper_model: str, mod
             f"| {row.agent_ms:,.0f} | {row.tts_first_audio_ms:,.0f} | {row.total_ms:,.0f}{live} "
             f"| {row.wer:.2f} | {intent} | {row.end_reason or '--'} |"
         )
+    lines += ["", "## What the recogniser heard", "", "| Line | Said | Heard |", "|---|---|---|"]
+    for row in rows:
+        lines.append(f"| {row.id} | {row.reference} | {row.transcript or '--'} |")
     text = "\n".join(lines) + "\n"
     Path(path).write_text(text, encoding="utf-8")
     return text

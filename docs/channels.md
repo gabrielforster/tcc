@@ -13,8 +13,8 @@ So the seam is written down in `channels/base.py` and tested in `tests/test_chan
 
 A channel owns the things only it can know:
 
-- **Transport.** HTTP request and response for the chat channel; a WebRTC room for the
-  voice channel when it lands.
+- **Transport.** HTTP request and response for the chat channel; a LiveKit (WebRTC) room
+  for the voice call ([`docs/voice-call.md`](./voice-call.md)).
 - **Identity.** Only the channel knows whether the browser proved who it is. The chat
   channel mints and verifies signed tokens; anonymous sessions are a supported mode.
 - **The thread.** HTTP has none, so the channel keeps the session, the turn cap and the
@@ -65,12 +65,12 @@ forgetting one rather than a type check.
 `ChannelCapabilities` is data, so callers ask *"can this channel take audio?"* rather than
 *"is this the voice channel?"*. The difference matters the day a third channel appears.
 
-| Capability | `chat` | Why a caller asks |
-|---|---|---|
-| `accepts_audio` | yes | Whether to offer the microphone at all |
-| `accepts_text` | yes | A voice call accepts none |
-| `shows_delivery_status` | yes | Whether a status ladder means anything here |
-| `realtime` | no | Whether the customer is present and waiting, or reading later |
+| Capability | `chat` | `voice` | Why a caller asks |
+|---|---|---|---|
+| `accepts_audio` | yes | yes | Whether to offer the microphone at all |
+| `accepts_text` | yes | no | A voice call accepts none |
+| `shows_delivery_status` | yes | no | Whether a status ladder means anything here |
+| `realtime` | no | yes | Whether the customer is present and waiting, or reading later |
 
 Chat is **store-and-forward**: the widget picks a message up when it next opens or polls.
 `realtime=False` is what makes the seeded-thread behaviour below honest rather than a
@@ -233,8 +233,9 @@ lives, and what is actually proven today is narrower than a second adapter would
 self-test. That is the property a WhatsApp adapter would rely on. Integrating the API would
 not establish it — with one channel there is nothing to be inconsistent with, so the
 integration would mostly test Meta's uptime, while the guard tests the claim the thesis
-makes. A second adapter would be stronger evidence still; the voice channel is where that
-comes from.
+makes. A second adapter is stronger evidence still, and the voice call is that adapter: it
+routes every turn through the same orchestrator, to the same agent, by the same code path
+as a chat voice note ([`docs/voice-call.md`](./voice-call.md)).
 
 **Telephony.** The interesting problems in an automated call are turn-taking,
 interruption, the latency budget and the legal opening. All four exist identically in a
@@ -243,16 +244,18 @@ channel, carries the same agent over SIP to a real number without changing the a
 the substitution is **reversible**, and saying so is part of the defence rather than an
 excuse for it.
 
-The design the voice channel is being built against is approved and drawn:
+The design the voice channel was built against was approved and drawn:
 
 <img src="./images/voice-channel-mockup.png" width="300" alt="The voice call screen: a notice that the call is transcribed and recorded, a pulsing orb while the customer speaks, the live transcript, a turn-time strip, and mute, hang-up and transfer-to-a-person controls">
 
-Nothing behind that screen exists yet — it is the target for the real-time voice channel,
-not a running interface. The three numbers in the turn-time strip are **placeholders drawn
-by a designer**, not measurements; the measured version is one of the two findings the
-voice channel owes. What the drawing does fix is the shape of the legal opening (a notice
-that cannot be skipped), that the customer can always reach a person, and that the
-transcript is visible rather than implied.
+The running page (`make call`, then `/call/demo`) is a plainer version of that screen: the
+notice, the orb, the live transcript and a turn-time strip filled from the call's own
+measurements. The numbers in the drawing were **placeholders drawn by a designer**; the
+measured ones are in [`docs/voice-call-report.md`](./voice-call-report.md). The transfer
+button is not built -- the customer reaches a person by asking for one, which is the
+agent's existing handover. What the drawing fixed, and the call keeps, is the shape of the
+legal opening (a notice that cannot be skipped), that the customer can always reach a
+person, and that the transcript is visible rather than implied.
 
 ### What is honestly lost
 
@@ -278,7 +281,10 @@ Named here, and inherited by the article's limitations section:
 | `src/collection/channels/outbound.py` | The join: proactive agent → scheduled contact → mailbox |
 | `src/collection/channels/session.py` | Sessions, tokens, rate limits |
 | `src/collection/api/chat.py` | The HTTP surface, including the delivery-report endpoint |
+| `src/collection/channels/voice_call.py` | `VoiceCallChannel`: the notice, silence, the two records |
+| `src/collection/channels/livekit_call.py` | The LiveKit transport for a call |
 | `tests/test_channels.py` | The contract, the ladder, the seeding rules, and the import guard |
+| `tests/test_voice_call.py` | The call: the notice, the ways it ends, the record, erasure |
 
 The chat channel itself — identity, limits, status codes, the widget — is documented in
 [`docs/web-chat.md`](./web-chat.md).
