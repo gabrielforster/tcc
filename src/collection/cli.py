@@ -716,6 +716,53 @@ def contacts() -> None:
     )
 
 
+@app.command()
+def experiment(
+    replications: int = typer.Option(30, help="replications, one seed each"),
+    first_seed: int = typer.Option(1, help="seed of the first replication"),
+) -> None:
+    """Simulate the system against the manual and semi-automated baselines.
+
+    Every replication builds a synthetic book, trains the rankers on what was knowable on
+    the decision day, and plays each arm at each daily capacity. Writes the tables of
+    docs/experiment-results.md (the hand-written reading around them is kept) and
+    docs/images/experiment-capacity.png. Protocol: docs/experiment-protocol.md.
+    """
+    from collection.experiment import report
+    from collection.experiment.run import run_experiment
+
+    last = first_seed + replications - 1
+    results = run_experiment(
+        replications,
+        first_seed,
+        progress=lambda seed: console.print(f"[dim]replication {seed}/{last} done[/]"),
+    )
+    path = report.write(
+        results, settings.dir_docs / "experiment-results.md", settings.dir_docs / "images"
+    )
+    console.print("\n".join(report.differences_table(results)))
+    console.print(f"[green]wrote[/] {path}")
+
+
+@app.command()
+def concurrency(
+    levels: str = typer.Option("1,50,100,200,400", help="concurrent conversations per level"),
+    turns: int = typer.Option(5, help="messages each conversation sends"),
+) -> None:
+    """Hold many chat conversations at once against a served app and time every request.
+
+    The server runs in a child process on a free port, in memory with the template
+    responder, so no database or API key is involved. Writes the concurrency table into
+    docs/experiment-results.md.
+    """
+    from collection.experiment import load
+
+    results = load.run_load(tuple(int(n) for n in levels.split(",")), turns)
+    console.print("\n".join(load.table(results)))
+    path = load.write(results, settings.dir_docs / "experiment-results.md")
+    console.print(f"[green]wrote[/] {path}")
+
+
 @tenant_app.command("seed")
 def tenant_seed(
     name: str = typer.Option("Desenvolvimento", "--name", help="Name of the tenant to seed."),
