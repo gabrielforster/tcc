@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Gabriel Forster Rocha" />
+  <title>Prévia</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Prévia do estado atual</h1>
+<p class="subtitle">Sistema Multiagente Inteligente de Cobrança com LLM,
+RAG e Machine Learning</p>
+<p class="author">Gabriel Forster Rocha</p>
+<p class="date">06/11/2026 — pré-apresentação</p>
+</header>
+<h1 id="em-uma-página">Em uma página</h1>
+<p>O sistema conduz a cobrança de recebíveis com três agentes
+coordenados por um orquestrador central: um <strong>agente
+responsivo</strong> que atende o cliente com respostas ancoradas na base
+de conhecimento (RAG), um <strong>agente proativo</strong> que decide
+quem contatar, quando e por qual canal dentro das restrições legais, e
+um <strong>agente preditivo</strong> que ordena a fila por probabilidade
+de pagamento e de inadimplência futura.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Entregas do cronograma
+concluídas</strong></td>
+<td style="text-align: left;">14 de 19 (até 29/10)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pull requests
+integrados</strong></td>
+<td style="text-align: left;">28</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Testes automatizados</strong></td>
+<td style="text-align: left;">689</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Código</strong></td>
+<td style="text-align: left;">~14,6 mil linhas de produção · ~8,5 mil de
+teste</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pendente</strong></td>
+<td style="text-align: left;">voz em tempo real (entrega 15) e a fase de
+avaliação e redação (16–19)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>O que esta prévia mostra:</strong> o widget de chat
+funcionando de ponta a ponta (contato proativo, dúvidas respondidas,
+contestação escalada para uma pessoa, <em>opt-out</em>), os modelos
+preditivos com suas métricas, e as avaliações já medidas de cada
+módulo.</p>
+<p><strong>Arquivos que acompanham este PDF:</strong></p>
+<ul>
+<li><code>video/00-demo-completo.mp4</code>: demonstração de 49 s com as
+três cenas</li>
+<li><code>video/01-conversa.mp4</code>, <code>02-opt-out.mp4</code>,
+<code>03-celular.mp4</code>: as cenas separadas</li>
+<li><code>img/</code>: todas as capturas e gráficos em alta
+resolução</li>
+<li><code>terminal/</code>: a saída bruta de cada comando de avaliação
+executado hoje</li>
+</ul>
+<h1 id="arquitetura">Arquitetura</h1>
+<pre><code>              ┌──────────────────────────────────────────┐
+              │              ORQUESTRADOR                │
+              │  roteia · prioriza · aplica opt-out      │
+              │  · registra                              │
+              └──────────────────────────────────────────┘
+                   │              │               │
+        ┌──────────┘              │               └──────────┐
+        ▼                         ▼                          ▼
+┌────────────────┐      ┌──────────────────┐      ┌────────────────────┐
+│   RESPONSIVO   │      │     PROATIVO     │      │     PREDITIVO      │
+│ intenção + RAG │      │ motor de regras  │      │ ranking via API    │
+│ + LLM          │      │ + composição     │      │ POST /score        │
+└────────────────┘      └──────────────────┘      └────────────────────┘
+        │                         │                          │
+        └─────────────────────────┼──────────────────────────┘
+                                  ▼
+                 ┌──────────────────────────────────┐
+                 │        CONTRATO DE CANAL         │
+                 │  chat (pronto) · voz (pendente)  │
+                 └──────────────────────────────────┘
+                                  ▼
+                 ┌──────────────────────────────────┐
+                 │  REGISTRO DURÁVEL MULTI-INQUILINO│
+                 │  Postgres + pgvector · MinIO     │
+                 └──────────────────────────────────┘</code></pre>
+<p>Decisões que sustentam a defesa:</p>
+<ul>
+<li><strong>O <em>opt-out</em> é aplicado pelo orquestrador antes de
+qualquer agente executar.</strong> Nenhum agente precisa lembrar de
+respeitá-lo.</li>
+<li><strong>Nenhum agente importa um canal.</strong> Um teste analisa o
+código com um parser e falha se isso acontecer, e esse teste tem o
+próprio teste. É isso que permite trocar WhatsApp por chat, ou telefone
+por WebRTC, sem tocar nos agentes.</li>
+<li><strong>Horários de contato são avaliados em
+<code>America/Sao_Paulo</code>, nunca em UTC</strong>: 08:00 UTC são
+05:00 no Brasil, um horário proibido.</li>
+<li><strong>Dados pessoais pseudonimizados</strong> com HMAC-SHA256 e
+uma chave derivada por inquilino. Transcrições têm retenção de 180 dias
+(LGPD, art. 15–16).</li>
+</ul>
+<h1 id="demonstração-o-canal-de-chat">Demonstração: o canal de chat</h1>
+<p>O widget é embutido em qualquer site com uma tag
+<code>&lt;script&gt;</code>, fica isolado em <em>shadow DOM</em> e fala
+com a API do sistema. As cenas abaixo são do servidor real, rodando
+localmente com o inquilino de demonstração.</p>
+<div class="row">
+<figure>
+<img src="img/01-chat-mensagem-proativa.png" style="width:46.0%"
+alt="A mensagem que o agente proativo deixou para a cliente, esperando na caixa de entrada quando ela abre o chat. Valor, atraso, condições e a instrução de opt-out vêm do motor de regras e da checagem de conformidade." />
+<figcaption aria-hidden="true">A mensagem que o agente proativo deixou
+para a cliente, esperando na caixa de entrada quando ela abre o chat.
+Valor, atraso, condições e a instrução de opt-out vêm do motor de regras
+e da checagem de conformidade.</figcaption>
+</figure>
+<figure>
+<img src="img/02-chat-resposta-juros.png" style="width:46.0%"
+alt="Dúvida sobre juros e multa, respondida a partir do FAQ, com as fontes recuperadas." />
+<figcaption aria-hidden="true">Dúvida sobre juros e multa, respondida a
+partir do FAQ, com as fontes recuperadas.</figcaption>
+</figure>
+</div>
+<div class="row">
+<figure>
+<img src="img/03-chat-resposta-parcelamento.png" style="width:46.0%"
+alt="Pedido de parcelamento: a resposta usa a faixa de atraso da cliente (8–30 dias) na tabela de parcelamento." />
+<figcaption aria-hidden="true">Pedido de parcelamento: a resposta usa a
+faixa de atraso da cliente (8–30 dias) na tabela de
+parcelamento.</figcaption>
+</figure>
+<figure>
+<img src="img/04-chat-escalacao-humano.png" style="width:46.0%"
+alt="Contestação de valor: o agente não discute, transfere para uma pessoa da equipe e a conversa entra na fila de escalação." />
+<figcaption aria-hidden="true">Contestação de valor: o agente não
+discute, transfere para uma pessoa da equipe e a conversa entra na fila
+de escalação.</figcaption>
+</figure>
+</div>
+<div class="pb">
+
+</div>
+<div class="row">
+<figure>
+<img src="img/05-chat-opt-out.png" style="width:46.0%"
+alt="Opt-out: o pedido é registrado e a supressão vale no agendamento e de novo no momento da entrega." />
+<figcaption aria-hidden="true">Opt-out: o pedido é registrado e a
+supressão vale no agendamento e de novo no momento da
+entrega.</figcaption>
+</figure>
+<figure>
+<img src="img/06-chat-celular.png" style="width:38.0%"
+alt="O mesmo widget num celular." />
+<figcaption aria-hidden="true">O mesmo widget num celular.</figcaption>
+</figure>
+</div>
+<figure>
+<img src="img/00-pagina-demo-com-widget.png" style="width:90.0%"
+alt="A página de exemplo com o widget aberto. O botão rosa da página hospedeira mostra que o estilo dela não vaza para o widget." />
+<figcaption aria-hidden="true">A página de exemplo com o widget aberto.
+O botão rosa da página hospedeira mostra que o estilo dela não vaza para
+o widget.</figcaption>
+</figure>
+<div class="pb">
+
+</div>
+<h1 id="módulo-preditivo">Módulo preditivo</h1>
+<p>Duas tarefas, ambas com divisão cronológica 70/15/15 (sem vazamento
+temporal) e validação cruzada <code>TimeSeriesSplit</code> com k = 5. O
+campeão é escolhido por <strong>precisão média (AP)</strong>, nunca por
+acurácia: com 17% de positivos, prever sempre a classe majoritária já dá
+83% de acurácia e não diz nada.</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Tarefa</th>
+<th style="text-align: left;">Campeão</th>
+<th style="text-align: right;">AP (teste)</th>
+<th style="text-align: right;">AP de referência¹</th>
+<th style="text-align: right;">ROC AUC</th>
+<th style="text-align: right;">F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Propensão ao pagamento</td>
+<td style="text-align: left;">XGBoost +
+<code>scale_pos_weight</code></td>
+<td style="text-align: right;"><strong>0,851</strong></td>
+<td style="text-align: right;">0,688</td>
+<td style="text-align: right;">0,735</td>
+<td style="text-align: right;">0,816</td>
+</tr>
+<tr>
+<td style="text-align: left;">Inadimplência futura</td>
+<td style="text-align: left;">XGBoost +
+<code>scale_pos_weight</code></td>
+<td style="text-align: right;"><strong>0,400</strong></td>
+<td style="text-align: right;">0,165</td>
+<td style="text-align: right;">0,812</td>
+<td style="text-align: right;">0,491</td>
+</tr>
+</tbody>
+</table>
+<p>¹ AP de um classificador sem informação, igual à taxa de positivos no
+teste.</p>
+<p>Seis candidatos por tarefa (regressão logística como baseline, Random
+Forest e XGBoost, cada um com <em>class weights</em> ou SMOTE). Na
+inadimplência futura o campeão <strong>multiplica por 2,4 a precisão
+média do acaso</strong>. Executado hoje sobre 11.177 e 10.780 registros
+sintéticos; 1.169 clientes pontuados pela API.</p>
+<figure>
+<img src="img/11-modelo-inadimplencia-curvas.png" style="width:85.0%"
+alt="Curvas ROC e precisão–revocação da tarefa de inadimplência futura (relatório versionado)." />
+<figcaption aria-hidden="true">Curvas ROC e precisão–revocação da tarefa
+de inadimplência futura (relatório versionado).</figcaption>
+</figure>
+<figure>
+<img src="img/12-modelo-inadimplencia-shap.png" style="width:70.0%"
+alt="Importância SHAP das variáveis na tarefa de inadimplência futura." />
+<figcaption aria-hidden="true">Importância SHAP das variáveis na tarefa
+de inadimplência futura.</figcaption>
+</figure>
+<h1 id="regras-de-contato-ancoradas-em-dado-real">Regras de contato
+ancoradas em dado real</h1>
+<p>A primeira evidência empírica do projeto veio da base pública
+<em>Bank Marketing</em> (UCI): a taxa de resposta <strong>cai de 13,0%
+para 5,5% ao longo de seis tentativas de contato</strong>, uma queda de
+58%. É daí que vêm <code>max_attempts = 4</code> e
+<code>cooldown = 48 h</code> no motor de regras: são números medidos,
+não chutados.</p>
+<figure>
+<img src="img/13-resposta-por-tentativa.png" style="width:75.0%"
+alt="Taxa de resposta por tentativa de contato (Bank Marketing)." />
+<figcaption aria-hidden="true">Taxa de resposta por tentativa de contato
+(Bank Marketing).</figcaption>
+</figure>
+<p>O orquestrador, numa rodada de demonstração
+(<code>collection demo</code>): 5 eventos processados, 2 contatos
+agendados com canal e estágio de atraso, <strong>1 contato suprimido por
+opt-out antes de chegar a qualquer agente</strong>.</p>
+<h1 id="avaliações-já-medidas">Avaliações já medidas</h1>
+<p>Cada módulo entra no artigo com um conjunto rotulado e uma comparação
+entre braços.</p>
+<p><strong>Recuperação (RAG)</strong>, sobre 16 perguntas rotuladas:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">k</th>
+<th style="text-align: right;">precisão@k</th>
+<th style="text-align: right;">revocação@k</th>
+<th style="text-align: right;">MRR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0,625</td>
+<td style="text-align: right;">0,583</td>
+<td style="text-align: right;">0,625</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0,375</td>
+<td style="text-align: right;">0,906</td>
+<td style="text-align: right;">0,771</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0,250</td>
+<td style="text-align: right;"><strong>1,000</strong></td>
+<td style="text-align: right;">0,783</td>
+</tr>
+</tbody>
+</table>
+<p>As perguntas que não ficam em 1º lugar são todas semânticas, não
+lexicais. Essa é a hipótese para a comparação com <em>embeddings</em>
+neurais.</p>
+<p><strong>Respostas</strong> (braço de controle, sem LLM), sobre 16
+perguntas: 87,5% ancoradas, <strong>100% fiéis</strong> às fontes, 85,7%
+de citações corretas, mediana de 2,4 ms.</p>
+<p><strong>Mensagens ativas</strong>, sobre 20 <em>briefs</em>:
+<strong>100% em conformidade</strong> (as cinco checagens legais),
+<strong>0 valores inventados</strong>, 0 mensagens acima do limite do
+SMS.</p>
+<p><strong>Voz: quanto custa o erro de reconhecimento</strong>, sobre 18
+áudios rotulados:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">WER</th>
+<th style="text-align: right;">intenção preservada</th>
+<th style="text-align: right;">valores intactos</th>
+<th style="text-align: right;">pedem confirmação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0,000</td>
+<td style="text-align: right;">1,000</td>
+<td style="text-align: right;">1,000</td>
+<td style="text-align: right;">0,444</td>
+</tr>
+<tr>
+<td style="text-align: right;">0,046</td>
+<td style="text-align: right;">0,967</td>
+<td style="text-align: right;">0,958</td>
+<td style="text-align: right;">0,444</td>
+</tr>
+<tr>
+<td style="text-align: right;">0,099</td>
+<td style="text-align: right;">0,856</td>
+<td style="text-align: right;">0,867</td>
+<td style="text-align: right;">0,433</td>
+</tr>
+<tr>
+<td style="text-align: right;">0,151</td>
+<td style="text-align: right;">0,833</td>
+<td style="text-align: right;">0,750</td>
+<td style="text-align: right;">0,433</td>
+</tr>
+</tbody>
+</table>
+<p>O erro não degrada o sistema de forma uniforme: a intenção sobrevive,
+mas um valor falado uma vez não. Com WER de ~10%, uma transcrição que se
+lê perfeitamente, um valor em cada sete já está errado. Por isso
+<strong>todo valor ouvido em áudio é lido de volta antes de virar
+ação</strong>.</p>
+<h1 id="a-api">A API</h1>
+<figure>
+<img src="img/07-api-swagger.png" style="width:85.0%"
+alt="Os endpoints: o canal de chat (sessões, mensagens, áudio, recibos de entrega) e a pontuação preditiva." />
+<figcaption aria-hidden="true">Os endpoints: o canal de chat (sessões,
+mensagens, áudio, recibos de entrega) e a pontuação
+preditiva.</figcaption>
+</figure>
+<h1 id="o-que-falta">O que falta</h1>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">Data</th>
+<th style="text-align: left;">Entrega</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">15</td>
+<td style="text-align: left;">05/11</td>
+<td style="text-align: left;">Chamada de voz em tempo real
+(WebRTC/LiveKit) + tabela de tempo de turno</td>
+<td style="text-align: left;"><strong>não iniciada</strong>: falta
+escolher o TTS</td>
+</tr>
+<tr>
+<td style="text-align: left;">16</td>
+<td style="text-align: left;">12/11</td>
+<td style="text-align: left;">Suíte de testes + experimento controlado
+contra os dois baselines</td>
+<td style="text-align: left;">testes prontos (689); experimento a
+desenhar</td>
+</tr>
+<tr>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;">19/11</td>
+<td style="text-align: left;">Resultados consolidados e análise
+estatística</td>
+<td style="text-align: left;">metade medida (acima); braços com LLM
+ainda não executados</td>
+</tr>
+<tr>
+<td style="text-align: left;">18</td>
+<td style="text-align: left;">26/11</td>
+<td style="text-align: left;">Artigo completo revisado</td>
+<td style="text-align: left;">o artigo ainda está na versão de
+proposta</td>
+</tr>
+<tr>
+<td style="text-align: left;">19</td>
+<td style="text-align: left;">03/12</td>
+<td style="text-align: left;">Versão final, <em>slides</em>, defesa</td>
+<td style="text-align: left;">—</td>
+</tr>
+</tbody>
+</table>
+<figure>
+<img src="img/15-voz-mockup.png" style="width:60.0%"
+alt="Protótipo de tela do canal de voz em tempo real (entrega 15)." />
+<figcaption aria-hidden="true">Protótipo de tela do canal de voz em
+tempo real (entrega 15).</figcaption>
+</figure>
+<p><strong>Mudanças de escopo já registradas</strong>
+(<code>cronograma.md</code>, §2): a WhatsApp Business API foi trocada
+pelo canal de chat simulado, e a telefonia comutada pela chamada WebRTC.
+O critério: uma integração só entra se acrescentar uma decisão nova a
+algum agente. Ambas acrescentariam apenas transporte, conta comercial e
+contrato de faturamento.</p>
+<h1 id="notas-sobre-esta-prévia">Notas sobre esta prévia</h1>
+<ul>
+<li><strong>Os dados são sintéticos ou públicos.</strong> A extração do
+ERP não aconteceu; a comparação operacional antes/depois virou limitação
+documentada (<code>docs/data-acquisition-plan.md</code>).</li>
+<li><strong>O texto das respostas no chat foi gerado por um modelo
+simulado.</strong> Não havia chave de API de LLM configurada nesta
+máquina, então a etapa de geração foi substituída por respostas
+roteirizadas, escritas a partir dos mesmos documentos da base.
+Recuperação, classificação de intenção, escalação, <em>opt-out</em> e
+recibos de entrega são o código real. Sem chave, o sistema real responde
+citando os trechos recuperados na íntegra.</li>
+<li>As métricas desta prévia vêm de execuções de 06/11/2026; a saída
+bruta está em <code>terminal/</code>.</li>
+</ul>
+</body>
+</html>

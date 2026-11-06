@@ -1,0 +1,16 @@
+ Events processed, in the order the orchestrator handled them 
+┏━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ # ┃ event             ┃ customer ┃ priority   ┃ handled by ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 1 │ message_received  │ cus_c    │ responsive │ responsive │
+│ 2 │ overdue_detected  │ cus_a    │ proactive  │ proactive  │
+│ 3 │ risk_detected     │ cus_b    │ proactive  │ proactive  │
+│ 4 │ contact_scheduled │ cus_a    │ proactive  │ predictive │
+│ 5 │ contact_scheduled │ cus_b    │ proactive  │ predictive │
+└───┴───────────────────┴──────────┴────────────┴────────────┘
+suppressed overdue_detected for cus_optout (opted out)
+scheduled cus_a via chat (stage 8-30, attempt 1, expected value R$ 162.38)
+scheduled cus_b via voice (stage 31-60, attempt 1, expected value R$ 440.6)
+unrouted reply_sent (no agent handles it yet)
+
+summary {'processed': 5, 'produced': 3, 'suppressed': 1, 'unrouted': 1}

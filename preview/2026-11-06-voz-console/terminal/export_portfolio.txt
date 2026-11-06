@@ -1,0 +1,11 @@
+1167 customers
+          p_pay  p_default
+count  1167.000   1167.000
+mean      0.532      0.433
+std       0.167      0.176
+min       0.203      0.043
+25%       0.393      0.288
+50%       0.521      0.434
+75%       0.669      0.577
+max       0.909      0.812
+{'threshold': 0.21999999999999997, 'champion': 'propensity', 'version': 1} {'threshold': 0.59, 'champion': 'default', 'version': 1}

@@ -1,0 +1,8 @@
+indexed 5 documents -> 9 chunks (tfidf, 4515 dims, mean 78.1 words/chunk)
+
+Retrieval over 16 labelled questions
+ k  precision@k  recall@k    mrr  questions
+ 1        0.625    0.5833 0.6250         16
+ 3        0.375    0.9062 0.7708         16
+ 5        0.250    1.0000 0.7833         16
+10        0.125    1.0000 0.7833         16

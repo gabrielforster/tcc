@@ -1,0 +1,24 @@
+ok synthetic: 1200 customers, 12000 receivables
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/raw/customers.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/raw/invoices.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/raw/collection_events.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/raw/agreements.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/raw/source.json
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/interim/customers.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/interim/invoices.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/interim/collection_events.parquet
+  tenants/d5aa8cc8-7ee1-43e7-a1f8-5bfd25cb76df/interim/agreements.parquet
+ok /home/gabriel/Work/personal/tcc/docs/data-dictionary.md
+ok /home/gabriel/Work/personal/tcc/docs/eda-synthetic.md
+
+Task: propensity (target `target_payment_propensity`)
+     split    n      start        end  positive_rate
+     train 7823 2024-06-04 2026-02-06         0.6978
+validation 1677 2026-02-06 2026-06-08         0.7066
+      test 1677 2026-06-08 2026-10-07         0.6881
+
+Task: default (target `target_future_default`)
+     split    n      start        end  positive_rate
+     train 7545 2024-05-20 2025-12-15         0.1765
+validation 1618 2025-12-15 2026-04-12         0.1700
+      test 1617 2026-04-12 2026-08-23         0.1651

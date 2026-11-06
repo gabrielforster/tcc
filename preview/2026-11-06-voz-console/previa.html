@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Gabriel Forster Rocha" />
+  <title>Prévia — voz e console</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Prévia: voz e console interno</h1>
+<p class="subtitle">Sistema Multiagente Inteligente de Cobrança com LLM,
+RAG e Machine Learning</p>
+<p class="author">Gabriel Forster Rocha</p>
+<p class="date">06/11/2026 — pré-apresentação, parte 2</p>
+</header>
+<h1 id="o-que-esta-prévia-mostra">O que esta prévia mostra</h1>
+<p>Duas partes do sistema que ainda <strong>não estão
+construídas</strong> e que aqui aparecem como protótipos de tela,
+montados sobre o que <strong>já existe e foi medido</strong>:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;"></th>
+<th style="text-align: left;">Tela</th>
+<th style="text-align: left;">O que é real</th>
+<th style="text-align: left;">O que é protótipo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;"><strong>Chamada de voz</strong> (entrega
+15)</td>
+<td style="text-align: left;">o áudio (sintetizado localmente pelo
+Piper), a transcrição pelo Whisper local, a intenção, a consulta à base,
+a regra de leitura de volta e todos os tempos medidos</td>
+<td style="text-align: left;">a tela, o transporte WebRTC, a geração do
+texto do agente</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;"><strong>Console interno</strong></td>
+<td style="text-align: left;">as probabilidades dos dois modelos
+publicados e o porquê de cada uma (SHAP) para os 1.167 clientes; a
+tabela de parcelamento e os limites de alçada</td>
+<td style="text-align: left;">a tela, os nomes, os contadores
+operacionais do dia</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Arquivos que acompanham este PDF:</strong></p>
+<ul>
+<li><code>video/00-demo-voz-e-console.mp4</code>: as duas demonstrações
+com cartelas, 1 min 58 s, <strong>com áudio</strong></li>
+<li><code>video/02-chamada-de-voz.mp4</code>: a chamada completa, 69 s,
+com áudio</li>
+<li><code>video/01-console.mp4</code>: o percurso pelo console, 40
+s</li>
+<li><code>img/</code>: todas as telas em alta resolução</li>
+<li><code>mock/</code>: as páginas do protótipo, que abrem no navegador
+(<code>console.html</code>, <code>voz.html</code>)</li>
+</ul>
+<div class="pb">
+
+</div>
+<h1 id="a-chamada-de-voz">1. A chamada de voz</h1>
+<p>O cliente atende uma chamada no navegador. O aviso de gravação é a
+primeira frase e não pode ser pulado. Ao lado, o painel <strong>Por
+dentro do agente</strong> mostra, a cada turno, o que o sistema ouviu, o
+que entendeu, o que consultou e quanto tempo cada etapa levou.</p>
+<div class="row">
+<figure>
+<img src="img/31-voz-agente-abertura.png" style="width:48.0%"
+alt="Abertura: o aviso de gravação vem antes de qualquer outra coisa." />
+<figcaption aria-hidden="true">Abertura: o aviso de gravação vem antes
+de qualquer outra coisa.</figcaption>
+</figure>
+<figure>
+<img src="img/32-voz-interrupcao.png" style="width:48.0%"
+alt="Interrupção: o cliente começa a falar e o agente para no meio da frase." />
+<figcaption aria-hidden="true">Interrupção: o cliente começa a falar e o
+agente para no meio da frase.</figcaption>
+</figure>
+</div>
+<div class="row">
+<figure>
+<img src="img/33-voz-leitura-de-volta.png" style="width:48.0%"
+alt="Leitura de volta: um valor dito por voz nunca vira ação sem ser confirmado." />
+<figcaption aria-hidden="true">Leitura de volta: um valor dito por voz
+nunca vira ação sem ser confirmado.</figcaption>
+</figure>
+<figure>
+<img src="img/35-voz-encerrada.png" style="width:48.0%"
+alt="Fim da chamada: acordo proposto dentro da alçada, registro enviado ao console." />
+<figcaption aria-hidden="true">Fim da chamada: acordo proposto dentro da
+alçada, registro enviado ao console.</figcaption>
+</figure>
+</div>
+<p><strong>O roteiro.</strong> Carlos deve R$ 840,00 com 35 dias de
+atraso, o que o coloca na faixa de 31 a 60 dias da tabela: entrada
+mínima de 15%, até 10 parcelas, 20% de desconto à vista e juros de 1,5%
+ao mês. Ele oferece R$ 450,00 de entrada e o restante em 3 vezes de R$
+130,00: dentro da alçada automática (até 12 parcelas) e acima da parcela
+mínima de R$ 50,00.</p>
+<div class="pb">
+
+</div>
+<h2 id="o-que-cada-turno-custa">O que cada turno custa</h2>
+<p>Medido nesta máquina (Ryzen 7 5700X3D, só CPU) com o código do
+projeto: o áudio do cliente foi sintetizado pelo Piper, transcrito pelo
+<code>WhisperTranscriber</code> (modelo <code>small</code>, int8), e o
+texto passou pelo classificador de intenção, pela resolução de intenção
+pelo contexto da conversa, pela busca na base e pela regra
+<code>needs_confirmation</code>.</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">O cliente disse</th>
+<th style="text-align: left;">O Whisper ouviu</th>
+<th style="text-align: left;">Intenção</th>
+<th style="text-align: center;">Lê de volta?</th>
+<th style="text-align: right;">STT</th>
+<th style="text-align: right;">Turno</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">“Pode falar, sim.”</td>
+<td style="text-align: left;">“Pode falar? Sim.”</td>
+<td style="text-align: left;">segunda via ⚠</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: right;">1.174 ms</td>
+<td style="text-align: right;">2,38 s</td>
+</tr>
+<tr>
+<td style="text-align: left;">“Quero parcelar. Consigo dar quatrocentos
+e cinquenta reais de entrada.”</td>
+<td style="text-align: left;">“Quero, pessoal, consigo dar 450 reais de
+entrada.”</td>
+<td style="text-align: left;">negociação</td>
+<td style="text-align: center;"><strong>450</strong></td>
+<td style="text-align: right;">1.445 ms</td>
+<td style="text-align: right;">2,58 s</td>
+</tr>
+<tr>
+<td style="text-align: left;">“Isso, pode ser.”</td>
+<td style="text-align: left;">“Isso. Pode ser.”</td>
+<td style="text-align: left;">segunda via ⚠</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: right;">1.350 ms</td>
+<td style="text-align: right;">2,47 s</td>
+</tr>
+<tr>
+<td style="text-align: left;">“Em três vezes.”</td>
+<td style="text-align: left;">“e três vezes”</td>
+<td style="text-align: left;">negociação</td>
+<td style="text-align: center;"><strong>três</strong></td>
+<td style="text-align: right;">1.209 ms</td>
+<td style="text-align: right;">2,34 s</td>
+</tr>
+<tr>
+<td style="text-align: left;">“Não, obrigado.”</td>
+<td style="text-align: left;">“Não, obrigado.”</td>
+<td style="text-align: left;">conversa</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: right;">1.384 ms</td>
+<td style="text-align: right;">2,53 s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tempo de turno</strong> (do fim da fala ao primeiro som da
+resposta), mediana <strong>2,47 s</strong>:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Etapa</th>
+<th style="text-align: right;">Tempo</th>
+<th style="text-align: left;">Origem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Detecção de fim de turno</td>
+<td style="text-align: right;">500 ms</td>
+<td style="text-align: left;">configurado (janela de silêncio), não
+medido</td>
+</tr>
+<tr>
+<td style="text-align: left;">Transcrição (Whisper <code>small</code>,
+local)</td>
+<td style="text-align: right;"><strong>1.174–1.445 ms</strong></td>
+<td style="text-align: left;">medido</td>
+</tr>
+<tr>
+<td style="text-align: left;">Intenção + base de conhecimento</td>
+<td style="text-align: right;">2,5–3,5 ms</td>
+<td style="text-align: left;">medido</td>
+</tr>
+<tr>
+<td style="text-align: left;">Geração do texto</td>
+<td style="text-align: right;">600 ms</td>
+<td style="text-align: left;"><strong>simulado</strong>: sem chave de
+LLM nesta máquina</td>
+</tr>
+<tr>
+<td style="text-align: left;">Primeiro áudio da resposta (Piper,
+local)</td>
+<td style="text-align: right;">21–101 ms</td>
+<td style="text-align: left;">medido</td>
+</tr>
+</tbody>
+</table>
+<h2 id="o-que-a-prévia-revelou">O que a prévia revelou</h2>
+<ol type="1">
+<li><strong>A transcrição domina o tempo do turno.</strong> A síntese de
+voz local é quase gratuita: o Piper produz o primeiro áudio em 21–101 ms
+e fala 38 vezes mais rápido que o tempo real. Já o Whisper leva cerca de
+1,3 s por frase, na proporção de 0,5 s de processamento por segundo de
+fala. A primeira otimização a tentar é transcrever enquanto o cliente
+ainda fala, não trocar a voz.</li>
+<li><strong>O erro de reconhecimento atingiu os valores, como a medição
+anterior previu.</strong> “Quero parcelar” virou “Quero, pessoal” (40%
+de palavras erradas) e, mesmo assim, a intenção (<em>negociação</em>) e
+o valor (450) sobreviveram. Os dois valores falados na chamada
+dispararam a leitura de volta, e é por isso que ela existe.</li>
+<li><strong>Uma lacuna real: a resposta a uma pergunta de
+sim/não.</strong> “Pode falar, sim” e “Isso, pode ser” foram
+classificadas como <em>segunda via</em>. Uma palavra casou fracamente
+com uma frase-pista dessa intenção, com confiança de 0,076, acima do
+mínimo de 0,04. Assim o agente se considera seguro e nem consulta o
+contexto da conversa. No chat isso quase não aparece; na voz, onde toda
+leitura de volta termina num “sim”, aparece em todo turno.
+<strong>Correção para a entrega 15:</strong> depois de uma leitura de
+volta, a próxima fala é tratada como confirmação (sim/não), não
+reclassificada.</li>
+<li><strong>Um defeito encontrado no caminho:</strong> com a versão 19
+da biblioteca <code>av</code> instalada pelo <code>uv.lock</code>, a
+transcrição real pelo Whisper falha (<code>metadata_errors</code>). A CI
+não percebe porque usa o transcritor roteirizado. Fixar
+<code>av&lt;19</code> resolve; as medições acima foram feitas com
+<code>av</code> 18.</li>
+</ol>
+<h1 id="o-console-interno-como-os-modelos-enxergam-cada-cliente">2. O
+console interno: como os modelos enxergam cada cliente</h1>
+<p>Cada ponto do gráfico é um cliente real da base de demonstração. A
+posição vem das duas probabilidades que os modelos publicados calculam
+para ele: <strong>propensão a pagar</strong> (eixo horizontal) e
+<strong>risco de inadimplência</strong> (eixo vertical).</p>
+<figure>
+<img src="img/20-console-painel.png" style="width:100.0%"
+alt="Painel da carteira: 1.167 clientes, R$ 10,0 milhões em aberto, divididos em quatro segmentos." />
+<figcaption aria-hidden="true">Painel da carteira: 1.167 clientes, R$
+10,0 milhões em aberto, divididos em quatro segmentos.</figcaption>
+</figure>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Segmento</th>
+<th style="text-align: left;">Regra</th>
+<th style="text-align: right;">Clientes</th>
+<th style="text-align: right;">P(pagar)</th>
+<th style="text-align: right;">P(inadimplir)</th>
+<th style="text-align: right;">Atraso médio histórico</th>
+<th style="text-align: right;">Faturas pagas com atraso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Alto risco</strong></td>
+<td style="text-align: left;">inadimplência ≥ limiar ajustado (59%)</td>
+<td style="text-align: right;">268</td>
+<td style="text-align: right;">32%</td>
+<td style="text-align: right;">67%</td>
+<td style="text-align: right;">178 dias</td>
+<td style="text-align: right;">92%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Baixa propensão</strong></td>
+<td style="text-align: left;">propensão &lt; 40%</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">38%</td>
+<td style="text-align: right;">56%</td>
+<td style="text-align: right;">113 dias</td>
+<td style="text-align: right;">87%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Atenção</strong></td>
+<td style="text-align: left;">o restante</td>
+<td style="text-align: right;">540</td>
+<td style="text-align: right;">53%</td>
+<td style="text-align: right;">43%</td>
+<td style="text-align: right;">41 dias</td>
+<td style="text-align: right;">55%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Bom pagador</strong></td>
+<td style="text-align: left;">risco &lt; 30% e propensão ≥ 60%</td>
+<td style="text-align: right;">314</td>
+<td style="text-align: right;">74%</td>
+<td style="text-align: right;">21%</td>
+<td style="text-align: right;">7 dias</td>
+<td style="text-align: right;">34%</td>
+</tr>
+</tbody>
+</table>
+<p>Os segmentos não foram desenhados à mão sobre o histórico: saem das
+duas probabilidades. O histórico de cada segmento (as duas últimas
+colunas) mostra que eles separam comportamentos de fato diferentes. A
+probabilidade de inadimplência não está calibrada (o modelo foi treinado
+com peso extra na classe rara), por isso o corte usa o <strong>limiar
+ajustado do próprio modelo</strong>, não 50%.</p>
+<div class="pb">
+
+</div>
+<h2 id="um-cliente-de-cada-lado">Um cliente de cada lado</h2>
+<div class="row">
+<figure>
+<img src="img/22-console-cliente-alto-risco.png" style="width:48.0%"
+alt="Alto risco: 683 dias de atraso, todas as 7 faturas do histórico pagas com atraso. A faixa da tabela permitiria 18 parcelas e 40% de desconto, mas a alçada automática para em 12x e 20%: acima disso, uma pessoa aprova." />
+<figcaption aria-hidden="true">Alto risco: 683 dias de atraso, todas as
+7 faturas do histórico pagas com atraso. A faixa da tabela permitiria 18
+parcelas e 40% de desconto, mas a alçada automática para em 12x e 20%:
+acima disso, uma pessoa aprova.</figcaption>
+</figure>
+<figure>
+<img src="img/24-console-cliente-bom-pagador.png" style="width:48.0%"
+alt="Bom pagador: atraso médio de 7 dias em 12 faturas, nada vencido (R$ 101,5 mil a vencer). Fica fora da fila de cobrança e recebe só lembrete preventivo." />
+<figcaption aria-hidden="true">Bom pagador: atraso médio de 7 dias em 12
+faturas, nada vencido (R$ 101,5 mil a vencer). Fica fora da fila de
+cobrança e recebe só lembrete preventivo.</figcaption>
+</figure>
+</div>
+<p><strong>Por que os modelos dizem isso.</strong> Para cada cliente, a
+contribuição SHAP de cada variável, na média das suas faturas. As
+explicações batem com o histórico: no cliente de alto risco, o atraso
+médio histórico e a proporção de faturas pagas com atraso empurram o
+risco para cima; no bom pagador, o mesmo atraso médio histórico (7 dias)
+é o que mais o empurra para baixo, seguido pelo limite de crédito e pelo
+atraso das últimas faturas.</p>
+<p><strong>Próxima ação.</strong> O console junta o que os modelos dizem
+com o que as regras permitem: janela de horário legal (em
+<code>America/Sao_Paulo</code>), limite de tentativas e intervalo
+medidos na base Bank Marketing, canal preferido do cliente, a faixa da
+tabela de parcelamento e os limites de alçada.</p>
+<div class="row">
+<figure>
+<img src="img/21-console-carteira-alto-risco.png" style="width:48.0%"
+alt="A carteira ordenada pela fila de contato: risco de inadimplência × valor em aberto." />
+<figcaption aria-hidden="true">A carteira ordenada pela fila de contato:
+risco de inadimplência × valor em aberto.</figcaption>
+</figure>
+<figure>
+<img src="img/25-console-cliente-atencao.png" style="width:48.0%"
+alt="Um cliente no segmento Atenção." />
+<figcaption aria-hidden="true">Um cliente no segmento
+Atenção.</figcaption>
+</figure>
+</div>
+<div class="pb">
+
+</div>
+<h2 id="quando-o-agente-entrega-a-conversa-para-uma-pessoa">Quando o
+agente entrega a conversa para uma pessoa</h2>
+<div class="row">
+<figure>
+<img src="img/26-console-fila-escalacao.png" style="width:48.0%"
+alt="Fila de escalação: cada item diz qual regra mandou a conversa para uma pessoa." />
+<figcaption aria-hidden="true">Fila de escalação: cada item diz qual
+regra mandou a conversa para uma pessoa.</figcaption>
+</figure>
+<figure>
+<img src="img/27-console-conversa-assumida.png" style="width:48.0%"
+alt="A operadora assume a conversa da Marina, a cliente da demonstração de chat, e o agente fica pausado." />
+<figcaption aria-hidden="true">A operadora assume a conversa da Marina,
+a cliente da demonstração de chat, e o agente fica pausado.</figcaption>
+</figure>
+</div>
+<div class="row">
+<figure>
+<img src="img/28-console-conversa-resolvida.png" style="width:48.0%"
+alt="Resolvida: é só a resolução que encerra uma conversa escalada, e é ela que inicia o prazo de retenção de 180 dias." />
+<figcaption aria-hidden="true">Resolvida: é só a resolução que encerra
+uma conversa escalada, e é ela que inicia o prazo de retenção de 180
+dias.</figcaption>
+</figure>
+<figure>
+<img src="img/29-console-chamada-registro.png" style="width:48.0%"
+alt="O registro da chamada de voz: transcrição, decisões de cada turno e o acordo proposto." />
+<figcaption aria-hidden="true">O registro da chamada de voz:
+transcrição, decisões de cada turno e o acordo proposto.</figcaption>
+</figure>
+</div>
+<p>A fila e o “assumir/resolver” já existem no código (PR #29, comandos
+<code>make queue</code>, <code>claim</code>, <code>resolve</code>); o
+que esta tela acrescenta é a interface.</p>
+<h1 id="notas-sobre-esta-prévia">Notas sobre esta prévia</h1>
+<ul>
+<li><strong>As probabilidades e as explicações são reais</strong>: saem
+dos modelos publicados (v1), aplicados aos 1.167 clientes da base
+sintética de demonstração, pelo mesmo caminho do comando
+<code>collection score</code>. O script está em
+<code>scripts/export_portfolio.py</code>.</li>
+<li><strong>Os nomes são fictícios</strong> e gerados a partir do
+identificador pseudonimizado. Marina e Carlos são clientes de
+demonstração; os medidores da Marina são ilustrativos.</li>
+<li><strong>Contadores do dia</strong> no painel (148 contatos, 12
+suprimidos, 3 escalados) são ilustrativos.</li>
+<li><strong>O texto do agente na chamada é roteirizado</strong> a partir
+da tabela de parcelamento e dos limites de alçada; a etapa de geração
+aparece no tempo de turno como 600 ms simulados.</li>
+<li><strong>As duas vozes são do Piper</strong> (<code>faber</code> para
+o agente, <code>jeff</code> para o cliente), rodando localmente: nenhum
+áudio saiu da máquina. É também a candidata natural para a decisão de
+TTS da entrega 15.</li>
+</ul>
+</body>
+</html>

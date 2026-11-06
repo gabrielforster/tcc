@@ -1,0 +1,7 @@
+
+Composers over 20 labelled briefs
+composer  messages  compliant  sendable  invented_figures  over_authority  disclosures  distinctness  pairs  
+mean_chars  over_cap  p95_ms  fallbacks
+template        20        1.0       1.0               0.0             0.0          1.0         0.307     16   
+231.0         0     0.0          0
+report -> /home/gabriel/Work/personal/tcc/docs/outreach-comparison.md

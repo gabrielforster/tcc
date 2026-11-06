@@ -1,0 +1,179 @@
+{
+ "end_of_turn_ms": 500,
+ "whisper_model": "small",
+ "turns": [
+  {
+   "n": 1,
+   "speaker": "agente",
+   "text": "Olá, Carlos. Aqui é o atendimento automático da Simplifica. Esta chamada é gravada e transcrita. Podemos falar sobre a sua fatura em aberto?",
+   "audio": "01-agente.wav",
+   "audio_ms": 8011,
+   "tts_total_ms": 183,
+   "tts_first_audio_ms": 26
+  },
+  {
+   "n": 2,
+   "speaker": "cliente",
+   "text": "Pode falar, sim.",
+   "audio": "02-cliente.wav",
+   "audio_ms": 1916,
+   "heard": "Pode falar? Sim.",
+   "wer": 0.0,
+   "stt_ms": 1174,
+   "intent": "second_copy",
+   "confidence": 0.397,
+   "intent_ms": 1.95,
+   "intent_alone": "second_copy",
+   "inherited": false,
+   "retrieved": [
+    "limites-de-alcada.md",
+    "faq.md",
+    "politica-de-cobranca.md"
+   ],
+   "retrieval_ms": 1.17,
+   "figures": [],
+   "read_back": false
+  },
+  {
+   "n": 3,
+   "speaker": "agente",
+   "text": "Sua fatura de oitocentos e quarenta reais está com trinta e cinco dias de atraso. Você pode pagar à vista com vinte por cento de desconto, ou parcelar em até dez vezes, com entrada mínima de quinze por cento.",
+   "audio": "03-agente.wav",
+   "audio_ms": 11018,
+   "tts_total_ms": 283,
+   "tts_first_audio_ms": 101
+  },
+  {
+   "n": 4,
+   "speaker": "cliente",
+   "text": "Quero parcelar. Consigo dar quatrocentos e cinquenta reais de entrada.",
+   "audio": "04-cliente.wav",
+   "audio_ms": 5085,
+   "heard": "Quero, pessoal, consigo dar 450 reais de entrada.",
+   "wer": 0.4,
+   "stt_ms": 1445,
+   "intent": "negotiation",
+   "confidence": 0.132,
+   "intent_ms": 2.0,
+   "intent_alone": "negotiation",
+   "inherited": false,
+   "retrieved": [
+    "script-de-negociacao.md",
+    "politica-de-cobranca.md",
+    "limites-de-alcada.md"
+   ],
+   "retrieval_ms": 1.35,
+   "figures": [
+    "450"
+   ],
+   "read_back": true
+  },
+  {
+   "n": 5,
+   "speaker": "agente",
+   "text": "Só para confirmar: entrada de quatrocentos e cinquenta reais, certo?",
+   "audio": "05-agente.wav",
+   "audio_ms": 3831,
+   "tts_total_ms": 90,
+   "tts_first_audio_ms": 30
+  },
+  {
+   "n": 6,
+   "speaker": "cliente",
+   "text": "Isso, pode ser.",
+   "audio": "06-cliente.wav",
+   "audio_ms": 2136,
+   "heard": "Isso. Pode ser.",
+   "wer": 0.0,
+   "stt_ms": 1350,
+   "intent": "second_copy",
+   "confidence": 0.076,
+   "intent_ms": 1.49,
+   "intent_alone": "second_copy",
+   "inherited": false,
+   "retrieved": [
+    "limites-de-alcada.md",
+    "faq.md",
+    "politica-de-cobranca.md"
+   ],
+   "retrieval_ms": 1.02,
+   "figures": [],
+   "read_back": false
+  },
+  {
+   "n": 7,
+   "speaker": "agente",
+   "text": "Perfeito. O restante, trezentos e noventa reais, pode ficar em até dez parcelas. Em quantas vezes você prefere?",
+   "audio": "07-agente.wav",
+   "audio_ms": 6362,
+   "tts_total_ms": 159,
+   "tts_first_audio_ms": 21
+  },
+  {
+   "n": 8,
+   "speaker": "cliente",
+   "text": "Em três vezes.",
+   "audio": "08-cliente.wav",
+   "audio_ms": 1718,
+   "heard": "e três vezes",
+   "wer": 0.333,
+   "stt_ms": 1209,
+   "intent": "negotiation",
+   "confidence": 0.377,
+   "intent_ms": 2.2,
+   "intent_alone": "negotiation",
+   "inherited": false,
+   "retrieved": [
+    "limites-de-alcada.md",
+    "faq.md",
+    "politica-de-cobranca.md"
+   ],
+   "retrieval_ms": 1.33,
+   "figures": [
+    "três"
+   ],
+   "read_back": true
+  },
+  {
+   "n": 9,
+   "speaker": "agente",
+   "text": "Combinado: entrada de quatrocentos e cinquenta reais e três parcelas de cento e trinta reais, com juros de um vírgula cinco por cento ao mês. Vou enviar o boleto da entrada por mensagem. Posso ajudar em mais alguma coisa?",
+   "audio": "09-agente.wav",
+   "audio_ms": 11900,
+   "tts_total_ms": 350,
+   "tts_first_audio_ms": 24
+  },
+  {
+   "n": 10,
+   "speaker": "cliente",
+   "text": "Não, obrigado.",
+   "audio": "10-cliente.wav",
+   "audio_ms": 2171,
+   "heard": "Não, obrigado.",
+   "wer": 0.0,
+   "stt_ms": 1384,
+   "intent": "small_talk",
+   "confidence": 0.5,
+   "intent_ms": 1.83,
+   "intent_alone": "small_talk",
+   "inherited": false,
+   "retrieved": [
+    "politica-de-cobranca.md",
+    "script-de-negociacao.md",
+    "faq.md"
+   ],
+   "retrieval_ms": 1.36,
+   "figures": [],
+   "read_back": false
+  },
+  {
+   "n": 11,
+   "speaker": "agente",
+   "text": "Obrigado, Carlos. Tenha um ótimo dia.",
+   "audio": "11-agente.wav",
+   "audio_ms": 2368,
+   "tts_total_ms": 75,
+   "tts_first_audio_ms": 40
+  }
+ ]
+}

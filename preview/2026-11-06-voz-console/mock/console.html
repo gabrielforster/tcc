@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Console de cobrança — protótipo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --green: #17423a; --green-2: #1f5a4e; --accent: #2e8b6e; --mint: #d6ece4; --bg: #f4f6f5;
+    --ink: #1c2522; --muted: #66756f; --line: #e1e8e5; --card: #fff;
+    --good: #2e8b6e; --warn: #d9a21b; --risk: #c94a3d; --low: #6d6fb3;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 "Inter", "Noto Sans", system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+  .app { display: grid; grid-template-columns: 228px 1fr; min-height: 100vh; }
+  nav { background: var(--green); color: #dceee8; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 15px; margin: 2px 6px 20px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; font-weight: 800; }
+  .brand small { display: block; font-weight: 500; color: #9fcbbd; font-size: 11px; }
+  nav a { color: inherit; text-decoration: none; padding: 9px 12px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  nav a:hover { background: rgba(255,255,255,.06); }
+  nav a.on { background: rgba(255,255,255,.12); color: #fff; }
+  nav a .badge { margin-left: auto; background: #e8574a; color: #fff; border-radius: 10px; font-size: 11px; padding: 1px 7px; font-weight: 700; }
+  nav .foot { margin-top: auto; font-size: 11.5px; color: #9fcbbd; padding: 10px 8px 0; border-top: 1px solid rgba(255,255,255,.1); }
+  nav .foot b { color: #fff; display: block; font-size: 12.5px; }
+  main { padding: 22px 28px 40px; overflow: hidden; }
+  header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  header.top h1 { font-size: 21px; margin: 0; letter-spacing: -.2px; }
+  header.top .sub { color: var(--muted); font-size: 13px; }
+  header.top .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .pill { font-size: 11.5px; padding: 3px 9px; border-radius: 20px; background: var(--mint); color: var(--green); font-weight: 600; white-space: nowrap; }
+  .pill.gray { background: #eceeed; color: #55625d; }
+  .grid { display: grid; gap: 14px; }
+  .k4 { grid-template-columns: repeat(4, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 10px; font-size: 13.5px; color: #34413c; display: flex; align-items: center; gap: 8px; }
+  .card h3 .hint { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; }
+  .kpi .v { font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
+  .kpi .l { color: var(--muted); font-size: 12.5px; }
+  .kpi .d { font-size: 12px; margin-top: 4px; }
+  .seg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+  .seg i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .s-bom { background: #e2f3ec; color: #1d6b52; } .s-bom i { background: var(--good); }
+  .s-aten { background: #fbf1d8; color: #8a6510; } .s-aten i { background: var(--warn); }
+  .s-baixa { background: #e9e9f6; color: #4a4c8a; } .s-baixa i { background: var(--low); }
+  .s-risco { background: #f9e3e0; color: #9c3329; } .s-risco i { background: var(--risk); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .3px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 10px; border-bottom: 1px solid #eef2f0; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: #f6faf8; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { height: 7px; border-radius: 4px; background: #edf1ef; position: relative; overflow: hidden; min-width: 70px; }
+  .bar b { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+  .chips { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: #fff; border-radius: 20px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; font-weight: 500; }
+  .chip.on { border-color: var(--green); background: var(--green); color: #fff; }
+  .btn { border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: 13px; cursor: pointer; background: var(--green); color: #fff; }
+  .btn.ghost { background: #fff; color: var(--green); border: 1px solid var(--line); }
+  .btn.ok { background: var(--accent); }
+  .muted { color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; }
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .gauge { display: flex; align-items: center; gap: 16px; }
+  .gauge svg { flex: none; }
+  .gauge .t { font-size: 12.5px; color: var(--muted); }
+  .gauge .t b { display: block; font-size: 15px; color: var(--ink); }
+  .why { display: grid; grid-template-columns: 1fr 120px; gap: 6px 12px; align-items: center; font-size: 13px; }
+  .why .b { height: 10px; position: relative; background: #f1f4f2; border-radius: 5px; }
+  .why .b span { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+  .why .b .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #c9d3cf; }
+  .rule { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #e6ece9; font-size: 13px; }
+  .rule:last-child { border: 0; }
+  .rule .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex: none; color: #fff; }
+  .ic.y { background: var(--good); } .ic.n { background: var(--risk); } .ic.h { background: var(--warn); }
+  .q { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
+  .q:last-child { border: 0; }
+  .q .who { font-weight: 600; } .q .why2 { font-size: 13px; color: #45514c; }
+  .q .meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; margin-top: 2px; }
+  .chat { background: #efece4; border-radius: 12px; padding: 14px; height: 455px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 78%; padding: 8px 11px; border-radius: 10px; font-size: 13.2px; background: #fff; box-shadow: 0 1px 1px rgba(0,0,0,.05); }
+  .msg.me { align-self: flex-end; background: #d5ece2; }
+  .msg.op { align-self: flex-end; background: #17423a; color: #fff; }
+  .msg .who { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; opacity: .65; margin-bottom: 2px; }
+  .sys { align-self: center; font-size: 12px; background: #fdf3cf; border: 1px solid #f0dc93; color: #6c5612; padding: 4px 12px; border-radius: 8px; }
+  .composer { display: flex; gap: 8px; margin-top: 10px; }
+  .composer input { flex: 1; border: 1px solid var(--line); border-radius: 22px; padding: 10px 16px; font: inherit; outline: none; }
+  .composer input:focus { border-color: var(--accent); }
+  .banner { background: #fdf3cf; border: 1px solid #f0dc93; color: #6c5612; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+  .banner.ok { background: #e2f3ec; border-color: #b9dccd; color: #1d6b52; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; text-align: right; }
+  .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; background: #eef1ef; color: #4b5853; }
+  .tag.warn { background: #fbe5e1; color: #9c3329; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; } .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .turn { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid #eef2f0; font-size: 13px; }
+  .turn .sp { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; padding-top: 2px; }
+  .turn .dec { margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .wave { height: 46px; display: flex; align-items: center; gap: 2px; margin: 6px 0 10px; }
+  .wave span { width: 3px; border-radius: 2px; background: #9cc9b8; }
+  .wave span.a { background: var(--green); }
+  .mockflag { position: fixed; right: 14px; bottom: 12px; font-size: 11px; color: #7a8782; background: rgba(255,255,255,.9); border: 1px solid var(--line); padding: 4px 10px; border-radius: 20px; }
+  .fade { animation: fade .35s ease; } @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <div class="brand"><div class="logo">S+</div><div>Cobrança<small>Console interno · Simplifica</small></div></div>
+    <a href="#/painel" data-r="painel">📊 Painel</a>
+    <a href="#/carteira" data-r="carteira">👥 Carteira</a>
+    <a href="#/fila" data-r="fila">🙋 Fila de escalação <span class="badge" id="qbadge">3</span></a>
+    <a href="#/chamada" data-r="chamada">📞 Chamadas</a>
+    <div class="foot"><b>Paula Mendes</b>operadora · paula@simplifica.com.br<br>inquilino: desenvolvimento</div>
+  </nav>
+  <main id="view"></main>
+</div>
+<div class="mockflag">protótipo · probabilidades reais dos modelos publicados · nomes fictícios</div>
+<script>
+const BRL = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+const PCT = v => (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + '%';
+const FIRST = ['Ana','Bruno','Camila','Diego','Eduarda','Felipe','Gabriela','Henrique','Isabela','João','Larissa','Marcos','Natália','Otávio','Patrícia','Rafael','Sabrina','Tiago','Vanessa','Wesley','Yasmin','Lucas','Fernanda','Rodrigo','Juliana','André','Beatriz','Caio','Daniela','Gustavo'];
+const LAST = ['Souza','Oliveira','Lima','Pereira','Costa','Almeida','Ribeiro','Carvalho','Gomes','Martins','Rocha','Barbosa','Moreira','Cardoso','Teixeira','Correia','Pinto','Nunes','Freitas','Vieira'];
+const SEGNAME = { retail: 'varejo', wholesale: 'atacado', services: 'serviços' };
+const TIER = { small: 'pequena', medium: 'média', large: 'grande' };
+const CHANNEL = { whatsapp: 'chat', phone: 'voz', email: 'e-mail', sms: 'sms' };
+const BANDS = [ // knowledge/tabela-de-parcelamento.csv
+  { max: 7, name: '1 a 7 dias', down: 0, n: 3, disc: 5, rate: 1.0 },
+  { max: 30, name: '8 a 30 dias', down: 10, n: 6, disc: 10, rate: 1.0 },
+  { max: 60, name: '31 a 60 dias', down: 15, n: 10, disc: 20, rate: 1.5 },
+  { max: 180, name: '61 a 180 dias', down: 20, n: 12, disc: 30, rate: 1.5 },
+  { max: 1e9, name: 'acima de 180 dias', down: 30, n: 18, disc: 40, rate: 2.0 },
+];
+const ALCADA = { disc: 20, n: 12 }; // knowledge/limites-de-alcada.md
+const SEG = {
+  risco: { label: 'Alto risco', cls: 's-risco', color: '#c94a3d' },
+  baixa: { label: 'Baixa propensão', cls: 's-baixa', color: '#6d6fb3' },
+  aten: { label: 'Atenção', cls: 's-aten', color: '#d9a21b' },
+  bom: { label: 'Bom pagador', cls: 's-bom', color: '#2e8b6e' },
+};
+let DATA, CUST, BY = {}, filter = 'todos', claimed = false, resolved = false;
+
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+function classify(c, tDefault) {
+  if (c.p_default >= tDefault) return 'risco';
+  if (c.p_default < 0.30 && c.p_pay >= 0.60) return 'bom';
+  if (c.p_pay < 0.40) return 'baixa';
+  return 'aten';
+}
+const segBadge = k => `<span class="seg ${SEG[k].cls}"><i></i>${SEG[k].label}</span>`;
+const bar = (v, color) => `<div class="bar"><b style="width:${(v * 100).toFixed(1)}%;background:${color}"></b></div>`;
+
+async function load() {
+  DATA = await (await fetch('portfolio.json')).json();
+  const t = DATA.default.threshold;
+  CUST = DATA.customers.map((c, i) => {
+    const h = hash(c.id);
+    return { ...c, name: `${FIRST[h % FIRST.length]} ${LAST[(h >>> 7) % LAST.length]}`, seg: classify(c, t),
+             priority: c.p_default * Math.max(c.open_amount, 1) };
+  });
+  CUST.sort((a, b) => b.priority - a.priority);
+  CUST.forEach((c, i) => { c.rank = i + 1; BY[c.id] = c; });
+  // Named characters for the walkthrough: the chat demo's Marina and the voice demo's Carlos.
+  window.SAMPLES = {
+    risco: CUST.filter(c => c.seg === 'risco')[2],
+    bom: CUST.filter(c => c.seg === 'bom' && c.open_amount > 0)[0] || CUST.filter(c => c.seg === 'bom')[0],
+    aten: CUST.filter(c => c.seg === 'aten')[40],
+  };
+  route();
+}
+
+function nextAction(c) {
+  const band = BANDS.find(b => c.days_overdue <= b.max);
+  const rows = [];
+  if (c.days_overdue <= 0) {
+    rows.push(['y', 'Nada vencido', c.open_amount > 0 ? `${BRL(c.open_amount)} a vencer · nenhuma cobrança ativa` : 'nenhuma fatura em aberto']);
+    rows.push(['y', 'Lembrete preventivo', '3 dias antes do próximo vencimento, pelo canal preferido']);
+    rows.push(['n', 'Fora da fila de cobrança', 'bom histórico: contato ativo só se uma fatura vencer']);
+    return { band: null, rows };
+  }
+  rows.push(['y', 'Janela de contato aberta', 'seg–sex 8h–20h, sáb 8h–14h · avaliado em America/Sao_Paulo']);
+  rows.push(['y', `Tentativa 2 de 4 · intervalo de 48 h respeitado`, 'teto medido na base Bank Marketing: a resposta cai de 13,0% para 5,5% em seis tentativas']);
+  rows.push(['y', `Canal: ${CHANNEL[c.channel] || c.channel}`, `canal preferido do cliente no ERP: ${c.channel}`]);
+  const nOk = Math.min(band.n, ALCADA.n), dOk = Math.min(band.disc, ALCADA.disc);
+  rows.push([band.n > ALCADA.n || band.disc > ALCADA.disc ? 'h' : 'y', `Faixa ${band.name}: entrada ${band.down}% · até ${band.n}x · ${band.disc}% à vista`,
+    band.n > ALCADA.n || band.disc > ALCADA.disc
+      ? `alçada automática: até ${ALCADA.n}x e ${ALCADA.disc}% — o agente oferece ${nOk}x / ${dOk}%; acima disso, uma pessoa aprova`
+      : `dentro da alçada automática (até ${ALCADA.n}x, ${ALCADA.disc}% de desconto)`]);
+  return { band, rows };
+}
+
+function shell(title, sub, right = '') {
+  return `<header class="top"><div><h1>${title}</h1><div class="sub">${sub}</div></div><div class="right">${right}</div></header>`;
+}
+
+// ------------------------------------------------------------------ painel
+function painel() {
+  const n = CUST.length, open = CUST.reduce((s, c) => s + c.open_amount, 0);
+  const count = k => CUST.filter(c => c.seg === k).length;
+  const openOf = k => CUST.filter(c => c.seg === k).reduce((s, c) => s + c.open_amount, 0);
+  const segs = ['risco', 'baixa', 'aten', 'bom'];
+  const W = 560, H = 300, P = 36;
+  const L = 54, x = v => L + v * (W - L - 26), y = v => H - P - v * (H - P - 10);
+  const pts = CUST.map(c => `<circle cx="${x(c.p_pay).toFixed(1)}" cy="${y(c.p_default).toFixed(1)}" r="2.6" fill="${SEG[c.seg].color}" fill-opacity=".55"/>`).join('');
+  const t = DATA.default.threshold;
+  const ticks = [0, .25, .5, .75, 1].map(v => `
+    <text x="${x(v)}" y="${H - P + 16}" font-size="10" text-anchor="middle" fill="#7b8883">${PCT(v)}</text>
+    <text x="${L - 6}" y="${y(v) + 3}" font-size="10" text-anchor="end" fill="#7b8883">${PCT(v)}</text>
+    <line x1="${x(v)}" x2="${x(v)}" y1="${y(0)}" y2="${y(1)}" stroke="#eef2f0"/>
+    <line x1="${x(0)}" x2="${x(1)}" y1="${y(v)}" y2="${y(v)}" stroke="#eef2f0"/>`).join('');
+  return shell('Painel da carteira', `${n.toLocaleString('pt-BR')} clientes pontuados · modelos v1 · dados até ${DATA.as_of}`,
+      '<span class="pill">propensão: XGBoost</span><span class="pill">inadimplência: XGBoost</span>') + `
+  <div class="grid k4 fade">
+    <div class="card kpi"><div class="l">Carteira em aberto</div><div class="v">${BRL(open)}</div><div class="d muted">${n.toLocaleString('pt-BR')} clientes</div></div>
+    <div class="card kpi"><div class="l">Alto risco de inadimplência</div><div class="v" style="color:var(--risk)">${count('risco')}</div><div class="d muted">${PCT(count('risco') / n)} dos clientes · ${BRL(openOf('risco'))} em aberto</div></div>
+    <div class="card kpi"><div class="l">Bons pagadores</div><div class="v" style="color:var(--good)">${count('bom')}</div><div class="d muted">${PCT(count('bom') / n)} · só lembretes preventivos</div></div>
+    <div class="card kpi"><div class="l">Hoje</div><div class="v">148 <span style="font-size:14px;color:var(--muted);font-weight:500">contatos</span></div><div class="d"><span style="color:var(--risk)">12 suprimidos por opt-out</span> · 3 escalados</div></div>
+  </div>
+  <div class="two" style="margin-top:14px">
+    <div class="card fade"><h3>Como os modelos enxergam cada cliente <span class="hint">cada ponto é um cliente</span></h3>
+      <svg width="${W}" height="${H}" style="max-width:100%">${ticks}
+        <line x1="${x(0)}" x2="${x(1)}" y1="${y(t)}" y2="${y(t)}" stroke="#c94a3d" stroke-dasharray="5 4"/>
+        <text x="${x(1) - 4}" y="${y(t) - 5}" font-size="10.5" text-anchor="end" fill="#c94a3d">limiar ajustado do modelo de inadimplência (${PCT(t)})</text>
+        ${pts}
+        <text x="${(x(0) + x(1)) / 2}" y="${H - 4}" font-size="11" text-anchor="middle" fill="#45514c">probabilidade de pagar (propensão) →</text>
+        <text transform="translate(11 ${(y(0) + y(1)) / 2}) rotate(-90)" font-size="11" text-anchor="middle" fill="#45514c">risco de inadimplência →</text>
+      </svg>
+      <div class="legend">${segs.map(k => `<span><i style="background:${SEG[k].color}"></i>${SEG[k].label}</span>`).join('')}</div>
+    </div>
+    <div class="card fade"><h3>Segmentos <span class="hint">clique para filtrar a carteira</span></h3>
+      <table><thead><tr><th>Segmento</th><th class="num">Clientes</th><th class="num">P(pagar)</th><th class="num">P(inadimplir)</th><th class="num">Em aberto</th></tr></thead><tbody>
+      ${segs.map(k => { const g = CUST.filter(c => c.seg === k), m = f => g.reduce((s, c) => s + c[f], 0) / g.length;
+        return `<tr class="click" onclick="filter='${k}';location.hash='#/carteira'"><td>${segBadge(k)}</td><td class="num">${g.length}</td><td class="num">${PCT(m('p_pay'))}</td><td class="num">${PCT(m('p_default'))}</td><td class="num">${BRL(g.reduce((s, c) => s + c.open_amount, 0))}</td></tr>`; }).join('')}
+      </tbody></table>
+      <div style="margin-top:14px;font-size:12.5px;color:#45514c;line-height:1.5">
+        <b>Regra de segmentação:</b> <i>alto risco</i> quando o modelo de inadimplência passa o próprio limiar ajustado (${PCT(t)});
+        <i>bom pagador</i> com risco &lt; 30% e propensão ≥ 60%; <i>baixa propensão</i> com propensão &lt; 40%; o resto, <i>atenção</i>.
+      </div>
+      <div style="margin-top:12px" class="grid">
+        <div class="rule"><div class="ic y">✓</div><div><b>Fila de contato ordenada por perda esperada</b><div class="muted">risco de inadimplência × valor em aberto</div></div></div>
+        <div class="rule"><div class="ic n">✕</div><div><b>Opt-out bloqueia antes de qualquer agente</b><div class="muted">aplicado pelo orquestrador, no agendamento e de novo na entrega</div></div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ------------------------------------------------------------------ carteira
+function carteira() {
+  const list = CUST.filter(c => filter === 'todos' || c.seg === filter).slice(0, 14);
+  const chips = [['todos', 'Todos'], ['risco', 'Alto risco'], ['baixa', 'Baixa propensão'], ['aten', 'Atenção'], ['bom', 'Bom pagador']]
+    .map(([k, l]) => `<span class="chip ${filter === k ? 'on' : ''}" onclick="filter='${k}';route()">${l}</span>`).join('');
+  return shell('Carteira', 'ordenada pela fila de contato: risco de inadimplência × valor em aberto') + `
+  <div class="chips">${chips}</div>
+  <div class="card fade" style="padding:6px 8px"><table><thead><tr>
+    <th>#</th><th>Cliente</th><th>Segmento</th><th>P(pagar)</th><th>P(inadimplir)</th><th class="num">Atraso</th><th class="num">Em aberto</th><th>Canal</th></tr></thead><tbody>
+    ${list.map(c => `<tr class="click" onclick="location.hash='#/cliente/${c.id}'">
+      <td class="muted">${c.rank}</td><td><b>${c.name}</b><div class="muted" style="font-size:11.5px">${SEGNAME[c.segment] || c.segment} · empresa ${TIER[c.size_tier] || c.size_tier} · ${c.state}</div></td>
+      <td>${segBadge(c.seg)}</td>
+      <td><div style="display:flex;gap:8px;align-items:center">${bar(c.p_pay, 'var(--good)')}<span class="num" style="width:34px">${PCT(c.p_pay)}</span></div></td>
+      <td><div style="display:flex;gap:8px;align-items:center">${bar(c.p_default, 'var(--risk)')}<span class="num" style="width:34px">${PCT(c.p_default)}</span></div></td>
+      <td class="num">${c.days_overdue ? c.days_overdue + ' d' : '—'}</td><td class="num">${BRL(c.open_amount)}</td><td>${CHANNEL[c.channel] || c.channel}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ------------------------------------------------------------------ cliente
+function gauge(v, color, label, sub) {
+  const r = 34, C = 2 * Math.PI * r;
+  return `<div class="gauge"><svg width="86" height="86" viewBox="0 0 86 86"><circle cx="43" cy="43" r="${r}" fill="none" stroke="#edf1ef" stroke-width="9"/>
+    <circle cx="43" cy="43" r="${r}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * v} ${C}" transform="rotate(-90 43 43)"/>
+    <text x="43" y="48" font-size="17" font-weight="700" text-anchor="middle" fill="#1c2522">${PCT(v)}</text></svg>
+    <div class="t"><b>${label}</b>${sub}</div></div>`;
+}
+function why(list, goodWhenPositive, what) {
+  const m = Math.max(...list.map(r => Math.abs(r.impact)), 0.01);
+  return `<div class="why">${list.map(r => {
+    const good = (r.impact > 0) === goodWhenPositive, w = Math.abs(r.impact) / m * 50, color = good ? 'var(--good)' : 'var(--risk)';
+    const pos = r.impact > 0 ? `left:50%;width:${w}%` : `right:50%;width:${w}%`;
+    return `<div>${r.feature} <span class="muted" style="font-size:11.5px">${r.impact > 0 ? '↑ eleva' : '↓ reduz'} ${what}</span></div>
+            <div class="b"><span style="${pos};background:${color}"></span><i class="mid"></i></div>`; }).join('')}</div>`;
+}
+function cliente(id) {
+  const c = BY[id]; if (!c) return '<p>Cliente não encontrado.</p>';
+  const a = nextAction(c);
+  return shell(c.name, `${SEGNAME[c.segment] || c.segment} · empresa ${TIER[c.size_tier] || c.size_tier} · ${c.state} · posição ${c.rank} na fila`,
+      `${segBadge(c.seg)}<button class="btn ghost" onclick="history.back()">← voltar</button>`) + `
+  <div class="three fade">
+    <div class="card">${gauge(c.p_pay, 'var(--good)', 'Probabilidade de pagar', 'modelo de propensão · média das faturas')}</div>
+    <div class="card">${gauge(c.p_default, 'var(--risk)', 'Risco de inadimplência', `limiar do modelo: ${PCT(DATA.default.threshold)} · ${c.p_default >= DATA.default.threshold ? '<b style="color:var(--risk);display:inline">acima</b>' : 'abaixo'}`)}</div>
+    <div class="card"><dl class="kv">
+      <dt>Em aberto</dt><dd>${BRL(c.open_amount)}</dd>
+      <dt>Atraso atual</dt><dd>${c.days_overdue ? c.days_overdue + ' dias' : '—'}</dd>
+      <dt>Atraso médio histórico</dt><dd>${c.avg_days_late != null ? c.avg_days_late.toFixed(0) + ' dias' : '—'}</dd>
+      <dt>Faturas pagas com atraso</dt><dd>${c.late_rate != null ? PCT(c.late_rate) : '—'}</dd>
+      <dt>Faturas no histórico</dt><dd>${c.invoices}</dd>
+      <dt>Limite de crédito</dt><dd>${BRL(c.credit_limit)}</dd></dl></div>
+  </div>
+  <div class="two" style="margin-top:14px">
+    <div class="card fade"><h3>Por que os modelos dizem isso <span class="hint">contribuição SHAP, média das faturas do cliente</span></h3>
+      <div class="muted" style="font-size:12px;margin:2px 0 6px">PROPENSÃO A PAGAR</div>${why(c.why_pay, true, 'a propensão')}
+      <div class="muted" style="font-size:12px;margin:14px 0 6px">RISCO DE INADIMPLÊNCIA</div>${why(c.why_default, false, 'o risco')}
+      <div class="legend"><span><i style="background:var(--good)"></i>a favor do cliente</span><span><i style="background:var(--risk)"></i>contra o cliente</span></div>
+    </div>
+    <div class="card fade"><h3>Próxima ação <span class="hint">motor de regras + tabela de parcelamento + alçada</span></h3>
+      ${a.rows.map(([k, t, d]) => `<div class="rule"><div class="ic ${k}">${k === 'y' ? '✓' : k === 'n' ? '✕' : '!'}</div><div><b>${t}</b><div class="muted">${d}</div></div></div>`).join('')}
+      ${c.days_overdue > 0 ? `<div style="margin-top:12px;display:flex;gap:8px"><button class="btn">Agendar contato</button><button class="btn ghost">Ver conversas</button></div>` : ''}
+    </div>
+  </div>`;
+}
+
+// ------------------------------------------------------------------ fila
+const QUEUE = [
+  { id: 'marina', who: 'Marina Albuquerque', ch: 'chat', why: 'Contestação de valor: “esse valor ta errado, nao e isso que eu devo”', rule: 'contestação → pessoa (limites de alçada)', ago: 'há 4 min', amount: 1250 },
+  { id: 'otavio', who: 'Otávio Freitas', ch: 'voz', why: 'Pediu 35% de desconto à vista', rule: 'desconto acima da alçada automática de 20%', ago: 'há 18 min', amount: 3480 },
+  { id: 'larissa', who: 'Larissa Nunes', ch: 'chat', why: 'Três mensagens seguidas sem intenção compreendida', rule: 'agente não entendeu 3× → pessoa', ago: 'há 41 min', amount: 612 },
+];
+function fila() {
+  return shell('Fila de escalação', 'conversas que o agente entregou a uma pessoa · o agente não responde enquanto alguém detém a conversa') + `
+  <div class="card fade">${QUEUE.map(q => `
+    <div class="q"><div><div class="who">${q.who} <span class="tag">${q.ch}</span> ${q.id === 'marina' && claimed ? `<span class="tag" style="background:#e2f3ec;color:#1d6b52">com paula@simplifica.com.br</span>` : '<span class="tag warn">na fila</span>'}</div>
+      <div class="why2">${q.why}</div><div class="meta"><span>regra: ${q.rule}</span><span>${q.ago}</span><span>${BRL(q.amount)} em aberto</span></div></div>
+      <div>${q.id === 'marina' ? `<button class="btn" id="claim" onclick="claimed=true;location.hash='#/conversa'">${claimed ? 'Abrir' : 'Assumir'}</button>` : '<button class="btn ghost">Assumir</button>'}</div></div>`).join('')}
+  </div>`;
+}
+
+// ------------------------------------------------------------------ conversa (take-over)
+function conversa() {
+  return shell('Marina Albuquerque', 'chat · conversa escalada por contestação de valor',
+      resolved ? '<span class="pill">resolvida</span>' : '<span class="pill">assumida por você</span><button class="btn ok" id="resolve" onclick="resolveThread()">Resolver</button>') + `
+  <div class="banner ${resolved ? 'ok' : ''}">${resolved ? '✓ Conversa resolvida. O relógio de retenção de 180 dias começou a contar.' : '⏸ Você assumiu esta conversa. O agente está pausado e não responde até que ela seja resolvida.'}</div>
+  <div class="two">
+    <div class="card fade" style="padding:12px"><div class="chat" id="chat">
+      <div class="msg"><div class="who">agente · mensagem proativa</div>Olá Marina, aqui é a Simplifica (mensagem automática). Seu débito de R$ 1.250,00 está com 12 dias de atraso. Dá para parcelar em até 6x com entrada de 10%, ou pagar à vista com 10% de desconto. Responda para combinar, ou SAIR para não receber mais.</div>
+      <div class="msg me"><div class="who">cliente</div>quais sao os juros e a multa por atraso?</div>
+      <div class="msg"><div class="who">agente</div>Em caso de atraso, há multa de 2% sobre o valor do título e juros de 1% ao mês, calculados proporcionalmente aos dias em atraso.</div>
+      <div class="msg me"><div class="who">cliente</div>esse valor ta errado, nao e isso que eu devo</div>
+      <div class="msg"><div class="who">agente</div>Vou encaminhar o seu atendimento para uma pessoa da equipe. Em breve alguém entra em contato por aqui.</div>
+      <div class="sys">intenção: contestação · conversa transferida para a fila</div>
+      <div class="sys">paula@simplifica.com.br assumiu a conversa</div>
+      ${window.OPMSG ? `<div class="msg op"><div class="who">Paula · equipe</div>${window.OPMSG}</div>` : ''}
+    </div>
+    ${resolved ? '' : `<div class="composer"><input id="reply" placeholder="Responder como Paula…"><button class="btn" onclick="sendOp()">Enviar</button></div>`}</div>
+    <div class="grid">
+      <div class="card fade"><h3>O que os modelos dizem sobre ela <span class="hint">cliente da demonstração · valores ilustrativos</span></h3>
+        ${gauge(0.71, 'var(--good)', 'Probabilidade de pagar', 'histórico sem contestações anteriores')}
+        <div style="height:8px"></div>${gauge(0.24, 'var(--risk)', 'Risco de inadimplência', 'abaixo do limiar do modelo')}</div>
+      <div class="card fade"><h3>Limites de alçada</h3>
+        <div class="rule"><div class="ic y">✓</div><div><b>Desconto até 20%</b><div class="muted">acima disso, supervisor</div></div></div>
+        <div class="rule"><div class="ic y">✓</div><div><b>Parcelamento até 12x</b><div class="muted">parcela mínima de R$ 50,00</div></div></div>
+        <div class="rule"><div class="ic h">!</div><div><b>Contestação suspende a campanha</b><div class="muted">nenhum contato automático até a resolução</div></div></div></div>
+    </div>
+  </div>`;
+}
+function sendOp() {
+  const v = document.getElementById('reply').value.trim(); if (!v) return;
+  window.OPMSG = v; route(); const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight;
+}
+function resolveThread() { resolved = true; document.getElementById('qbadge').textContent = '2'; route(); }
+
+// ------------------------------------------------------------------ chamada (voice call record)
+const INTENT = { second_copy: 'segunda via', negotiation: 'negociação', dispute: 'contestação', small_talk: 'conversa',
+  payment_claim: 'pagamento informado', debt_inquiry: 'consulta de débito', opt_out: 'opt-out', unknown: 'não entendida' };
+async function chamada() {
+  const T = await (await fetch('voice/turns.json')).json();
+  const bars = Array.from({ length: 120 }, (_, i) => `<span class="${i % 9 < 4 ? 'a' : ''}" style="height:${8 + Math.abs(Math.sin(i * 1.7) * 30 + Math.sin(i * .35) * 8)}px"></span>`).join('');
+  const turns = T.turns.map(t => t.speaker === 'agente'
+    ? `<div class="turn"><div class="sp">agente</div><div>${t.text}<div class="dec"><span class="tag">voz: 1º áudio em ${t.tts_first_audio_ms} ms</span></div></div></div>`
+    : `<div class="turn"><div class="sp" style="color:var(--accent)">Carlos</div><div>“${t.heard}”
+        <div class="dec"><span class="tag">STT ${t.stt_ms} ms</span><span class="tag ${t.intent === 'second_copy' ? 'warn' : ''}">intenção: ${INTENT[t.intent] || t.intent}${t.inherited ? ' (herdada)' : ''}${t.intent === 'second_copy' ? ' ⚠ leitura errada' : ''}</span>
+        ${t.read_back ? `<span class="tag" style="background:#fdf3cf;color:#6c5612">valor ouvido: ${t.figures.join(', ')} → ler de volta</span>` : ''}
+        ${t.wer > 0 ? `<span class="tag">WER ${PCT(t.wer)}</span>` : ''}</div></div></div>`).join('');
+  return shell('Chamada · Carlos Moreira', 'voz em tempo real · 06/11 14:32 · 1 min 18 s · gravada e transcrita com aviso',
+      '<span class="pill">acordo proposto</span>') + `
+  <div class="two">
+    <div class="card fade"><h3>Transcrição e decisões por turno <span class="hint">transcrição feita pelo Whisper local</span></h3>
+      <div class="wave">${bars}</div>${turns}</div>
+    <div class="grid" style="align-content:start">
+      <div class="card fade"><h3>Resultado</h3><dl class="kv">
+        <dt>Débito</dt><dd>R$ 840,00 · 35 dias</dd><dt>Faixa</dt><dd>31 a 60 dias</dd>
+        <dt>Entrada</dt><dd>R$ 450,00 (lida de volta ✓)</dd><dt>Parcelas</dt><dd>3 × R$ 130,00 + 1,5% a.m.</dd>
+        <dt>Alçada</dt><dd style="color:var(--good)">dentro do limite</dd><dt>Próximo passo</dt><dd>boleto da entrada por chat</dd></dl></div>
+      <div class="card fade"><h3>Regras aplicadas</h3>
+        <div class="rule"><div class="ic y">✓</div><div><b>Aviso de gravação no primeiro turno</b><div class="muted">não pode ser pulado</div></div></div>
+        <div class="rule"><div class="ic y">✓</div><div><b>Valor falado lido de volta antes de virar ação</b><div class="muted">o erro de reconhecimento atinge valores, não a intenção</div></div></div>
+        <div class="rule"><div class="ic y">✓</div><div><b>Interrupção do cliente respeitada</b><div class="muted">o agente parou de falar no meio da frase</div></div></div></div>
+    </div>
+  </div>`;
+}
+
+async function route() {
+  const [, r, id] = location.hash.split('/');
+  const name = r || 'painel';
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.r === name || (name === 'cliente' && a.dataset.r === 'carteira') || (name === 'conversa' && a.dataset.r === 'fila')));
+  const v = document.getElementById('view');
+  v.innerHTML = name === 'carteira' ? carteira() : name === 'cliente' ? cliente(id) : name === 'fila' ? fila()
+    : name === 'conversa' ? conversa() : name === 'chamada' ? await chamada() : painel();
+  window.scrollTo(0, 0);
+  const chat = document.getElementById('chat'); if (chat) chat.scrollTop = chat.scrollHeight;
+}
+window.addEventListener('hashchange', route);
+load();
+</script>
+</body>
+</html>

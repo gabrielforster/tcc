@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Chamada de voz — protótipo</title>
+<style>
+  :root { --green: #17423a; --deep: #0f2c27; --accent: #2e8b6e; --mint: #9fe0c6; --ink: #1c2522; --muted: #6b7a74; --line: #e1e8e5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 "Inter", "Noto Sans", system-ui, sans-serif; color: var(--ink); background: #e9eeec; height: 100vh; overflow: hidden; }
+  .stage { display: grid; grid-template-columns: 400px 1fr; gap: 26px; padding: 26px 30px; height: 100vh; }
+  /* ---------------------------------------------------------- the call (customer side) */
+  .call { background: radial-gradient(120% 80% at 50% 25%, #1d5247 0%, var(--deep) 62%); border-radius: 30px; color: #e8f4ef;
+          display: flex; flex-direction: column; padding: 20px 22px 22px; box-shadow: 0 18px 40px rgba(15,44,39,.35); position: relative; overflow: hidden; }
+  .rec { align-self: center; display: inline-flex; gap: 8px; align-items: center; background: rgba(201,74,61,.18); color: #ffd5cf;
+         border: 1px solid rgba(255,140,125,.35); font-size: 12px; padding: 5px 12px; border-radius: 20px; }
+  .rec i { width: 8px; height: 8px; border-radius: 50%; background: #ff6a57; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .who { text-align: center; margin-top: 18px; }
+  .who h2 { margin: 0; font-size: 22px; font-weight: 600; }
+  .who .sub { color: #9fcbbd; font-size: 13px; margin-top: 2px; }
+  .orbwrap { flex: none; height: 200px; display: grid; place-items: center; position: relative; }
+  .orb { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5fd1a9, #1f7a5f 70%);
+         box-shadow: 0 0 0 0 rgba(95,209,169,.5); display: grid; place-items: center; transition: transform .2s; }
+  .orb.talk { animation: pulse 0.9s infinite; }
+  .orb.listen { background: radial-gradient(circle at 35% 30%, #f7f3e6, #b9c9c3 70%); animation: pulse2 1.4s infinite; }
+  .orb.think { background: radial-gradient(circle at 35% 30%, #a7b6f0, #5560a8 70%); animation: spin 1.2s linear infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(95,209,169,.55); transform: scale(1); } 50% { transform: scale(1.06); } 100% { box-shadow: 0 0 0 34px rgba(95,209,169,0); transform: scale(1); } }
+  @keyframes pulse2 { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,.35); } 100% { box-shadow: 0 0 0 30px rgba(255,255,255,0); } }
+  @keyframes spin { 0% { filter: hue-rotate(0); transform: rotate(0); } 100% { filter: hue-rotate(40deg); transform: rotate(360deg); } }
+  .bars { display: flex; gap: 4px; align-items: center; height: 40px; }
+  .bars span { width: 5px; border-radius: 3px; background: rgba(255,255,255,.85); height: 8px; transition: height .12s; }
+  .state { text-align: center; font-size: 13.5px; color: #cfe8df; height: 20px; }
+  .transcript { margin-top: 10px; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; overflow: hidden; }
+  .line { font-size: 14.5px; line-height: 1.45; padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,.07); }
+  .line b { display: block; font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--mint); margin-bottom: 2px; }
+  .line.c { background: rgba(255,255,255,.14); }
+  .line.c b { color: #ffe6a8; }
+  .line .cut { color: #ffb4a8; font-size: 12px; font-style: italic; }
+  .readback { position: absolute; left: 18px; right: 18px; top: 92px; background: #fdf3cf; color: #5d4a0d; border-radius: 14px; padding: 12px 14px;
+              box-shadow: 0 10px 24px rgba(0,0,0,.25); transform: translateY(-14px); opacity: 0; transition: all .35s; font-size: 13.5px; }
+  .readback.on { opacity: 1; transform: none; }
+  .readback .fig { font-size: 22px; font-weight: 800; color: #3b2f06; }
+  .controls { display: flex; justify-content: center; gap: 22px; margin-top: 14px; }
+  .controls button { width: 54px; height: 54px; border-radius: 50%; border: 0; font-size: 20px; background: rgba(255,255,255,.12); color: #fff; }
+  .controls .end { background: #d9493c; }
+  .controls .human { font-size: 13px; width: auto; border-radius: 27px; padding: 0 16px; }
+  .ended { position: absolute; inset: 0; background: rgba(15,44,39,.94); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 30px; }
+  .ended.on { display: flex; }
+  .ended h3 { margin: 0; font-size: 20px; }
+  /* ---------------------------------------------------------- inside the agent */
+  .inside { display: flex; flex-direction: column; min-height: 0; }
+  .inside header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+  .inside h1 { margin: 0; font-size: 20px; color: var(--green); }
+  .inside header .sub { color: var(--muted); font-size: 13px; }
+  .budget { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+  .budget .t { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  .budget .t b { color: var(--ink); font-size: 14px; }
+  .wf { display: flex; height: 26px; border-radius: 7px; overflow: hidden; background: #f1f4f2; }
+  .wf div { display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; width: 0; transition: width .5s ease; }
+  .k-eot { background: #9aa8a3; } .k-stt { background: #3e7cc4; } .k-nlu { background: #8a5cc4; } .k-gen { background: repeating-linear-gradient(45deg, #d9a21b, #d9a21b 6px, #e6b84a 6px, #e6b84a 12px); } .k-tts { background: var(--accent); }
+  .legend { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); margin-top: 7px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  .turns { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 60px); mask-image: linear-gradient(to bottom, transparent 0, #000 60px); }
+  .tc { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 13px; animation: in .35s ease; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+  .tc .h { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .tc .h b { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+  .tc .said { color: var(--muted); font-size: 12px; }
+  .tc .heard { font-size: 14px; margin: 2px 0 6px; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #eef2f0; color: #3f4c47; }
+  .tag.ok { background: #e2f3ec; color: #1d6b52; } .tag.warn { background: #fbe5e1; color: #9c3329; } .tag.rb { background: #fdf3cf; color: #6c5612; }
+  .tc .row { display: flex; gap: 10px; align-items: center; margin-top: 7px; }
+  .tc .row .wf { flex: 1; height: 18px; }
+  .tc .row .ms { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; width: 70px; text-align: right; }
+  .tc.agent { background: #f7faf9; }
+  .tc.barge { border-color: #f3b9b0; background: #fff6f4; }
+  .mockflag { position: fixed; right: 14px; bottom: 10px; font-size: 11px; color: #7a8782; background: rgba(255,255,255,.85); border: 1px solid var(--line); padding: 4px 10px; border-radius: 20px; }
+  .start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(233,238,236,.92); z-index: 9; }
+  .start button { font: 600 16px inherit; padding: 14px 26px; border-radius: 30px; border: 0; background: var(--green); color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="call">
+    <div class="rec"><i></i>Esta chamada é gravada e transcrita</div>
+    <div class="who"><h2>Simplifica</h2><div class="sub" id="timer">chamando…</div></div>
+    <div class="orbwrap"><div class="orb" id="orb"><div class="bars" id="bars"></div></div></div>
+    <div class="state" id="state"></div>
+    <div class="transcript" id="tx"></div>
+    <div class="readback" id="rb"><div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Valor ouvido · confirmando com você</div><div class="fig" id="rbfig"></div><div id="rbtxt" style="font-size:12.5px">valores ditos por voz são sempre lidos de volta antes de virar ação</div></div>
+    <div class="controls"><button title="microfone">🎙</button><button class="end" title="encerrar">✆</button><button class="human" title="falar com uma pessoa">👤 pessoa</button></div>
+    <div class="ended" id="ended"><div style="font-size:40px">✓</div><h3>Chamada encerrada</h3><div id="endsum" style="color:#cfe8df;font-size:13.5px"></div></div>
+  </section>
+
+  <section class="inside">
+    <header><h1>Por dentro do agente</h1><span class="sub">o que acontece entre o cliente parar de falar e o agente responder</span></header>
+    <div class="budget">
+      <div class="t"><span>Tempo de turno — do fim da fala ao 1º som da resposta</span><span>último turno: <b id="last">—</b> · mediana: <b id="median">—</b></span></div>
+      <div class="wf" id="wfmain"><div class="k-eot"></div><div class="k-stt"></div><div class="k-nlu"></div><div class="k-gen"></div><div class="k-tts"></div></div>
+      <div class="legend"><span><i class="k-eot"></i>fim de turno (500 ms, configurado)</span><span><i class="k-stt"></i>transcrição — Whisper local (medido)</span><span><i class="k-nlu"></i>intenção + base de conhecimento (medido)</span><span><i class="k-gen"></i>geração (simulada)</span><span><i class="k-tts"></i>1º áudio — Piper local (medido)</span></div>
+    </div>
+    <div class="turns" id="turns"></div>
+  </section>
+</div>
+<div class="mockflag">protótipo · áudio sintetizado localmente (Piper) · transcrição, intenção e tempos medidos com o código do projeto</div>
+<div class="start" id="start"><button onclick="startCall()">▶ Iniciar chamada</button></div>
+<script>
+const GEN_MS = 600; // generation is scripted in this preview; budgeted, not measured
+const BARGE_AT = 0.6; // fraction of agent turn 3 spoken before the customer cuts in
+const INTENT = { second_copy: 'segunda via', negotiation: 'negociação', dispute: 'contestação', small_talk: 'conversa', payment_claim: 'pagamento informado',
+                 debt_inquiry: 'consulta de débito', opt_out: 'opt-out', unknown: 'não entendida' };
+const FIG = { '450': 'R$ 450,00 de entrada', 'três': '3 parcelas' };
+let T, t0, events = [], spans = [], audioOn = new URLSearchParams(location.search).has('audio');
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const now = () => performance.now() - t0;
+
+const bars = $('bars'); bars.innerHTML = Array.from({ length: 9 }, () => '<span></span>').join('');
+let barTimer;
+function animateBars(on) {
+  clearInterval(barTimer);
+  bars.querySelectorAll('span').forEach(s => s.style.height = '8px');
+  if (on) barTimer = setInterval(() => bars.querySelectorAll('span').forEach(s => s.style.height = (8 + Math.random() * 30) + 'px'), 110);
+}
+function setState(kind, text) {
+  $('orb').className = 'orb ' + (kind || ''); $('state').textContent = text; animateBars(kind === 'talk' || kind === 'listen');
+}
+function addLine(cls, who) {
+  const el = document.createElement('div'); el.className = 'line ' + cls; el.innerHTML = `<b>${who}</b><span></span>`;
+  $('tx').appendChild(el); while ($('tx').children.length > 3) $('tx').firstChild.remove(); return el.querySelector('span');
+}
+async function typeWords(span, text, ms, stopAt = 1) {
+  const words = text.split(' '), n = Math.max(1, Math.round(words.length * stopAt));
+  for (let i = 0; i < n; i++) { span.textContent = words.slice(0, i + 1).join(' '); await sleep(ms * stopAt / n); }
+}
+function play(file, ms) {
+  events.push({ audio: file, at: Math.round(now()), dur: Math.round(ms) });
+  if (audioOn) { const a = new Audio('voice/' + file); a.play(); setTimeout(() => a.pause(), ms); }
+}
+function tick() { const s = Math.floor(now() / 1000); $('timer').textContent = `em chamada · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+
+function waterfall(el, parts, total) {
+  const ks = ['eot', 'stt', 'nlu', 'gen', 'tts'];
+  ks.forEach((k, i) => { const d = el.children[i]; d.style.width = (parts[i] / total * 100) + '%'; d.textContent = parts[i] / total > 0.09 ? parts[i] + ' ms' : ''; });
+}
+
+async function customerTurn(t, nextAgent) {
+  setState('listen', 'ouvindo você…');
+  const span = addLine('c', 'você');
+  play(t.audio, t.audio_ms);
+  await typeWords(span, t.heard, t.audio_ms);
+  // after the customer stops: end of turn, STT, intent + retrieval, generation, first audio
+  setState('think', 'processando…');
+  const nlu = Math.max(1, Math.round(t.intent_ms + t.retrieval_ms));
+  const parts = [T.end_of_turn_ms, t.stt_ms, nlu, GEN_MS, nextAgent.tts_first_audio_ms];
+  const total = parts.reduce((a, b) => a + b, 0);
+  spans.push(total);
+  const card = document.createElement('div'); card.className = 'tc';
+  const wrong = t.intent === 'second_copy';
+  card.innerHTML = `<div class="h"><b>Turno do cliente</b>${t.wer > 0 ? `<span class="tag">WER ${Math.round(t.wer * 100)}%</span>` : '<span class="tag ok">transcrição exata</span>'}</div>
+    <div class="said">disse: “${t.text}”</div><div class="heard">ouvido: “${t.heard}”</div>
+    <div class="tags"><span class="tag ${wrong ? 'warn' : 'ok'}">intenção: ${INTENT[t.intent] || t.intent}${wrong ? ' ⚠ leitura errada' : ''}</span>
+      <span class="tag">base: ${[...new Set(t.retrieved.map(r => r.split(':')[0].replace(/\.(md|csv)$/, '')))].slice(0, 2).join(', ')}</span>
+      ${t.read_back ? `<span class="tag rb">valor ouvido: ${t.figures.join(', ')} → ler de volta</span>` : '<span class="tag">sem valor falado</span>'}</div>
+    <div class="row"><div class="wf"><div class="k-eot"></div><div class="k-stt"></div><div class="k-nlu"></div><div class="k-gen"></div><div class="k-tts"></div></div><div class="ms">${(total / 1000).toFixed(2).replace('.', ',')} s</div></div>`;
+  $('turns').appendChild(card); while ($('turns').children.length > 4) $('turns').firstChild.remove();
+  await sleep(60);
+  waterfall(card.querySelector('.wf'), parts, total);
+  waterfall($('wfmain'), parts, total);
+  $('last').textContent = (total / 1000).toFixed(2).replace('.', ',') + ' s';
+  const sorted = [...spans].sort((a, b) => a - b), med = sorted[Math.floor((sorted.length - 1) / 2)];
+  $('median').textContent = (med / 1000).toFixed(2).replace('.', ',') + ' s';
+  await sleep(total);
+  if (t.read_back) { $('rbfig').textContent = t.figures.map(f => FIG[f] || f).join(' · '); $('rb').classList.add('on'); }
+}
+
+async function agentTurn(t, barge) {
+  setState('talk', barge ? 'agente falando…' : 'agente falando…');
+  const span = addLine('', 'agente');
+  const frac = barge ? BARGE_AT : 1;
+  play(t.audio, t.audio_ms * frac);
+  await typeWords(span, t.text, t.audio_ms, frac);
+  if (barge) {
+    span.insertAdjacentHTML('beforeend', ' <span class="cut">— interrompido</span>');
+    const card = document.createElement('div'); card.className = 'tc barge';
+    card.innerHTML = `<div class="h"><b>Interrupção</b><span class="tag warn">o cliente começou a falar</span></div>O agente parou no meio da frase e passou a ouvir. A oferta já tinha sido feita; o restante não foi repetido.`;
+    $('turns').appendChild(card);
+  }
+  $('rb').classList.remove('on');
+}
+
+async function startCall() {
+  $('start').remove();
+  T = await (await fetch('voice/turns.json')).json();
+  t0 = performance.now(); window.__t0 = t0;
+  setState('', 'chamando…'); await sleep(1600);
+  const timer = setInterval(tick, 250); tick();
+  const turns = T.turns;
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    if (t.speaker === 'agente') {
+      await agentTurn(t, t.n === 3);
+      if (i < turns.length - 1) await sleep(t.n === 3 ? 80 : 350);
+    } else {
+      await customerTurn(t, turns[i + 1]);
+    }
+  }
+  clearInterval(timer); setState('', ''); animateBars(false);
+  const s = Math.floor(now() / 1000);
+  $('endsum').innerHTML = `${Math.floor(s / 60)} min ${s % 60} s · acordo proposto: entrada de R$ 450,00 + 3 × R$ 130,00<br>registro completo da chamada enviado ao console`;
+  $('ended').classList.add('on');
+  window.__done = true;
+}
+window.__events = events;
+if (new URLSearchParams(location.search).has('auto')) window.addEventListener('load', () => setTimeout(startCall, 300));
+</script>
+</body>
+</html>

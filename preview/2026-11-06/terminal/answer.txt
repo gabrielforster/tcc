@@ -1,0 +1,7 @@
+
+Responders over 16 labelled questions
+responder  questions  grounded_rate  faithful_rate  citation_accuracy  sentence_support  latency_p50_ms  
+latency_p95_ms  fallbacks
+ template         16          0.875            1.0             0.8571               1.0             2.4       
+2.5          0
+report -> /home/gabriel/Work/personal/tcc/docs/responder-comparison.md
