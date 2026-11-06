@@ -84,7 +84,17 @@ def test_no_passages_means_no_call_to_the_model():
     assert client.calls == [], "the model was asked to answer with no evidence"
 
 
-@pytest.mark.parametrize("reply", [REFUSAL, f"{REFUSAL}.", f"  {REFUSAL}  ", ""])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        REFUSAL,
+        f"{REFUSAL}.",
+        f"  {REFUSAL}  ",
+        "",
+        # qwen2.5:3b, 2026-11-06: the token followed by the citation line the prompt asks for.
+        f"{REFUSAL} Fonte: (politica-de-cobranca.md)",
+    ],
+)
 def test_a_refusal_is_not_grounded_and_reaches_a_human(passages, reply):
     answer = LLMResponder(client=scripted(reply)).respond("?", Intent.NEGOTIATION, passages)
     assert not answer.grounded
