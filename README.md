@@ -274,8 +274,21 @@ against. Every answer is scored for faithfulness — invented figures, unsupport
 and citations of documents that were never retrieved — and
 [`docs/responder-comparison.md`](./docs/responder-comparison.md) carries the results.
 
-The template arm needs no API key and runs in CI. The LLM arm needs `ANTHROPIC_API_KEY`
-and is run by hand.
+The template arm needs no API key and runs in CI. The LLM arm is run by hand, against
+either provider:
+
+```bash
+# hosted Claude
+LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-ant-... make answer ARGS="--compare"
+
+# a local model, no account and no key: Ollama in docker-compose, OpenAI protocol
+make ollama                      # starts the server, pulls qwen2.5:3b (OLLAMA_MODEL=...)
+LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b make answer ARGS="--compare"
+```
+
+The `openai` provider is any server speaking the OpenAI chat protocol, so Groq or
+OpenRouter are the same provider with `LLM_BASE_URL` and `LLM_API_KEY` set. Every generated
+report names the provider, model and date its LLM arm ran against.
 
 ### Outbound messages
 

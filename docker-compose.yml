@@ -43,6 +43,23 @@ services:
     volumes:
       - miniodata:/data
 
+  # A local language model for the LLM arms, so they run with no account and no key. Not
+  # started by `make up`: it is only needed for an evaluation, and it holds gigabytes of
+  # RAM while loaded. `make ollama` starts it and pulls the model. The context length is
+  # raised because a responder prompt carries several retrieved passages, and Ollama
+  # silently truncates a prompt longer than its window rather than refusing it.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: collection-ollama
+    profiles: ["llm"]
+    environment:
+      OLLAMA_CONTEXT_LENGTH: "8192"
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollamadata:/root/.ollama
+
 volumes:
   pgdata:
   miniodata:
+  ollamadata:
