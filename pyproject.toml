@@ -39,6 +39,11 @@ api = [
 rag = ["pypdf>=4.2", "python-docx>=1.1"]
 llm = ["anthropic>=0.40"]
 voice = ["faster-whisper>=1.0"]
+call = [
+    "livekit>=1.2.1",
+    "livekit-api>=1.2.2",
+    "piper-tts>=1.8.0",
+]
 
 [dependency-groups]
 dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.6", "httpx2>=0.28"]
