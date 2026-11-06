@@ -489,6 +489,9 @@ class ChatChannel:
                     "Pronto, registrei o seu pedido: não enviaremos mais mensagens de "
                     "cobrança por este canal."
                 )
+                reply.intent = "opt_out"
+                if event.payload.get("transcript"):
+                    reply.transcript = str(event.payload["transcript"])
                 return reply
 
         for event in produced:
