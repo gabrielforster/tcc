@@ -1,9 +1,9 @@
-.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma
+.PHONY: setup up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
 
-up:               ## start Postgres (pgvector), Redis and MinIO
+up:               ## start Postgres (pgvector), Redis, MinIO and LiveKit (the voice call)
 	docker compose up -d
 
 down:
@@ -59,6 +59,16 @@ outreach:         ## evaluate the outbound composers; ARGS="--compare" also runs
 
 voice:            ## sweep what recognition error costs; ARGS="--audio FILE" transcribes one clip
 	uv run collection voice $(ARGS)
+
+voices:           ## download the two Piper pt-BR voices the call uses into data/voices
+	uv run python -m piper.download_voices --download-dir data/voices pt_BR-faber-medium pt_BR-cadu-medium
+
+call:             ## the voice call demo on http://127.0.0.1:8100/call/demo (needs `make voices`, LiveKit up)
+	docker compose up -d livekit
+	uv run collection call serve $(ARGS)
+
+call-bench:       ## the turn-time budget on synthesised speech; ARGS="--live" goes through LiveKit
+	uv run collection call bench $(ARGS)
 
 contacts:         ## report what the outbound path decides (serve --seed-demo is the live demo)
 	uv run collection contacts

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atendimento por voz</title>
+<!-- The LiveKit browser SDK. Only the page's code comes from the CDN; the call's audio
+     goes browser -> the self-hosted LiveKit server -> the agent, never to a third party. -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 26rem; margin: 2rem auto; padding: 0 1rem; color: #1b1b1f; }
+  .notice { background: #fff4d6; border: 1px solid #e8c766; border-radius: .5rem; padding: .75rem; font-size: .9rem; }
+  .orb { width: 6rem; height: 6rem; margin: 1.5rem auto; border-radius: 50%; background: #c9d6ff; transition: transform .2s, background .2s; }
+  .orb.agent { background: #6c8cff; transform: scale(1.08); }
+  .orb.listening { background: #5cc48a; }
+  .controls { display: flex; gap: .5rem; justify-content: center; }
+  button { font-size: 1rem; padding: .6rem 1rem; border-radius: 2rem; border: 0; cursor: pointer; }
+  #call { background: #2e9e5b; color: white; }
+  #hangup { background: #d64545; color: white; }
+  #mute { background: #e4e4ea; }
+  .log { margin-top: 1.5rem; font-size: .9rem; }
+  .turn { margin: .4rem 0; padding: .5rem .7rem; border-radius: .6rem; }
+  .turn.agent { background: #eef1ff; }
+  .turn.customer { background: #e9f7ef; text-align: right; }
+  .timing { font-family: ui-monospace, monospace; font-size: .75rem; color: #555; margin-top: 1rem; }
+  .status { text-align: center; color: #555; font-size: .85rem; }
+</style>
+</head>
+<body>
+  <h2>Atendimento automático de cobrança</h2>
+  <p class="notice">Esta ligação está sendo transcrita e registrada. O aviso é falado no início da
+    chamada e não pode ser pulado. Você pode pedir para falar com uma pessoa a qualquer momento.</p>
+  <div id="orb" class="orb"></div>
+  <p id="status" class="status">Pronto para ligar.</p>
+  <div class="controls">
+    <button id="call">Ligar</button>
+    <button id="mute" disabled>Silenciar</button>
+    <button id="hangup" disabled>Desligar</button>
+  </div>
+  <div id="timing" class="timing"></div>
+  <div id="log" class="log"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let room = null;
+
+function bubble(role, text) {
+  const div = document.createElement("div");
+  div.className = "turn " + role;
+  div.textContent = text;
+  $("log").appendChild(div);
+}
+
+function state(text, orb) {
+  $("status").textContent = text;
+  $("orb").className = "orb " + (orb || "");
+}
+
+function onData(payload, participant, kind, topic) {
+  if (topic !== "call") return;
+  const message = JSON.parse(new TextDecoder().decode(payload));
+  if (message.type === "agent") { bubble("agent", message.text); state("Atendente falando…", "agent"); }
+  if (message.type === "listening") state("Pode falar.", "listening");
+  if (message.type === "heard") {
+    bubble("customer", message.transcript || "[não entendi o áudio]");
+    state("Processando…", "");
+  }
+  if (message.type === "timing") {
+    $("timing").textContent =
+      `fim da fala ${message.endpointing_ms} ms · transcrição ${message.stt_ms} ms · ` +
+      `agente ${message.agent_ms} ms · voz ${message.tts_first_audio_ms} ms = ${message.total_ms} ms`;
+    state("Pode falar.", "listening");
+  }
+  if (message.type === "ended") { state("Chamada encerrada (" + message.reason + ").", ""); finish(); }
+}
+
+async function call() {
+  $("call").disabled = true;
+  state("Conectando…", "");
+  const response = await fetch("/call/start", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+  });
+  if (!response.ok) { state("Não foi possível iniciar a chamada.", ""); $("call").disabled = false; return; }
+  const { url, token } = await response.json();
+  room = new LivekitClient.Room({ audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true } });
+  room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+    if (track.kind === "audio") document.body.appendChild(track.attach());
+  });
+  room.on(LivekitClient.RoomEvent.DataReceived, onData);
+  room.on(LivekitClient.RoomEvent.Disconnected, finish);
+  await room.connect(url, token);
+  await room.localParticipant.setMicrophoneEnabled(true);
+  $("hangup").disabled = false;
+  $("mute").disabled = false;
+  state("Aguardando o atendente…", "");
+}
+
+function finish() {
+  $("hangup").disabled = true;
+  $("mute").disabled = true;
+  $("call").disabled = false;
+  if (room) { const r = room; room = null; r.disconnect(); }
+}
+
+$("call").onclick = call;
+$("hangup").onclick = () => { state("Chamada encerrada.", ""); finish(); };
+$("mute").onclick = async () => {
+  const muted = room.localParticipant.isMicrophoneEnabled;
+  await room.localParticipant.setMicrophoneEnabled(!muted);
+  $("mute").textContent = muted ? "Ativar microfone" : "Silenciar";
+};
+</script>
+</body>
+</html>
