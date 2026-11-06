@@ -182,7 +182,12 @@ def test_an_opt_out_ends_the_call_and_sticks(channel, tmp_path):
     call = listening(channel)
     turn = channel.hear(call.call_id, clip(tmp_path, "parar"))
     assert turn.ends_call and turn.end_reason == "opt_out"
+    assert turn.intent == "opt_out"
     assert call.customer_id in channel.opted_out
+    # The record says what the customer said, not that they sent some audio.
+    transcript = channel.record(call.call_id)["transcript"]
+    said = [turn["text"] for turn in transcript if turn["role"] == "customer"]
+    assert said == [TRANSCRIPTS["parar"]]
 
 
 @needs_ffmpeg

@@ -346,7 +346,15 @@ class ResponsiveAgent(Agent):
         )
 
         if reply.classification.intent is Intent.OPT_OUT:
-            return [event.caused(EventType.OPT_OUT_REQUESTED, source="responsive_agent")]
+            # What was heard travels with it, as it does on an escalation: an opt-out
+            # spoken on a call is a record the operation must be able to show.
+            return [
+                event.caused(
+                    EventType.OPT_OUT_REQUESTED,
+                    source="responsive_agent",
+                    **({"transcript": heard.text} if heard is not None else {}),
+                )
+            ]
 
         if reply.escalated:
             # The transcript travels with the escalation: the person picking it up needs
