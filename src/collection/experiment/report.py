@@ -16,7 +16,13 @@ from collection.experiment.run import CAPACITIES, SCENARIOS, Results
 
 START = "<!-- generated:start -->"
 END = "<!-- generated:end -->"
-ARM_LABEL = {"none": "no contact", "manual": "manual", "semi": "semi-automated", "full": "system"}
+ARM_LABEL = {
+    "none": "no contact",
+    "manual": "manual",
+    "semi": "semi-automated",
+    "ranked": "ranking only",
+    "full": "system",
+}
 
 
 def _cap(capacity: int | None) -> str:
@@ -66,7 +72,7 @@ def arms_table(results: Results, scenario: str = "main") -> list[str]:
     rows = [(None, "none")] + [
         (capacity, arm)
         for capacity in CAPACITIES
-        for arm in ("manual", "semi", "full")
+        for arm in ("manual", "semi", "ranked", "full")
         if not (arm == "manual" and capacity is None)
     ]
     for capacity, arm in rows:
@@ -108,6 +114,27 @@ def differences_table(results: Results, scenario: str = "main") -> list[str]:
                 f"| {rec.format(1, scale=100, signed=True)} | {effect} "
                 f"| {days.format(1, signed=True)} | {cost.format(0, signed=True)} |"
             )
+    return lines
+
+
+def ablation_table(results: Results) -> list[str]:
+    """Which half of prediction does the work: the ranking, or the reminders."""
+    lines = [
+        "| capacity/day | ranking only − semi-automated (pp) | system − ranking only (pp) "
+        "| reminders sent |",
+        "|--:|--:|--:|--:|",
+    ]
+    for capacity in CAPACITIES:
+        semi = results.series("main", "semi", capacity)
+        ranked = results.series("main", "ranked", capacity)
+        full = results.series("main", "full", capacity)
+        ranking = paired(_values(ranked, "recovery_rate_30"), _values(semi, "recovery_rate_30"))
+        reminders = paired(_values(full, "recovery_rate_30"), _values(ranked, "recovery_rate_30"))
+        sent = _values(full, "preventive_contacts").mean()
+        lines.append(
+            f"| {_cap(capacity)} | {ranking.format(1, scale=100, signed=True)} "
+            f"| {reminders.format(1, scale=100, signed=True)} | {sent:.0f} |"
+        )
     return lines
 
 
@@ -186,6 +213,10 @@ def generated(results: Results, chart_name: str) -> str:
         "### Paired differences (main scenario)",
         "",
         *differences_table(results),
+        "",
+        "### Ablation: the ranking against the reminders (main scenario)",
+        "",
+        *ablation_table(results),
         "",
         "### Sensitivity: system − semi-automated, Δ recovered ≤ 30 days (pp)",
         "",

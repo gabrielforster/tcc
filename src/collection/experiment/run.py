@@ -66,9 +66,11 @@ def run_replication(population: Population, results: Results) -> None:
             outcome(population, simulate(population, "none", response=response))
         )
         for capacity in CAPACITIES:
-            for arm in ("manual", "semi", "full"):
+            for arm in ("manual", "semi", "ranked", "full"):
                 if arm == "manual" and capacity is None:
                     continue
+                if arm == "ranked" and scenario != "main":
+                    continue  # the ablation answers one question, under the main model
                 run = simulate(population, arm, capacity=capacity, response=response)
                 results.outcomes.setdefault((scenario, arm, capacity), []).append(
                     outcome(population, run)

@@ -18,6 +18,8 @@ The arms (docs/experiment-protocol.md §2):
   ranks the overdue book by expected value (the response curve x amount x risk, less the
   channel's cost) and sends a preventive reminder before the due date to the receivables
   the default model flags.
+* **ranked** -- an ablation: the system without the reminders, so the two halves of what
+  prediction adds can be told apart.
 
 How a contact is answered (§3) is the same function for every arm:
 
@@ -46,7 +48,7 @@ from collection.rules.policy import (
     response_rate_for_attempt,
 )
 
-ARMS = ("none", "manual", "semi", "full")
+ARMS = ("none", "manual", "semi", "ranked", "full")
 
 #: When the day's contacts are made, local time: inside every permitted window, Saturdays
 #: included, so a refusal is about the day or the history and never about the hour.
@@ -165,7 +167,8 @@ def _candidates(
         # Oldest debt first: the order a desk without a model works in.
         return [(v, False) for v in sorted(overdue, key=lambda v: (v.due, v.invoice_id))]
 
-    # full: expected value of the next attempt, as the policy's own estimate prices it.
+    # ranked and full: expected value of the next attempt, as the policy's own estimate
+    # prices it. Only full adds the preventive reminders.
     def value(v: Visible, risk: float, channel: str) -> float:
         attempt = state.attempts[v.index] + 1
         return response_rate_for_attempt(attempt) * v.amount * risk - CHANNEL_COST[channel]
@@ -174,7 +177,7 @@ def _candidates(
     for v in overdue:
         channel = _channel(arm, (day - v.due).days)
         ranked.append((value(v, v.risk_overdue, channel), v, False))
-    for v in open_items:
+    for v in open_items if arm == "full" else []:
         lead = (v.due - day).days
         if (
             0 < lead <= PREVENTIVE_LEAD_DAYS
