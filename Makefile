@@ -1,4 +1,4 @@
-.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge queue migrate pipeline test lint fmt
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge queue migrate pipeline test lint fmt cronograma
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -80,3 +80,11 @@ lint:
 
 fmt:
 	uv run ruff format src tests && uv run ruff check --fix src tests
+
+cronograma:       ## rebuild cronograma.pdf from cronograma.md (pandoc in Docker; no local TeX needed)
+	docker run --rm --entrypoint sh -v "$(CURDIR)":/data pandoc/extra:latest -c '\
+	  apk add -q font-dejavu >/dev/null && fc-cache -f >/dev/null && \
+	  pandoc cronograma.md -o cronograma.pdf --pdf-engine=xelatex \
+	    -V mainfont="DejaVu Serif" -V sansfont="DejaVu Sans" -V monofont="DejaVu Sans Mono" \
+	    -V fontsize=9pt -V geometry:landscape -V geometry:margin=1.8cm && \
+	  chown $(shell id -u):$(shell id -g) cronograma.pdf'

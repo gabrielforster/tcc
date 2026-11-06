@@ -2,6 +2,12 @@
 
 Design document — 2026-10-25.
 
+> **Status (2026-11-05).** Stages 1, 2 and 2b shipped in #22-#29: the record, sources out
+> of the customer path, handover, and multi-provider generation with failover. Stage 3
+> exists only as the `internal_users` schema, which the escalation queue's `claim` checks
+> against. Roles, sessions and tenant policy (the rest of stage 3) and the console (stage
+> 4) have not been built; they are being re-scoped with the rest of the remaining work.
+
 ## 1. Intent
 
 Two defects started this, both visible in a single screenshot of the chat widget:
