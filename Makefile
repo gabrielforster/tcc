@@ -1,4 +1,4 @@
-.PHONY: setup up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma
+.PHONY: setup up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma article
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -114,3 +114,14 @@ cronograma:       ## rebuild cronograma.pdf from cronograma.md (pandoc in Docker
 	    -V mainfont="DejaVu Serif" -V sansfont="DejaVu Sans" -V monofont="DejaVu Sans Mono" \
 	    -V fontsize=9pt -V geometry:landscape -V geometry:margin=1.8cm && \
 	  chown $(shell id -u):$(shell id -g) cronograma.pdf'
+
+article:          ## build article/main.pdf (XeLaTeX + BibTeX in Docker; no local TeX needed)
+	docker build -q -t tcc-article-tex -f article/Dockerfile article >/dev/null
+	docker run --rm --user $(shell id -u):$(shell id -g) -e HOME=/tmp --entrypoint sh \
+	  -v "$(CURDIR)/article":/data -w /data tcc-article-tex -c '\
+	  run() { "$$@" >/dev/null || { grep -A3 "^!" main.log; exit 1; }; } && \
+	  run xelatex -interaction=nonstopmode -halt-on-error main.tex && run bibtex main && \
+	  run xelatex -interaction=nonstopmode -halt-on-error main.tex && \
+	  run xelatex -interaction=nonstopmode -halt-on-error main.tex && \
+	  rm -f main.aux main.bbl main.blg main.out main.log'
+	@echo "article/main.pdf"
