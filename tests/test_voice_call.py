@@ -361,3 +361,28 @@ def test_the_pipeline_benchmark_times_every_stage(index, tmp_path):
     assert row.reply_s and row.reply_s > 0
     report = write_report(rows, tmp_path / "report.md", "scripted", "pipeline")
     assert "| End-of-turn wait (hangover) | 700 |" in report
+
+
+# ------------------------------------------------------------------ the page
+def test_the_call_page_starts_a_call_in_a_fresh_room(channel, monkeypatch):
+    pytest.importorskip("livekit.api")
+    from fastapi.testclient import TestClient
+
+    from collection.api import call as call_api
+
+    started = []
+
+    async def fake_run(self):
+        started.append(self.room_name)
+
+    monkeypatch.setattr(call_api.CallAgent, "run", fake_run)
+    app = call_api.create_call_app(channel=channel, synthesizer=ToneSynthesizer())
+    with TestClient(app) as client:
+        page = client.get("/call/demo")
+        assert page.status_code == 200 and "transcrita e registrada" in page.text
+        first = client.post("/call/start", json={}).json()
+        second = client.post("/call/start", json={}).json()
+        assert first["room"] != second["room"]
+        assert first["token"] and first["url"].startswith("ws")
+        assert client.get("/call/records/nope").status_code == 404
+    assert started == [first["room"], second["room"]]

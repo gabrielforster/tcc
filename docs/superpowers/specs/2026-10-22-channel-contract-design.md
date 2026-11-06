@@ -2,9 +2,12 @@
 
 Design document — 2026-10-22.
 
-> **Status (2026-11-05).** The channel contract and the chat channel shipped in #18. The
-> LiveKit voice channel, the TTS decision and the two measurements in §6 have not been
-> built; they are being re-planned with the rest of the remaining work.
+> **Status (2026-11-06).** The channel contract and the chat channel shipped in #18. The
+> LiveKit voice channel shipped as a reduced proof of concept: TTS is local Piper, the
+> turn-time budget in §6 is measured (`docs/voice-call.md`), and it uses the low-level
+> LiveKit SDK rather than LiveKit Agents, so there is no barge-in and no learned
+> end-of-turn detection. Not built: SIP, and the cross-channel divergence harness (the call
+> reuses the chat's routing, so divergence is zero by construction but not yet measured).
 
 ## 1. Intent
 
