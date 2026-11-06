@@ -77,6 +77,29 @@ before; splitting them doubles what can go wrong for no gain in isolation.
 | Rate | 20 msg/min per session | A public endpoint gets hammered |
 | Message | 1000 chars | Longer is a paste or a probe, not a question |
 
+## Closing a thread, and the threads nothing closes
+
+A conversation is closed when the session holding it expires. That covers a visitor who
+walks away from an open widget, and nothing else: the sweep runs over the sessions one
+process holds, so a process that is restarted, killed, or that crashes mid-request leaves
+every thread it was tracking `OPEN` with nothing anywhere that will ever close it. Those
+rows accumulate, and `OPEN` stops being a fact about now.
+
+`collection conversations sweep` (`make sweep`) is the second half, and it reads the
+record rather than a process. A tenant's open threads with no turn for longer than the
+window are closed; `--dry-run` reports them and writes nothing. It is meant for a
+schedule.
+
+The two halves measure different things on purpose. A session knows its `last_seen_at`,
+which advances on any activity — a transcript redraw included. From the rows the most
+recent thing visible is the last turn, so a thread that is open but silent is
+indistinguishable from one that was abandoned. The window is therefore a day rather than
+the session TTL's half hour: wide enough that no live thread can fall inside it, which is
+what makes the sweep safe to run against a serving database.
+
+Escalated threads are never swept. They are open because a person has not answered them
+yet — a backlog to work, not a leak to clean up.
+
 ## Status codes the widget acts on
 
 A widget on someone else's page has only the status code to distinguish "try again" from
