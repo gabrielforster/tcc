@@ -36,7 +36,7 @@ def population():
 def _runs(population, response=MAIN):
     yield simulate(population, "none", response=response)
     for capacity in (2, 8, None):
-        for arm in ("manual", "semi", "full"):
+        for arm in ("manual", "semi", "ranked", "full"):
             if arm == "manual" and capacity is None:
                 continue
             yield simulate(population, arm, capacity=capacity, response=response)
@@ -95,6 +95,7 @@ def test_a_contact_only_ever_brings_a_payment_forward(population):
 
 def test_only_the_system_sends_preventive_reminders(population):
     assert not any(c.preventive for c in simulate(population, "semi").contacts)
+    assert not any(c.preventive for c in simulate(population, "ranked").contacts)
     full = simulate(population, "full")
     preventive = [c for c in full.contacts if c.preventive]
     assert preventive
@@ -108,7 +109,7 @@ def test_manual_needs_a_capacity(population):
         simulate(population, "manual")
     with pytest.raises(ValueError):
         simulate(population, "nobody")
-    assert set(ARMS) == {"none", "manual", "semi", "full"}
+    assert set(ARMS) == {"none", "manual", "semi", "ranked", "full"}
 
 
 def test_contacting_recovers_at_least_what_doing_nothing_does(population):
@@ -222,6 +223,7 @@ def test_rewriting_the_report_keeps_the_reading_around_the_tables(tmp_path):
     assert "Hand-written reading." in text and "Limits." in text
     assert "old tables" not in text
     assert "system − semi-automated" in text
+    assert "ranking only − semi-automated" in text
     assert "0 violations" in text
     assert (tmp_path / "images" / "experiment-capacity.png").exists()
 

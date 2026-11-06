@@ -161,6 +161,11 @@ def _rank(task: str, frozen: dict[str, pd.DataFrame], cohort_ids: set[str]) -> p
     pipeline = build_pipeline(candidate, splits)
     pipeline.fit(train.drop(columns=[target]), train[target].to_numpy())
 
+    # Predict on one thread: a forest sums its trees in whatever order the threads finish,
+    # and a last-bit difference in a score is a different ranking on a tie -- a replication
+    # has to be a function of its seed to the bit.
+    if "n_jobs" in pipeline.named_steps["model"].get_params():
+        pipeline.set_params(model__n_jobs=1)
     unlabelled = build_features(task, frozen, labelled=False)
     cohort = unlabelled[unlabelled["invoice_id"].isin(cohort_ids)]
     probability = pipeline.predict_proba(cohort.drop(columns=[target]))[:, 1]
