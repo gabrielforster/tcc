@@ -165,6 +165,112 @@ def test_the_whisper_backend_is_imported_lazily_so_a_fresh_clone_still_runs():
     assert transcriber._model is None
 
 
+def _segment(text: str, start: float, end: float, logprob: float, no_speech: float = 0.0):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        text=text, start=start, end=end, avg_logprob=logprob, no_speech_prob=no_speech
+    )
+
+
+class _FakeWhisperModel:
+    """`faster_whisper.WhisperModel` without the weights: returns prepared segments."""
+
+    segments: list = []
+    fails_with: Exception | None = None
+    loads: list[tuple[str, str]] = []
+    load_error: Exception | None = None
+
+    def __init__(self, size: str, compute_type: str) -> None:
+        if type(self).load_error is not None:
+            raise type(self).load_error
+        type(self).loads.append((size, compute_type))
+
+    def transcribe(self, path: str, language: str, beam_size: int):
+        from types import SimpleNamespace
+
+        assert Path(path).suffix == ".wav", "the model is handed the decoded clip"
+        if type(self).fails_with is not None:
+            raise type(self).fails_with
+        # A generator, as the real one is: decoding errors surface while iterating.
+        return iter(type(self).segments), SimpleNamespace(duration=3.0, language=language)
+
+
+@pytest.fixture
+def fake_whisper(monkeypatch):
+    import sys
+    import types
+
+    _FakeWhisperModel.segments = []
+    _FakeWhisperModel.fails_with = None
+    _FakeWhisperModel.loads = []
+    _FakeWhisperModel.load_error = None
+    module = types.ModuleType("faster_whisper")
+    module.WhisperModel = _FakeWhisperModel
+    monkeypatch.setitem(sys.modules, "faster_whisper", module)
+    return _FakeWhisperModel
+
+
+@needs_ffmpeg
+def test_the_whisper_backend_joins_segments_and_reports_how_sure_it_was(fake_whisper):
+    fake_whisper.segments = [
+        _segment(" quero parcelar ", 0.0, 2.0, logprob=-0.05),
+        _segment("em seis vezes", 2.0, 3.0, logprob=-0.10),
+    ]
+    transcriber = get_transcriber("whisper")
+
+    heard = transcriber.transcribe_path(FIXTURE)
+
+    assert heard.text == "quero parcelar em seis vezes"
+    assert heard.transcriber == "whisper"
+    assert heard.usable
+    assert 0.9 < heard.confidence < 1.0
+    assert heard.latency_ms > 0
+    assert fake_whisper.loads == [("small", "int8")]
+    # Loaded once, not per clip.
+    transcriber.transcribe_path(FIXTURE)
+    assert len(fake_whisper.loads) == 1
+
+
+@needs_ffmpeg
+def test_a_backend_failure_mid_transcription_is_a_transcription_error(fake_whisper):
+    fake_whisper.fails_with = RuntimeError("CUDA out of memory")
+    with pytest.raises(TranscriptionError, match="RuntimeError: CUDA out of memory"):
+        get_transcriber("whisper").transcribe_path(FIXTURE)
+
+
+def test_a_model_that_cannot_be_loaded_is_a_transcription_error(fake_whisper):
+    fake_whisper.load_error = OSError("could not download model 'small'")
+    with pytest.raises(TranscriptionError, match="OSError: could not download"):
+        get_transcriber("whisper")._load()
+
+
+def test_without_the_voice_extra_the_error_says_what_to_install(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", None)
+    with pytest.raises(TranscriptionError, match="uv sync --extra voice"):
+        get_transcriber("whisper")._load()
+
+
+def test_a_long_confident_sentence_is_not_outvoted_by_a_short_hesitation():
+    from collection.voice.transcribe import _confidence
+
+    sentence = _segment("quero parcelar a dívida", 0.0, 4.0, logprob=-0.05)
+    hesitation = _segment("ahn", 4.0, 4.2, logprob=-2.0)
+    assert _confidence([sentence, hesitation]) > 0.9
+    assert _confidence([sentence, hesitation]) < _confidence([sentence])
+
+
+def test_a_segment_that_is_probably_not_speech_lowers_confidence():
+    from collection.voice.transcribe import _confidence
+
+    speech = _segment("quero parcelar", 0.0, 2.0, logprob=-0.05)
+    noise = _segment("quero parcelar", 0.0, 2.0, logprob=-0.05, no_speech=0.8)
+    assert _confidence([noise]) < MIN_CONFIDENCE < _confidence([speech])
+    assert _confidence([]) == 0.0, "silence is zero confidence, not an error"
+
+
 def test_confidence_below_the_threshold_makes_a_transcript_unusable():
     assert not Transcription(
         text="quero parcelar", confidence=MIN_CONFIDENCE - 0.01, transcriber="x"
