@@ -29,6 +29,7 @@ from collection.channels.delivery import (
 from collection.channels.session import (
     SESSION_TTL_SECONDS,
     DatabaseSessionStore,
+    SessionNotFound,
     TenantNotServable,
     UnknownTenant,
     issue_token,
@@ -323,3 +324,50 @@ def test_an_anonymous_visitor_and_an_identified_one_each_get_their_own_conversat
     assert restored.get(known.session_id).identified is True
     assert restored.get(known.session_id).customer_id == "C7"
     assert restored.get(anonymous.session_id).identified is False
+
+
+@pytest.mark.db
+def test_an_open_whose_unit_of_work_fails_leaves_no_session_behind(db):
+    """The map may not hold a session whose conversation was never written.
+
+    The sibling of `test_a_sweep_whose_unit_of_work_fails...`, in the other direction. A
+    session left in the map after its insert rolled back looks live to `get`, and every
+    write through it is a write against a row that does not exist.
+    """
+    channel, scope = _serving(db)
+
+    with pytest.raises(RuntimeError), channel.store.unit():
+        session, _ = channel.open()
+        raise RuntimeError("whatever the caller was going to write next")
+
+    assert len(channel.store) == 0
+    assert scope.get(Conversation, uuid.UUID(session.session_id)) is None
+
+
+@pytest.mark.db
+def test_an_expiry_whose_unit_of_work_fails_keeps_tracking_the_session_it_closed(db):
+    """Refusing an expired session commits its closing first; a rollback undoes both."""
+    channel, scope = _serving(db)
+    session, _ = channel.open()
+    session.last_seen_at = time.time() - SESSION_TTL_SECONDS - 1
+
+    with pytest.raises(RuntimeError), channel.store.unit():
+        with pytest.raises(SessionNotFound):
+            channel.store.get(session.session_id)
+        raise RuntimeError("whatever the caller was going to write next")
+
+    assert len(channel.store) == 1
+    assert scope.get(Conversation, uuid.UUID(session.session_id)).state is ConversationState.OPEN
+
+
+@pytest.mark.db
+def test_a_close_whose_unit_of_work_fails_keeps_tracking_the_session(db):
+    channel, scope = _serving(db)
+    session, _ = channel.open()
+
+    with pytest.raises(RuntimeError), channel.store.unit():
+        channel.store.close(session.session_id)
+        raise RuntimeError("whatever the caller was going to write next")
+
+    assert len(channel.store) == 1
+    assert scope.get(Conversation, uuid.UUID(session.session_id)).state is ConversationState.OPEN
