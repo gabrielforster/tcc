@@ -44,6 +44,8 @@
 %% Marca visível do que ainda depende de trabalho em andamento. Antes da versão
 %% final, `grep -n pendente main.tex` precisa voltar vazio (exceto esta definição).
 \newcommand{\pendente}[1]{\textcolor{red!75!black}{\textbf{[PENDENTE: #1]}}}
+%% Versão curta para células estreitas de tabela.
+\newcommand{\pendentecel}{\textcolor{red!75!black}{\textbf{?}}}
 
 \jid{ROCS}
 \jtitle{SBC Computing Reviews, 202X, XX:1}
@@ -257,9 +259,11 @@ A Tabela~\ref{tab:preditivo} resume o campeão de cada tarefa no conjunto de tes
 \small
 \caption{Campeões no conjunto de teste (dados sintéticos), contra prever sempre a classe majoritária. PM = precisão média.}
 \label{tab:preditivo}
+\footnotesize
 \begin{tblr}{
   width=\linewidth,
   colspec={X[l]*{5}{Q[c]}},
+  colsep=3pt,
   row{1}={font=\bfseries},
   hline{1,2,4,Z}=0.6pt,
   rowsep=1.2pt,
@@ -284,9 +288,11 @@ Na base Bank Marketing, a taxa de resposta cai a cada nova tentativa da mesma ca
 \small
 \caption{Taxa de resposta por tentativa na base UCI Bank Marketing (41.188 contatos).}
 \label{tab:tentativas}
+\footnotesize
 \begin{tblr}{
   width=\linewidth,
-  colspec={X[c]*{6}{Q[c]}},
+  colspec={X[l]*{6}{Q[c]}},
+  colsep=3pt,
   row{1}={font=\bfseries},
   hline{1,2,Z}=0.6pt,
   rowsep=1.2pt,
@@ -418,7 +424,7 @@ Este apêndice reúne a tabela comparativa de trabalhos relacionados (Tabela~\re
 \begin{table*}[t]
 \centering
 \footnotesize
-\caption{Tabela comparativa de trabalhos relacionados. Legenda: \atende{}~atende, \parcial{}~parcial, \naoatende{}~não atende; A1--A3 = artigos científicos, S1--S3 = soluções comerciais. A coluna deste trabalho reflete o que foi construído; P6 depende da chamada de voz em tempo real.}
+\caption{Tabela comparativa de trabalhos relacionados. Legenda: \atende{}~atende, \parcial{}~parcial, \naoatende{}~não atende; A1--A3 = artigos científicos, S1--S3 = soluções comerciais. A coluna deste trabalho reflete o que foi construído; \pendentecel{} = P6 e o total dependem da chamada de voz em tempo real \pendente{fechar P6 e o total}.}
 \label{tab:comparativa}
 \begin{tblr}{
   width=\textwidth,
@@ -438,7 +444,7 @@ P3 --- Modelos preditivos de \textit{Machine Learning} & \naoatende & \atende & 
 P4 --- Arquitetura multiagente & \atende & \naoatende & \atende & \naoatende & \naoatende & \naoatende & \atende \\
 \SetCell[c=8]{l}\textit{Canais de Comunicação} & & & & & & & \\
 P5 --- Operação multicanal (texto + voz) & \naoatende & \naoatende & \naoatende & \atende & \atende & \atende & \atende \\
-P6 --- Canal de voz interativo (telefonia ou WebRTC) & \naoatende & \naoatende & \naoatende & \naoatende & \atende & \atende & \pendente{} \\
+P6 --- Canal de voz interativo (telefonia ou WebRTC) & \naoatende & \naoatende & \naoatende & \naoatende & \atende & \atende & \pendentecel \\
 P7 --- Transcrição automática de fala (STT) & \naoatende & \naoatende & \naoatende & \naoatende & \atende & \atende & \atende \\
 \SetCell[c=8]{l}\textit{Estratégia de Cobrança} & & & & & & & \\
 P8 --- Abordagem proativa autônoma & \parcial & \naoatende & \naoatende & \atende & \atende & \atende & \atende \\
@@ -447,8 +453,8 @@ P10 --- Priorização inteligente de inadimplentes & \naoatende & \parcial & \at
 P11 --- Cobrança preventiva (inadimplência futura) & \naoatende & \naoatende & \naoatende & \parcial & \naoatende & \naoatende & \atende \\
 \SetCell[c=8]{l}\textit{Domínio de Aplicação} & & & & & & & \\
 P12 --- Foco específico em cobrança e recuperação de crédito & \naoatende & \parcial & \atende & \atende & \atende & \atende & \atende \\
-\textbf{Pontuação total (máx. 12,0)} & 3,0 & 2,0 & 5,0 & 6,5 & 8,0 & 8,0 & \pendente{} \\
-\textbf{Cobertura dos requisitos (\%)} & 25\% & 17\% & 42\% & 54\% & 67\% & 67\% & \pendente{} \\
+\textbf{Pontuação total (máx. 12,0)} & 3,0 & 2,0 & 5,0 & 6,5 & 8,0 & 8,0 & \pendentecel \\
+\textbf{Cobertura dos requisitos (\%)} & 25\% & 17\% & 42\% & 54\% & 67\% & 67\% & \pendentecel \\
 \end{tblr}
 \end{table*}
 
@@ -459,7 +465,7 @@ P12 --- Foco específico em cobrança e recuperação de crédito & \naoatende &
 \label{tab:reproducao}
 \begin{tblr}{
   width=\linewidth,
-  colspec={Q[l,font=\ttfamily\footnotesize]X[l]},
+  colspec={Q[l,font=\ttfamily\scriptsize]X[l,font=\footnotesize]},
   row{1}={font=\bfseries},
   hline{1,2,Z}=0.6pt,
   rowsep=1.2pt,
