@@ -13,7 +13,10 @@ refuses a row whose chunk does not belong to the version it claims; a retrieval 
 that cites a chunk under the wrong version would be evidence that lies.
 
 A turn with no retrieval rows is a valid and meaningful state: an answer given with
-nothing retrieved. Absence of rows must stay distinguishable from absence of a turn.
+nothing retrieved. Absence of rows must stay distinguishable from absence of a turn. The
+same rule one level up is why `Conversation.purged_at` exists: a thread whose transcript was
+erased at the end of its retention window and one that was never spoken in both have no
+turns, and a record that cannot tell them apart cannot show that anything was erased.
 
 `provider` and `model` sit beside `responder` because answers are not comparable across
 models, and a console that cannot tell them apart cannot be used to compare them.
@@ -77,6 +80,10 @@ class Conversation(TenantScoped, Base):
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     escalation_reason: Mapped[str | None] = mapped_column(Text)
+    #: When the transcript was erased, for a thread past its retention window. A purged
+    #: conversation has no turns, and so does one that was never spoken in; this is what
+    #: keeps erasure distinguishable from absence.
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Turn(TenantScoped, Base):

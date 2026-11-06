@@ -1,4 +1,4 @@
-.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep migrate pipeline test lint fmt
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge migrate pipeline test lint fmt
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -59,6 +59,9 @@ contacts:         ## report what the outbound path decides (serve --seed-demo is
 
 sweep:            ## close the threads nothing is tracking (COLLECTION_TENANT=<slug>)
 	uv run collection conversations sweep $(ARGS)
+
+purge:            ## erase transcripts past their retention window (COLLECTION_TENANT=<slug>)
+	uv run collection conversations purge $(ARGS)
 
 migrate:          ## apply database migrations (alembic upgrade head)
 	uv run collection db upgrade
