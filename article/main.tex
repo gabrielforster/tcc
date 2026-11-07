@@ -70,12 +70,13 @@
 Curso de Engenharia de Software, Centro Universitário --- Católica de Santa Catarina, Jaraguá do Sul, SC, Brasil.
 \end{mail}
 
+
 \begin{abstract-pt}
-Este trabalho desenvolveu e avaliou um sistema multiagente de cobrança que integra modelos de linguagem de grande escala (LLMs), geração aumentada por recuperação (RAG), modelos preditivos de \textit{Machine Learning} e transcrição de voz. Um orquestrador central coordena três agentes --- responsivo, proativo e preditivo --- por meio de eventos imutáveis, aplica a prioridade do cliente que aguarda sobre a campanha agendada e verifica o pedido de \textit{opt-out} antes que qualquer agente execute. O módulo preditivo treina seis candidatos por tarefa com validação cruzada temporal e seleciona o campeão por precisão média; o módulo responsivo responde ancorado em uma base de conhecimento recuperada e escala para uma pessoa quando não há evidência; o módulo proativo decide quando e por qual canal contatar sob um motor de regras legais e empíricas e redige mensagens verificadas por um checador de conformidade. Cada componente gerativo foi medido contra um braço de controle que não pode errar, prática que expôs dois defeitos de métrica antes que produzissem resultados falsos. Entre os achados: a taxa de resposta em 41.188 contatos reais cai de 13,0\% na primeira tentativa para 5,5\% a partir da sexta, o que fundamenta o limite de quatro tentativas; um \textit{embedder} pré-treinado não superou a linha de base léxica TF-IDF na recuperação (MRR 0,80 contra 0,82); e, sob uma taxa de erro de palavras de 0,099, a intenção de uma mensagem de voz sobrevive em 86\% dos casos enquanto um em cada sete valores falados já está errado, o que levou o agente a confirmar todo valor ouvido antes de agir. Sem chave de um provedor hospedado, o braço LLM foi medido com um modelo local de 3 bilhões de parâmetros, tratado como piso: ele dobrou a variedade das mensagens proativas, mas o checador de conformidade barrou 9 de 20, e sua latência p95 (11,1~s) excede o orçamento de 5~s. Num experimento simulado com 30 replicações contra uma mesa manual e uma campanha automatizada sem predição, o sistema recuperou 4,7 a 4,8 pontos percentuais a mais do valor em risco em 30 dias quando a capacidade de contato é escassa, a menor custo, e nenhuma diferença quando há capacidade para contatar todos; nenhuma violação das regras foi encontrada por uma auditoria independente. As integrações com WhatsApp e telefonia comutada foram substituídas por canais simulados atrás de um contrato verificado por teste, e essa substituição, bem como a ausência de dados operacionais reais, é declarada como limitação. Uma chamada de voz em tempo real sobre WebRTC, com reconhecimento e síntese locais, responde em 2,2~s (mediana) do fim da fala à primeira palavra; mas as respostas por \textit{template}, lidas em voz alta, duram em mediana 102~s, e a chamada só se torna utilizável com um respondedor gerativo por trás.
+Este trabalho desenvolveu e avaliou um sistema multiagente de cobrança que integra LLMs, geração aumentada por recuperação (RAG), modelos preditivos de \textit{Machine Learning} e voz. Um orquestrador coordena os agentes responsivo, proativo e preditivo por eventos imutáveis, prioriza o cliente que aguarda sobre a campanha e verifica o \textit{opt-out} antes que qualquer agente execute. Todo componente gerativo foi medido contra um braço de controle que não pode errar, o que expôs dois defeitos de métrica antes que virassem resultados. Na base pública Bank Marketing, a taxa de resposta cai de 13,0\% na primeira tentativa para 5,5\% a partir da sexta, o que fundamenta o limite de quatro tentativas; um \textit{embedder} pré-treinado não superou o TF-IDF na recuperação; e, a uma taxa de erro de palavras de 0,099, a intenção de uma nota de voz sobrevive em 86\% dos casos enquanto um valor falado em sete já está errado. Medido com um modelo local de 3B parâmetros, o braço LLM dobrou a variedade das mensagens, mas o checador de conformidade barrou 9 de 20. Num experimento simulado contra uma mesa manual e uma campanha sem predição, o sistema recuperou 4,7 a 4,8 pontos percentuais a mais do valor em risco quando o contato é escasso, a menor custo, sem nenhuma violação das regras. Uma chamada de voz sobre WebRTC responde em 2,2~s, mas só é utilizável com respostas curtas. A ausência de dados operacionais reais é declarada como limitação.
 \end{abstract-pt}
 
 \begin{abstract-en}
-This work built and evaluated a multi-agent debt collection system combining Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), predictive Machine Learning models and speech recognition. A central orchestrator coordinates three agents --- responsive, proactive and predictive --- through immutable events, ranks a waiting customer above a scheduled campaign, and checks opt-out before any agent runs. The predictive module trains six candidates per task under temporal cross-validation and selects the champion by average precision; the responsive module answers grounded in a retrieved knowledge base and hands over to a person when no evidence is found; the proactive module decides when and through which channel to make contact under a rules engine of legal and empirical constraints, and writes messages checked by a compliance checker. Every generative component was measured against a control arm that cannot fail, a practice that exposed two metric defects before they produced false results. Among the findings: across 41,188 real contacts the response rate falls from 13.0\% on the first attempt to 5.5\% from the sixth onwards, which grounds the four-attempt cap; a pretrained embedder did not beat the lexical TF-IDF baseline on retrieval (MRR 0.80 against 0.82); and at a word error rate of 0.099 a voice note's intent survives 86\% of the time while one spoken figure in seven is already wrong, which led the agent to read back every figure it hears before acting on it. With no hosted provider key, the LLM arm was measured on a local three-billion-parameter model, treated as a floor: it doubled the variety of outbound messages, but the compliance checker stopped 9 of 20, and its p95 latency (11.1~s) exceeds the 5~s budget. In a simulated experiment with 30 replications against a manual desk and an automated campaign without prediction, the system recovered 4.7 to 4.8 percentage points more of the at-risk amount within 30 days when contact capacity is scarce, at lower cost, and no difference when there is capacity to reach everyone; an independent audit found no rule violations. The WhatsApp and switched-telephony integrations were replaced by simulated channels behind a test-enforced contract; that substitution, and the absence of real operational data, are stated as limitations. A real-time voice call over WebRTC, with local recognition and synthesis, answers 2.2~s (median) after the customer stops speaking; but template replies read aloud last a median of 102~s, so the call only becomes usable with a generative responder behind it.
+This work built and evaluated a multi-agent debt collection system combining LLMs, Retrieval-Augmented Generation (RAG), predictive Machine Learning and voice. An orchestrator coordinates responsive, proactive and predictive agents through immutable events, ranks a waiting customer above a campaign, and checks opt-out before any agent runs. Every generative component was measured against a control arm that cannot fail, which exposed two metric defects before they became results. On the public Bank Marketing data, response falls from 13.0\% on the first attempt to 5.5\% from the sixth, grounding a four-attempt cap; a pretrained embedder did not beat TF-IDF on retrieval; and at a word error rate of 0.099 a voice note's intent survives 86\% of the time while one spoken figure in seven is already wrong. Measured on a local 3B-parameter model, the LLM arm doubled message variety, but the compliance checker stopped 9 of 20. In a simulated experiment against a manual desk and a campaign without prediction, the system recovered 4.7 to 4.8 percentage points more of the at-risk amount when contact capacity is scarce, at lower cost, with no rule violations. A voice call over WebRTC answers in 2.2~s but is only usable with short replies. The absence of real operational data is stated as a limitation.
 \end{abstract-en}
 
 \begin{pchaves}
@@ -94,19 +95,11 @@ Multi-agent system, Artificial Intelligence, Automated collection, RAG, Machine 
 \section{Introdução}
 \label{sec:intro}
 
-O cenário de inadimplência no Brasil apresenta desafios estruturais significativos para empresas de todos os portes. Dezenas de milhões de brasileiros encontram-se em situação de inadimplência, o que impacta diretamente o fluxo de caixa das organizações e eleva os custos operacionais associados à recuperação de crédito \cite{serasa2024}. Nesse contexto, os processos tradicionais de cobrança --- baseados em ligações manuais, envio de correspondências e negociações presenciais --- revelam-se cada vez mais insuficientes diante do volume crescente de devedores e da necessidade de abordagens personalizadas e tempestivas \cite{cnc2025}.
+Dezenas de milhões de brasileiros estão inadimplentes, o que pesa no fluxo de caixa das empresas e no custo de recuperar crédito \cite{serasa2024}; a cobrança baseada em ligações manuais e correspondência não acompanha o volume nem personaliza a abordagem \cite{cnc2025}. Ao mesmo tempo, LLMs geram texto adequado ao contexto \cite{brown2020language}, o RAG os ancora em bases externas e reduz alucinações \cite{lewis2020retrieval}, modelos de ML antecipam a propensão ao pagamento \cite{hastie2009elements,lessmann2015benchmarking}, agentes autônomos executam ações orientadas por objetivos \cite{wang2024survey} e a transcrição de fala \cite{radford2023robust} abre o canal de voz. As soluções existentes atacam partes isoladas do problema --- risco, voz ou atendimento --- sem integrá-las sob as restrições legais da cobrança.
 
-Paralelamente, os avanços recentes em Inteligência Artificial (IA) têm proporcionado novas possibilidades para a automação de processos que envolvem linguagem natural e tomada de decisão. Destacam-se os \textit{Large Language Models} (LLMs), capazes de compreender e gerar texto com elevado grau de coerência e adequação contextual \cite{brown2020language}. Complementarmente, a técnica de \textit{Retrieval-Augmented Generation} (RAG) permite que esses modelos consultem bases de conhecimento externas antes de formular uma resposta, reduzindo alucinações \cite{lewis2020retrieval}. Abordagens de \textit{Machine Learning} (ML) possibilitam modelos preditivos que antecipam comportamentos, como a propensão de um cliente a quitar uma dívida \cite{hastie2009elements,lessmann2015benchmarking}. O paradigma de agentes autônomos e sistemas multiagentes, por sua vez, permite que aplicações planejem e executem ações orientadas por objetivos, e não apenas respondam \cite{wang2024survey}. A transcrição automática de fala, como a do Whisper \cite{radford2023robust}, amplia os canais disponíveis a sistemas automatizados.
+\textit{Problema e hipótese:} operadores humanos têm capacidade limitada, e sem priorização o esforço vai a clientes que pouco pagarão \cite{thomas2009credit}. A hipótese da proposta é que um sistema com (i) agentes conversacionais com RAG, (ii) agentes proativos multicanal e (iii) um módulo preditivo para priorização e previsão de inadimplência futura reduz o tempo de recuperação e aumenta a resolução em relação a processos manuais ou semiautomatizados sem predição. Sem dados de uma operação real (Seção~\ref{sec:limitacoes}), testou-se se cada decisão do sistema é correta, verificável e lícita, e, por simulação, quanto a predição muda a recuperação.
 
-A relevância do trabalho decorre do impacto econômico da inadimplência e de uma lacuna nas soluções existentes: ferramentas comerciais e acadêmicas atacam aspectos isolados do problema --- a previsão de risco, a automação por voz ou o atendimento conversacional --- mas não integram, em um único fluxo, inteligência preditiva, recuperação de conhecimento e operação multicanal sob as restrições legais da cobrança.
-
-\textit{Problema de pesquisa:} os métodos convencionais de cobrança enfrentam limitações de escalabilidade, personalização e tempestividade. Operadores humanos têm capacidade limitada de atendimento simultâneo, e a ausência de priorização frequentemente direciona esforço a clientes com baixa probabilidade de pagamento \cite{thomas2009credit}. A pergunta formulada na proposta foi: \textit{em que medida um sistema multiagente, baseado em LLMs com RAG e modelos preditivos, integrado a serviços de transcrição de áudio e a um canal de voz interativo, é capaz de automatizar a cobrança --- de forma responsiva e proativa --- e aumentar a eficiência da recuperação de crédito em comparação com abordagens convencionais?}
-
-\textit{Hipótese:} um sistema que combine (i) agentes conversacionais com RAG para o atendimento responsivo, (ii) agentes autônomos para a abordagem proativa por múltiplos canais e (iii) um módulo preditivo para priorização e previsão de inadimplência futura reduz o tempo de recuperação e aumenta a taxa de resolução em relação a processos manuais ou semiautomatizados sem inteligência preditiva \cite{lessmann2015benchmarking}. Como se discute na Seção~\ref{sec:limitacoes}, a parte operacional dessa hipótese --- taxa de recuperação real --- não pôde ser testada com dados de uma operação de cobrança; o que foi testado é se cada decisão do sistema é correta, verificável e dentro da lei, e a que custo.
-
-\textit{Objetivos:} o objetivo geral foi desenvolver e avaliar esse sistema. Os objetivos específicos, e o que foi entregue para cada um, foram: (a) levantar requisitos, inclusive legais (CDC \cite{cdc1990}, LGPD \cite{lgpd2018} e as alterações sobre superendividamento \cite{lei14181}) --- traduzidos em um motor de regras; (b) projetar a arquitetura multiagente --- um orquestrador com contrato de eventos e regra de prioridade; (c) implementar o módulo responsivo com RAG --- com classificação de intenção, conversa de múltiplos turnos, geração com LLM e medida de fidelidade; (d) implementar o módulo ativo --- com detecção de vencidos, regras de contato, redação verificada de mensagens e um canal de chat; (e) desenvolver o módulo preditivo para as duas tarefas --- servido por uma API de inferência; e (f) avaliar o sistema contra \textit{baselines} --- cumprido para cada componente isolado e, para o sistema integrado, por um experimento simulado contra os dois \textit{baselines} da proposta.
-
-\textit{Estrutura do texto:} a Seção~\ref{sec:tr} discute os trabalhos relacionados; a Seção~\ref{sec:metodologia} descreve dados, arquitetura e módulos como foram construídos, além das mudanças de escopo; a Seção~\ref{sec:resultados} apresenta as medições; a Seção~\ref{sec:discconclusao} discute achados, limitações e trabalhos futuros; o Apêndice traz a tabela comparativa e os comandos de reprodução.
+\textit{Objetivos e entregas:} requisitos legais (CDC \cite{cdc1990}, LGPD \cite{lgpd2018}, superendividamento \cite{lei14181}) traduzidos em um motor de regras; um orquestrador com contrato de eventos; o módulo responsivo com RAG, múltiplos turnos e medida de fidelidade; o módulo proativo com redação verificada; o módulo preditivo servido por API; e a avaliação contra \textit{baselines}. Os detalhes e as tabelas completas de cada medição estão nos documentos do repositório (\texttt{docs/}), citados ao longo do texto.
 
 %% ============================================================
 %%  2. TRABALHOS RELACIONADOS
@@ -114,9 +107,7 @@ A relevância do trabalho decorre do impacto econômico da inadimplência e de u
 \section{Trabalhos Relacionados}
 \label{sec:tr}
 
-A literatura e o mercado oferecem contribuições parciais ao problema. No eixo acadêmico, \citet{wang2024survey} revisam agentes autônomos baseados em LLMs, fundamentando o paradigma multiagente adotado aqui, embora sem foco em cobrança. \citet{mestiri2024credit} aplica modelos de \textit{Machine Learning} e \textit{Deep Learning} a \textit{credit scoring}, sem componente conversacional ou multicanal, e \citet{lessmann2015benchmarking} comparam sistematicamente classificadores para o mesmo fim, mostrando que métodos de \textit{ensemble} costumam superar a regressão logística --- comparação que este trabalho repete em escala menor. Mais próximo da proposta, o sistema MASCA \cite{jajoo2025masca} combina múltiplos agentes baseados em LLMs para avaliação de crédito, mas não trata da execução da cobrança nem da operação por voz. \citet{moro2014data}, autores da base pública de \textit{telemarketing} bancário usada aqui, modelam o sucesso de contatos telefônicos repetidos --- não de cobrança, mas da mesma pressão de contato que o módulo proativo precisa dosar.
-
-Entre as soluções comerciais, o HighRadius \cite{highradius} automatiza a cobrança com IA predominantemente por canais textuais, enquanto Skit.ai \cite{skitai} e Tovie AI \cite{tovieai} oferecem cobrança automatizada por voz. Nenhuma delas reúne simultaneamente RAG, arquitetura multiagente, operação multicanal e cobrança preventiva baseada em previsão de inadimplência futura. A análise comparativa, com 12 critérios, está na Tabela~\ref{tab:comparativa} (Apêndice).
+\citet{wang2024survey} revisam agentes autônomos baseados em LLMs, sem foco em cobrança. \citet{mestiri2024credit} e \citet{lessmann2015benchmarking} comparam classificadores para \textit{credit scoring}, sem componente conversacional; o segundo mostra \textit{ensembles} superando a regressão logística, comparação repetida aqui em escala menor. O MASCA \cite{jajoo2025masca} usa múltiplos agentes com LLMs para avaliação de crédito, mas não executa a cobrança. \citet{moro2014data} modelam contatos telefônicos repetidos em \textit{telemarketing} bancário, a mesma pressão de contato que o módulo proativo dosa. Comercialmente, o HighRadius \cite{highradius} automatiza a cobrança por texto, e Skit.ai \cite{skitai} e Tovie AI \cite{tovieai}, por voz. Nenhum reúne RAG, arquitetura multiagente, operação multicanal e cobrança preventiva (Tabela~\ref{tab:comparativa}, Apêndice).
 
 %% ============================================================
 %%  3. METODOLOGIA
@@ -124,57 +115,37 @@ Entre as soluções comerciais, o HighRadius \cite{highradius} automatiza a cobr
 \section{Metodologia}
 \label{sec:metodologia}
 
-A pesquisa foi aplicada, com desenvolvimento incremental em quatro etapas: (i) requisitos e análise do domínio; (ii) projeto da arquitetura; (iii) implementação dos módulos; e (iv) avaliação. O sistema foi implementado em Python 3.12, com \textit{scikit-learn} \cite{pedregosa2011scikit}, FastAPI, PostgreSQL com \textit{pgvector} e armazenamento de objetos compatível com S3. Cada entrega passou por \textit{pull request} revisado, com testes automatizados.
+O sistema foi implementado em Python 3.12 com \textit{scikit-learn} \cite{pedregosa2011scikit}, FastAPI, PostgreSQL com \textit{pgvector} e armazenamento de objetos, em entregas incrementais revisadas por \textit{pull request}. Um princípio atravessa a avaliação: \textbf{todo componente gerativo é medido contra um braço de controle que não pode errar} --- a resposta por \textit{template} cita a base e não pode alucinar; a mensagem por \textit{template} só preenche lacunas; o transcritor de controle devolve a referência. Quando o controle falha numa métrica, suspeita-se primeiro da métrica.
 
-Um princípio de avaliação atravessa todos os módulos e convém explicitá-lo antes deles: \textbf{todo componente gerativo foi medido contra um braço de controle que não pode errar}. A resposta por \textit{template} cita a base em vez de redigir, e por isso não pode alucinar; a mensagem por \textit{template} só preenche lacunas, e por isso não pode inventar um valor; o transcritor de controle devolve a transcrição de referência. Quando o controle falha em uma métrica, a suspeita recai primeiro sobre a métrica. Essa regra pegou dois defeitos de medida antes que virassem resultados (Seção~\ref{sec:disc}).
-
-\subsection{Dados e anonimização}
+\subsection{Dados, atributos e módulo preditivo}
 \label{sec:dados}
 
-O plano original previa extrair o histórico de um ERP empresarial. A autorização formal não chegou a tempo, e em 10/09/2026 decidiu-se (decisão D1) seguir com bases públicas, mantendo o ERP como trilha paralela que não chegou a ser concluída. Nenhuma base pública contém, ao mesmo tempo, recebíveis e os contatos de cobrança feitos sobre eles; por isso cada fonte sustenta uma afirmação diferente e as duas não são combinadas:
+Sem autorização a tempo para extrair o ERP previsto, decidiu-se usar bases públicas (decisão D1). Nenhuma delas liga recebíveis aos contatos de cobrança, e cada uma sustenta uma afirmação diferente: a \textbf{UCI Bank Marketing} \cite{moro2014data} (41.188 contatos telefônicos reais, com tentativa e resultado) informa a estratégia de contato; a \textbf{Home Credit} \cite{homecredit2018}, prevista para as tarefas preditivas, teve o \textit{loader} implementado, mas o acesso aos arquivos não foi obtido; e um \textbf{gerador sintético} com semente fixa (1.200 clientes, 12.000 recebíveis) é tratado como \textit{fixture}. A anonimização (LGPD) descarta identificadores diretos, generaliza quase-identificadores e troca chaves por pseudônimos HMAC-SHA256 com chave derivada por cliente da plataforma (\textit{tenant}), para que exportações de dois credores não permitam alinhar os mesmos devedores.
 
-\begin{itemize}
-\item \textbf{UCI Bank Marketing} \cite{moro2014data}: 41.188 contatos telefônicos reais, ordenados no tempo (maio de 2008 a novembro de 2010), com o número da tentativa e o resultado. Não é cobrança, mas é o melhor substituto público para \textit{estratégia de contato} --- quanto rendem tentativas repetidas. O calendário foi reconstruído a partir do mês e da ordem das linhas, o que é válido para ordenação e sazonalidade mensal, não para precisão diária.
-\item \textbf{Home Credit Default Risk} \cite{homecredit2018}: parcelas previstas e pagas, a fonte prevista para as tarefas preditivas. O \textit{loader} foi implementado, mas o acesso aos arquivos da competição não foi obtido, e a base não foi exercitada.
-\item \textbf{Gerador sintético}: 1.200 clientes, 12.000 recebíveis, 21.290 eventos de cobrança e 679 acordos, com semente fixa. Ele é tratado como \textit{fixture} de teste: os padrões que contém foram postos ali pelo próprio gerador.
-\end{itemize}
-
-As quatro tabelas do domínio (clientes, recebíveis, eventos de cobrança e acordos) seguem um dicionário de dados único, e toda fonte é mapeada para ele. A anonimização conforme a LGPD \cite{lgpd2018} classifica cada campo: identificadores diretos (nome, CPF/CNPJ, e-mail, telefone) são descartados; chaves são substituídas por pseudônimos HMAC-SHA256; quase-identificadores (cidade, estado, data de cadastro, número do documento) são generalizados. A chave do pseudônimo é derivada \textit{por cliente da plataforma} (\textit{tenant}) a partir de um segredo nunca versionado, porque, em cobrança, a mesma pessoa costuma dever a mais de um credor: sob uma chave global, duas exportações anonimizadas permitiriam alinhar os mesmos devedores sem conhecer um único nome.
-
-\subsection{Atributos, tarefas e prevenção de vazamento}
-\label{sec:features}
-
-Foram definidas duas tarefas: (1) \textbf{propensão ao pagamento} --- se um recebível vencido é quitado em até 30 dias do vencimento; e (2) \textbf{inadimplência futura} --- se um recebível, observado na data de emissão, ultrapassará 60 dias de atraso. Os atributos derivam do histórico do cliente (dias médios e máximos de atraso, taxa histórica de atraso e de inadimplência, atraso recente, tendência de atraso, taxa de resposta a contatos, contagem de acordos e de acordos rompidos) e do próprio documento (valor, valor relativo ao limite, prazo, mês e dia da semana de vencimento).
-
-A disciplina contra vazamento foi tratada como requisito: os atributos históricos usam janelas expansivas deslocadas em uma posição e junções \textit{as-of}, de modo que nenhuma linha enxerga o próprio desfecho; a divisão 70/15/15 é cronológica; e a validação cruzada usa \textit{TimeSeriesSplit} com $k=5$, para que nenhuma dobra seja avaliada em linhas anteriores aos seus dados de treino. Um erro de censura chegou a produzir taxa de positivos de 0,70 no treino e 0,53 no teste; a correção foi ancorar a data de referência no último pagamento observado, e não no último vencimento.
-
-\subsection{Módulo preditivo}
-\label{sec:preditivo}
-
-Para cada tarefa foram treinados seis candidatos: regressão logística (\textit{baseline}), regressão logística com pesos de classe, Random Forest \cite{breiman2001random} com pesos de classe e com SMOTE \cite{chawla2002smote}, e XGBoost \cite{chen2016xgboost} com \textit{scale\_pos\_weight} e com SMOTE, com busca de hiperparâmetros. O campeão é escolhido pela \textbf{precisão média} (área sob a curva precisão–revocação) na validação, nunca pela acurácia: com 16\% de positivos, prever sempre a classe majoritária já tem 84\% de acurácia e não informa nada. O limiar de decisão é ajustado na validação, e o conjunto de teste é avaliado uma única vez, depois da escolha. A interpretabilidade combina importância por permutação e valores SHAP \cite{lundberg2017unified}. O campeão é publicado como versão de modelo e servido por uma API (\texttt{POST /score}) que devolve o \textit{ranking} de prioridade consumido pelo agente proativo.
+Há duas tarefas: (1) \textbf{propensão}, se um recebível vencido é pago em até 30 dias; e (2) \textbf{inadimplência futura}, se um recebível, visto na emissão, passará de 60 dias de atraso. Os atributos vêm do histórico do cliente (atraso médio, taxas de atraso e de resposta, acordos rompidos) e do documento (valor, prazo, vencimento). Contra vazamento, os atributos históricos usam janelas expansivas deslocadas e junções \textit{as-of}, a divisão 70/15/15 é cronológica e a validação cruzada é \textit{TimeSeriesSplit} ($k=5$). Seis candidatos por tarefa --- regressão logística com e sem pesos de classe, Random Forest \cite{breiman2001random} e XGBoost \cite{chen2016xgboost}, cada um com pesos de classe ou SMOTE \cite{chawla2002smote} --- são comparados pela \textbf{precisão média}, nunca pela acurácia, que com 16\% de positivos premia a classe majoritária. A interpretabilidade usa permutação e SHAP \cite{lundberg2017unified}, e o campeão é servido por \texttt{POST /score}, que devolve o \textit{ranking} consumido pelo agente proativo.
 
 \subsection{Arquitetura multiagente}
 \label{sec:arquitetura}
 
-A arquitetura (Figura~\ref{fig:arquitetura}) tem quatro camadas: o orquestrador, os três agentes, os canais e serviços, e o registro durável. Toda interação é um \textbf{evento imutável}; um agente nunca altera o que recebe, mas emite novos eventos que carregam a causa (\textit{caused\_by}), de modo que o registro reconstrói por que cada contato aconteceu --- o que a LGPD exige e a avaliação usa como evidência. O contrato de cada agente é uma única operação, \textit{handle(event) $\to$ lista de eventos}, e por isso os agentes foram entregues primeiro como \textit{stubs} e depois substituídos sem que o orquestrador mudasse.
+Toda interação é um \textbf{evento imutável}: um agente emite novos eventos que carregam a causa, de modo que o registro reconstrói por que cada contato aconteceu, e o contrato de cada agente é uma única operação, \textit{handle(event) $\to$ eventos} (Figura~\ref{fig:arquitetura}). O orquestrador roteia; prioriza responsivo $\to$ escalação $\to$ proativo, porque a campanha não perde nada esperando e a pessoa pode desistir; verifica o \textbf{\textit{opt-out} antes de qualquer agente}, para que nenhum defeito num agente contate quem pediu para não ser contatado; e audita todo evento. O registro durável é multi-\textit{tenant}, com uma guarda na sessão do banco que devolve nada em vez de vazar quando uma consulta esquece o \textit{tenant}, e as transcrições têm retenção de 180 dias.
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[
   font=\scriptsize,
-  box/.style={draw, rounded corners=2pt, align=center, minimum height=7mm, inner sep=3pt},
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=6mm, inner sep=2pt},
   orq/.style={box, fill=blue!12, text width=.86\linewidth},
-  agent/.style={box, fill=green!12, text width=.27\linewidth, minimum height=12mm},
+  agent/.style={box, fill=green!12, text width=.27\linewidth, minimum height=10mm},
   serv/.style={box, fill=orange!14, text width=.86\linewidth},
   dados/.style={box, fill=gray!14, text width=.86\linewidth},
   >=Latex, node distance=3mm
 ]
-\node[orq] (orq) {\textbf{Orquestrador}\\ \scriptsize roteia, prioriza, aplica \textit{opt-out} e registra};
-\node[agent, below=6mm of orq.south, xshift=-.30\linewidth, anchor=north] (resp) {\textbf{Agente}\\\textbf{Responsivo}\\ \scriptsize intenção, RAG e resposta};
-\node[agent, below=6mm of orq.south, anchor=north] (proa) {\textbf{Agente}\\\textbf{Proativo}\\ \scriptsize regras, redação e conformidade};
-\node[agent, below=6mm of orq.south, xshift=.30\linewidth, anchor=north] (pred) {\textbf{Agente}\\\textbf{Preditivo}\\ \scriptsize \textit{ranking} via \texttt{POST /score}};
-\node[serv, below=6mm of proa] (serv) {\textbf{Canais e serviços:}~ chat embedável ~$\cdot$~ voz em tempo real (WebRTC) ~$\cdot$~ STT local (Whisper) ~$\cdot$~ LLM};
-\node[dados, below=3mm of serv] (dados) {\textbf{Registro durável:}~ PostgreSQL + \textit{pgvector} ~$\cdot$~ armazenamento de objetos ~$\cdot$~ trilha de auditoria};
+\node[orq] (orq) {\textbf{Orquestrador}: roteia, prioriza, aplica \textit{opt-out}, audita};
+\node[agent, below=5mm of orq.south, xshift=-.30\linewidth, anchor=north] (resp) {\textbf{Responsivo}\\ intenção, RAG, resposta};
+\node[agent, below=5mm of orq.south, anchor=north] (proa) {\textbf{Proativo}\\ regras, redação, conformidade};
+\node[agent, below=5mm of orq.south, xshift=.30\linewidth, anchor=north] (pred) {\textbf{Preditivo}\\ \textit{ranking} (\texttt{/score})};
+\node[serv, below=5mm of proa] (serv) {\textbf{Canais e serviços:} chat ~$\cdot$~ voz WebRTC ~$\cdot$~ Whisper local ~$\cdot$~ LLM};
+\node[dados, below=2mm of serv] (dados) {\textbf{Registro:} PostgreSQL + \textit{pgvector} ~$\cdot$~ objetos ~$\cdot$~ auditoria};
 \draw[->] (orq.south) -- (resp.north);
 \draw[->] (orq.south) -- (proa.north);
 \draw[->] (orq.south) -- (pred.north);
@@ -183,73 +154,28 @@ A arquitetura (Figura~\ref{fig:arquitetura}) tem quatro camadas: o orquestrador,
 \draw[->] (pred.south) -- ([xshift=.30\linewidth]serv.north);
 \draw[->] (serv.south) -- (dados.north);
 \end{tikzpicture}
-\caption{Arquitetura em quatro camadas. Nenhum agente importa um canal: a separação é verificada por teste (Seção~\ref{sec:canais}).}
+\caption{Arquitetura em quatro camadas. Nenhum agente importa um canal; a separação é verificada por teste.}
 \label{fig:arquitetura}
 \end{figure}
 
-O orquestrador tem poucas responsabilidades, deliberadamente: \textbf{roteamento} (um evento sem agente é registrado, não descartado); \textbf{prioridade}, na ordem responsivo $\to$ escalação $\to$ proativo e, dentro de cada nível, quem espera há mais tempo --- um cliente que escreveu sempre passa à frente de uma campanha, porque a campanha não perde nada esperando segundos e a pessoa pode desistir; \textbf{\textit{opt-out}}, verificado \textit{antes} de qualquer agente executar, para que nenhum defeito em um agente consiga contatar quem pediu para não ser contatado (CDC, art.~42, e o direito de oposição da LGPD); e \textbf{auditoria} de todo evento processado, produzido, suprimido ou não roteado. Há uma assimetria intencional: um cliente em \textit{opt-out} que escreve \textit{continua sendo atendido}, pois o \textit{opt-out} interrompe a cobrança ativa, não o serviço. Salvaguardas limitam a profundidade de cascata entre agentes, descartam eventos duplicados e processam a fila em fatias.
-
-O registro durável é multi-\textit{tenant}: clientes, recebíveis, versões da base de conhecimento com vetores por trecho, conversas, turnos e status de entrega pertencem a um \textit{tenant}. Uma guarda na sessão do banco recusa leituras de tabelas com escopo quando nenhum \textit{tenant} está associado e recusa escritas de linhas de outro \textit{tenant}, de modo que uma consulta que esqueça o predicado devolve nada em vez de vazar dados. As transcrições têm janela de retenção de 180 dias (LGPD, arts.~15 e~16): os turnos são apagados, a linha da conversa permanece com a marca do apagamento, e só conversas encerradas envelhecem --- uma conversa escalada aguardando uma pessoa nunca perde o conteúdo.
-
-\subsection{Base de conhecimento e RAG}
-\label{sec:rag}
-
-A base de conhecimento é um corpus em português escrito para este trabalho --- política de cobrança, FAQ, \textit{script} de negociação, tabela de parcelamento e limites de alçada (5 documentos, cerca de 660 palavras). Os documentos são fragmentados em trechos de 500 a 1.000 palavras com sobreposição de 75, preservando parágrafos. Cada versão publicada é vetorizada uma vez pelo modelo pré-treinado \textit{paraphrase-multilingual-MiniLM-L12-v2} \cite{reimers2019sentence} (384 dimensões) e recuperada por distância de cosseno no \textit{pgvector}, numa consulta que já filtra \textit{tenant}, versão vigente e público-alvo. O filtro de público é uma lista de permissão: o documento de limites de alçada, que contém os tetos de desconto, é interno e nunca ocupa uma posição do resultado servido ao cliente. Uma linha de base léxica (TF-IDF sobre n-gramas de palavras e de caracteres) foi mantida, porque um controle só vale se puder vencer. A recuperação foi avaliada isoladamente, contra 16 perguntas rotuladas, antes de qualquer LLM.
-
-\subsection{Agente responsivo}
+\subsection{Agentes responsivo e proativo}
 \label{sec:responsivo}
 
-O agente segue quatro passos: classifica a intenção (consulta de débito, segunda via, negociação, contestação, confirmação de pagamento, \textit{opt-out} e conversa social, esta acrescentada porque um ``bom dia, tudo bem?'' era classificado como negociação); decide se escala \textit{antes} de responder; recupera; e redige citando as fontes. Escalam para uma pessoa a contestação de dívida, a ausência de trecho relevante, três mensagens seguidas não compreendidas e a mensagem vazia. A confiança do classificador é uma margem entre a melhor e a segunda intenção, não uma probabilidade calibrada, e é relatada como tal. Uma conversa escalada passa a ter um dono: entra numa fila, é assumida por um operador identificado e só se encerra quando ele a resolve.
+A base de conhecimento (5 documentos escritos para o trabalho: política, FAQ, \textit{script} de negociação, tabela de parcelamento e limites de alçada) é vetorizada pelo \textit{paraphrase-multilingual-MiniLM-L12-v2} \cite{reimers2019sentence} e recuperada no \textit{pgvector} com filtro de \textit{tenant}, versão e público --- o documento interno de alçada nunca chega ao cliente. Uma linha de base TF-IDF foi mantida, porque um controle só vale se puder vencer. O agente responsivo classifica a intenção, decide se escala (contestação, nenhum trecho relevante, três mensagens não compreendidas) e responde citando as fontes. O braço LLM recebe só os trechos recuperados, com temperatura zero, 512 \textit{tokens} e um sinal literal de recusa (\texttt{NAO\_SEI}) que encaminha a uma pessoa; o provedor é substituível, inclusive por um modelo local servido pelo Ollama. A \textbf{fidelidade} exige que todo número da resposta conste nos trechos, que cada frase tenha suporte e que toda citação aponte para um documento recuperado. Acompanhamentos (``e em 6 vezes?'') acrescentam consultas a partir do histórico, nunca substituem a mensagem.
 
-A geração fica atrás de uma interface com dois braços. O \textit{template} cita o trecho recuperado e não pode alucinar; o braço LLM recebe \textit{apenas} os trechos recuperados, com temperatura zero e limite de 512 \textit{tokens}, e dispõe de um sinal literal (\texttt{NAO\_SEI}) para recusar, que encaminha a conversa a uma pessoa. Toda falha do provedor cai no \textit{template} com uma marca explícita, para que uma chave expirada não apareça nos resultados como empate. O provedor é substituível: além do cliente da Anthropic, um cliente compatível com a API da OpenAI permite servir um modelo local pelo Ollama, sem conta nem chave. A \textbf{fidelidade} é medida por três verificações: todo número da resposta precisa constar nos trechos (normalizando o separador de milhar brasileiro); cada frase é pontuada pela melhor similaridade com unidades do tamanho de uma frase; e toda citação precisa apontar para um documento recuperado. Linhas de citação e frases introdutórias não são pontuadas, nos dois braços igualmente.
+O agente proativo detecta vencidos e consome o \textit{ranking}. O motor de regras separa restrições \textbf{legais}, que não são parâmetros --- horário (dias úteis das 8h às 20h, sábados até 14h) no fuso de São Paulo, três contatos por semana, \textit{opt-out}, dívidas contestadas fora da campanha \cite{cdc1990,lei14181} --- de \textbf{empíricas}: quatro tentativas e 48 horas de intervalo, derivadas da base Bank Marketing (Seção~\ref{sec:res-componentes}). As mensagens são redigidas a partir da mesma tabela de parcelamento que o RAG serve, e um checador executado no agente, não no redator, verifica valores inventados, ameaça, as três divulgações obrigatórias (quem escreve, que é automático, como sair), ofertas acima da alçada e comprimento por canal; uma mensagem reprovada vira escalação.
 
-Mensagens de acompanhamento (``e em 6 vezes?'') são resolvidas contra o histórico. O contexto \textit{acrescenta} consultas, nunca substitui a mensagem, e os resultados das consultas são intercalados por posição. Uma intenção é herdada do histórico só quando o classificador não está confiante, a mensagem é curta e suas palavras são conhecidas --- porque a confiança, sozinha, não distingue um ``sim'' (margem 0,0000) de texto sem sentido (margem 0,0069). A janela de contexto de quatro turnos foi derivada por varredura (Seção~\ref{sec:res-multiturno}).
-
-\subsection{Agente proativo e motor de regras}
-\label{sec:proativo}
-
-Um \textit{job} detecta recebíveis vencidos e consome o \textit{ranking} preditivo para a cobrança preventiva. Antes de qualquer contato, um motor de regras separa dois tipos de restrição. As \textbf{legais} não são parâmetros: horário permitido (dias úteis das 8h às 20h, sábados das 8h às 14h, nunca domingos e feriados) avaliado no fuso de \textit{America/Sao\_Paulo} --- avaliá-lo em UTC permitiria contato às 5h locais, defeito que a demonstração revelou ---, teto de três contatos por semana, \textit{opt-out} absoluto e retirada da campanha de dívidas contestadas \cite{cdc1990,lei14181}. As \textbf{empíricas} são parâmetros que o experimento deve variar: o limite de quatro tentativas e o intervalo mínimo de 48 horas, ambos derivados da queda medida na base Bank Marketing (Seção~\ref{sec:res-contato}). Bloqueios legais são avaliados primeiro, e todo contato recusado gera um evento \textit{suppressed} com o motivo, de modo que um cliente nunca contatado também deixa registro. A promessa de pagamento suspende o contato por cinco dias.
-
-As mensagens são redigidas a partir de um \textit{briefing} com valor, dias de atraso, nome, tentativa, canal e as condições comerciais da faixa de atraso, lidas da mesma tabela de parcelamento que o RAG serve --- assim, a oferta que o sistema \textit{envia} e a resposta que ele \textit{dá} não podem divergir. O tom não escala com a dívida; escala apenas o que se oferece. Um checador de conformidade, executado no agente e não no redator (um componente que avalia a própria saída não pode ser comparado a uma alternativa), verifica cinco coisas: valores inventados, ameaça ou constrangimento por léxico, as três divulgações obrigatórias (quem escreve, que é automático e como sair), ofertas acima da alçada e comprimento por canal. Uma mensagem reprovada não é enviada: vira uma escalação com as violações anexadas.
-
-\subsection{Canais e mudanças de escopo}
+\subsection{Canais, voz e mudanças de escopo}
 \label{sec:canais}
 
-Três integrações previstas na proposta foram substituídas em 22/10/2026, antes de a implementação correspondente ser integrada, pelo critério de que uma integração externa só permanece no escopo se acrescenta uma \textit{decisão} nova a algum agente. A WhatsApp Business API exigia conta comercial, aprovação de \textit{templates} e faturamento, e não acrescentava decisão alguma; foi substituída por um \textbf{canal de chat embedável} com balões, notas de voz no fio da conversa, status de entrega e conversas iniciadas pelo sistema (Figura~\ref{fig:chat}). A telefonia comutada foi substituída por uma \textbf{chamada de voz em tempo real sobre WebRTC}, que preserva os problemas interessantes de uma ligação --- alternância de turnos, interrupção, orçamento de latência e aviso de gravação. O envio ativo por \textit{push} deu lugar a uma \textbf{conversa semeada}: o agente proativo deposita o contato na caixa do cliente, e ele aparece quando o \textit{widget} é aberto.
+Em 22/10/2026, a WhatsApp Business API e a telefonia comutada foram substituídas, pelo critério de que uma integração só fica no escopo se acrescenta uma \textit{decisão} a algum agente: um \textbf{canal de chat embedável} (notas de voz, status de entrega, conversas iniciadas pelo sistema) e uma \textbf{chamada de voz sobre WebRTC}. O risco foi deslocado para um \textbf{contrato de canal}: o canal detém transporte e identidade e nunca decide o que dizer, e um teste sintático falha se algum agente importar um canal.
 
-O risco arquitetural dessas integrações foi deslocado para um \textbf{contrato de canal}: o canal detém transporte, identidade e o fio da conversa, e nunca decide o que dizer, quem contatar ou o que o cliente disse. Um teste analisa sintaticamente cada módulo do pacote de agentes e falha se algum importar um canal por qualquer forma de \textit{import}; esse teste tem seu próprio teste, que planta cada grafia e confere que o alarme dispara. A identidade nunca vem do navegador: o \textit{backend} do sistema hospedeiro emite um \textit{token} assinado com HMAC-SHA256 sob uma chave derivada para esse fim, e sem \textit{token} a sessão é anônima --- um modo suportado, já que a base de conhecimento não contém dado de nenhum cliente. O vocabulário de dados do ERP (\textit{whatsapp}, \textit{phone}, \textit{email}, \textit{sms}) não foi renomeado: ele descreve contatos que de fato aconteceram, e reescrevê-lo corromperia a base de treino.
+Notas de voz são transcritas pelo Whisper \cite{radford2023robust} \textit{localmente}, porque voz é dado pessoal; transcrições pouco confiáveis escalam, e todo valor ouvido é lido de volta antes de qualquer ação. Como um reconhecedor real exigiria áudio de clientes, a avaliação \textit{fixa} a taxa de erro com um modelo determinístico de erros do português e mede o que sobrevive. A chamada em tempo real é uma prova de conceito reduzida: um servidor LiveKit auto-hospedado, síntese local pelo Piper (escolhido porque a resposta lê em voz alta a dívida de uma pessoa identificada, e o primeiro áudio sai em 60 a 90~ms), um aviso de gravação que não pode ser pulado e o mesmo caminho de nota de voz do chat --- por isso o SDK de baixo nível, e não o LiveKit Agents, que reconheceria a fala por conta própria e desligaria a escalação por confiança e a leitura de valores. Construí-la revelou dois defeitos já integrados: o Whisper real falhava em todo clipe por um argumento rejeitado pela camada de decodificação, e um \textit{opt-out} falado perdia a transcrição.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=.47\linewidth]{figuras/chat-conversa-semeada.png}\hfill
-\includegraphics[width=.47\linewidth]{figuras/chat-escalacao.png}
-\caption{Canal de chat. À esquerda, uma conversa semeada pelo agente proativo, com as três divulgações obrigatórias; à direita, uma contestação de valor transferida para uma pessoa.}
-\label{fig:chat}
-\end{figure}
-
-\subsection{Voz}
-\label{sec:voz}
-
-Notas de voz são validadas (formato, codec, duração entre 0,4~s e 120~s) e decodificadas antes de qualquer modelo, e transcritas pelo Whisper \cite{radford2023robust} executado \textit{localmente} em CPU: uma nota de voz é dado pessoal, e enviá-la a uma API de terceiros seria uma transferência a justificar. O custo é latência, que é medida, não escondida. Transcrições abaixo de um limiar de confiança escalam com o texto anexado, e todo valor monetário ou número de parcelas ouvido em áudio é lido de volta ao cliente para confirmação antes de qualquer ação.
-
-A avaliação de voz precisou inverter a forma usual. Um transcritor de controle devolve a referência e não pode errar, e um reconhecedor real exige áudio de clientes que o repositório não deve conter. Em vez de perguntar com que frequência o reconhecimento erra, a varredura \textit{fixa} a taxa de erro e pergunta o que sobrevive a ela: um modelo determinístico de erros do português (acentos perdidos, palavras do domínio trocadas, numerais confundidos, palavras funcionais omitidas, hesitações transcritas) corrompe as 18 referências rotuladas, e mede-se, a cada taxa, a concordância de intenção com a transcrição limpa e a sobrevivência dos valores falados.
-
-A \textbf{chamada de voz em tempo real} foi construída como prova de conceito reduzida: o cliente abre uma página, aciona a ligação, ouve um aviso de gravação, fala e é atendido pelo mesmo agente que atende o chat. O áudio trafega por WebRTC por um servidor LiveKit auto-hospedado (um contêiner em modo de desenvolvimento), e nada sai da máquina. O canal da chamada guarda todas as regras e nenhum transporte. A chamada abre num estado em que só o aviso de gravação e a saudação tocam, e a fala ouvida nesse intervalo é registrada e \textit{descartada}, não enfileirada --- senão o cliente seria gravado antes de ser avisado. Uma linha em silêncio é perguntada uma vez e então encerrada; escalação e \textit{opt-out} encerram a chamada depois da frase que os anuncia. A transcrição e o áudio têm vidas separadas: a transcrição vai para o mesmo armazenamento das conversas de chat, e o áudio, dado biométrico, pode ser apagado sem apagar a transcrição. O canal \textit{não reconhece fala}: cada enunciado concluído vira um clipe entregue ao orquestrador como nota de voz, pelo mesmo caminho do chat, de modo que a escalação por baixa confiança, a leitura de volta de valores e a supressão por \textit{opt-out} valem na chamada sem reimplementação. Por isso se usou o SDK de baixo nível do LiveKit, e não o \textit{framework} LiveKit Agents: o \textit{pipeline} do \textit{framework} reconhece a fala ele próprio e entrega texto ao agente, o que desligaria a escalação por confiança e a leitura de volta --- exatamente o que o contrato de canal proíbe. O fim do turno é decidido por energia (limiar fixo de $-45$~dBFS e 700~ms de silêncio).
-
-A síntese de fala é o \textbf{Piper} (voz \textit{pt\_BR-faber-medium}), executado localmente em CPU. A escolha seguiu o mesmo raciocínio do reconhecimento: as palavras são do sistema, mas uma resposta de cobrança lê em voz alta a dívida de uma pessoa identificada --- valor, parcelas, vencimento ---, e um TTS em nuvem seria um operador terceiro de dados sobre a situação financeira do devedor (LGPD). O argumento usual a favor da nuvem, a latência, não se sustenta aqui: o primeiro áudio do Piper sai em 60 a 90~ms em mediana. O custo é uma voz claramente sintética, o que não é defeito numa ligação que precisa declarar, na primeira frase, que é automática.
-
-Construir a chamada sobre o Whisper real revelou dois defeitos no código já integrado: um argumento passado ao \textit{faster-whisper} pela camada de decodificação (PyAV) fazia o reconhecedor real falhar em todo clipe --- até então só o transcritor de controle havia rodado ponta a ponta --- e um \textit{opt-out} falado perdia a transcrição. Ambos foram corrigidos.
-
-\subsection{Protocolo de avaliação}
+\subsection{Protocolo do experimento}
 \label{sec:protocolo}
 
-Cada componente foi avaliado isoladamente e com o mesmo princípio: dois braços sobre a mesma entrada, variando uma única coisa. As medições usam conjuntos rotulados versionados no repositório: 16 perguntas para recuperação e resposta, 23 mensagens para intenção, 13 diálogos (35 turnos, 15 de acompanhamento) para múltiplos turnos, 20 \textit{briefings} para mensagens proativas e 18 notas de voz para a varredura de erro. A comparação operacional contra os dois \textit{baselines} da proposta --- processo manual e processo semiautomatizado sem ML --- não pode usar dados reais de cobrança (Seção~\ref{sec:dados}) e foi conduzida como \textbf{simulação}, cujo protocolo foi fixado antes da leitura dos números. Ela mostra qual mecanismo produz uma diferença e em que condições, e quão grande ela é \textit{sob o modelo de resposta declarado}; não mostra quanto uma operação real recuperaria.
-
-Cada replicação gera uma carteira com o mesmo gerador sintético em que os modelos foram treinados (1.200 clientes), congela-a numa data de decisão --- nada posterior é visível ao sistema --- e acompanha por 90 dias a coorte de recebíveis que vencem nos 30 dias seguintes (cerca de 375, dos quais cerca de 224 em risco, isto é, não pagos no vencimento se ninguém agir). A data de pagamento sorteada pelo gerador é o desfecho sem intervenção; um contato só pode antecipá-la. A chance de um contato converter em pagamento na $k$-ésima tentativa vem da base Bank Marketing (13,0\% a 5,5\%), ajustada pela propensão do cliente; disputas (15\%) e \textit{opt-outs} (5\%) entre os contatos atendidos vêm do gerador. Quatro braços obedecem ao \textit{mesmo} motor de regras --- uma mesa humana também está sujeita à lei, e creditar ao sistema violações que o \textit{baseline} pôde cometer contaria as regras como resultado ---: \textbf{sem contato} (o piso); \textbf{manual}, por telefone, dos vencidos mais antigos primeiro, em dias úteis, a R\$~3,90 por ligação (R\$~1,40 de canal e R\$~2,50 de mão de obra, valor assumido); \textbf{semiautomatizado}, mesma ordem, canal por faixa de atraso, de segunda a sábado; e o \textbf{sistema}, que ordena os vencidos pelo valor esperado do contato a partir do modelo de propensão e envia lembretes preventivos ao quintil de maior risco previsto de inadimplência. A capacidade diária (2, 4, 8, 16 contatos e ilimitada) é a variável independente: mantê-la igual entre os braços isola a \textit{ordenação}, que é o que a predição muda, do volume.
-
-O indicador primário é a fração do valor em risco recuperada em até 30 dias do vencimento; também se medem a recuperação até o horizonte, os dias em aberto, os contatos e o custo por R\$~1.000 recuperados além do piso. São 30 replicações com números aleatórios comuns (dois braços que fazem o mesmo contato recebem a mesma resposta), e as diferenças pareadas por replicação são relatadas com intervalo \textit{bootstrap} percentil de 95\% (10.000 reamostragens) e o tamanho de efeito pareado $d_z$; um intervalo que contém zero é lido como ``nenhuma diferença detectável'', não como equivalência. Uma auditoria independente, que não importa o motor de regras, reconstrói as regras a partir do registro de contatos e precisa encontrar zero violações em toda execução. Duas premissas são variadas em análise de sensibilidade: todos convertem à taxa média (\textit{homogêneo}) e o chat converte à metade da taxa do telefone. Um braço de ablação mantém a ordenação e retira os lembretes.
-
-A meta de $\geq$ 100 interações concorrentes foi medida à parte: o servidor de chat roda num processo próprio, e $N$ clientes abrem uma sessão e enviam cinco mensagens cada, todos partindo juntos.
+Sem dados reais de cobrança, a comparação com os dois \textit{baselines} da proposta é uma \textbf{simulação}, com protocolo fixado antes dos números (\texttt{docs/experiment-protocol.md}). Cada uma das 30 replicações gera uma carteira com o gerador sintético, congela-a numa data de decisão e acompanha por 90 dias a coorte que vence nos 30 dias seguintes; um contato só pode antecipar o pagamento sorteado pelo gerador, com chance de conversão na $k$-ésima tentativa tirada da Bank Marketing e ajustada pela propensão. Todos os braços obedecem ao mesmo motor de regras: \textbf{sem contato}; \textbf{manual} (telefone, vencidos mais antigos primeiro, R\$~3,90 por ligação, com mão de obra assumida); \textbf{semiautomatizado} (mesma ordem, canal por faixa de atraso); e \textbf{sistema} (ordenação pelo valor esperado do contato e lembretes preventivos ao quintil de maior risco). A capacidade diária (2 a 16 contatos) é igual entre braços, o que isola a \textit{ordenação}. O indicador primário é a fração do valor em risco recuperada em 30 dias; as diferenças pareadas têm intervalo \textit{bootstrap} de 95\%, e uma auditoria independente reconstrói as regras a partir do registro e precisa achar zero violações.
 
 %% ============================================================
 %%  4. RESULTADOS
@@ -260,209 +186,85 @@ A meta de $\geq$ 100 interações concorrentes foi medida à parte: o servidor d
 \subsection{Módulo preditivo}
 \label{sec:res-preditivo}
 
-A Tabela~\ref{tab:preditivo} resume o campeão de cada tarefa no conjunto de teste, avaliado uma única vez. \textbf{Esses números vêm do gerador sintético} e, portanto, verificam o protocolo de treino --- que os modelos recuperam um processo desenhado nos dados, sem vazamento --- e não dizem nada sobre o comportamento real de pagamento. Eles são relatados por isso, e não como evidência sobre cobrança.
+A Tabela~\ref{tab:preditivo} vem do gerador sintético: verifica o protocolo de treino, não o comportamento real de pagamento. Na tarefa 2, o campeão tem acurácia \textit{menor} que a classe majoritária (0,762 contra 0,836) e, ainda assim, é o único útil: multiplica a precisão média por 2,5 e recupera 71\% dos futuros inadimplentes --- a meta de acurácia da proposta estava mal formulada para um alvo desbalanceado. As diferenças entre candidatos ficaram dentro de um desvio-padrão, e os atributos históricos dominam a interpretabilidade.
 
 \begin{table}[t]
 \centering
-\small
-\caption{Campeões no conjunto de teste (dados sintéticos), contra prever sempre a classe majoritária. PM = precisão média.}
+\caption{Campeões no teste (dados sintéticos) contra a classe majoritária. PM = precisão média.}
 \label{tab:preditivo}
 \footnotesize
 \begin{tblr}{
   width=\linewidth,
-  colspec={X[l]*{5}{Q[c]}},
+  colspec={X[l]*{4}{Q[c]}},
   colsep=3pt,
   row{1}={font=\bfseries},
   hline{1,2,4,Z}=0.6pt,
-  rowsep=1.2pt,
+  rowsep=1pt,
 }
-Tarefa / modelo & PM & AUC & F1 & Rev. & Acur. \\
-1 --- XGBoost (\textit{scale\_pos\_weight}) & 0,860 & 0,746 & 0,818 & 0,943 & 0,709 \\
-1 --- classe majoritária & 0,692 & 0,500 & --- & --- & 0,692 \\
-2 --- Random Forest (pesos de classe) & 0,414 & 0,818 & 0,495 & 0,711 & 0,762 \\
-2 --- classe majoritária & 0,165 & 0,500 & --- & --- & 0,836 \\
+Tarefa / modelo & PM & AUC & Rev. & Acur. \\
+1 --- XGBoost & 0,860 & 0,746 & 0,943 & 0,709 \\
+1 --- majoritária & 0,692 & 0,500 & --- & 0,692 \\
+2 --- Random Forest & 0,414 & 0,818 & 0,711 & 0,762 \\
+2 --- majoritária & 0,165 & 0,500 & --- & 0,836 \\
 \end{tblr}
 \end{table}
 
-Dois resultados merecem leitura. Na tarefa 2, o campeão tem acurácia \textit{menor} que a da classe majoritária (0,762 contra 0,836) e, ainda assim, é o único modelo útil: multiplica a precisão média por 2,5 e recupera 71\% dos recebíveis que serão inadimplentes. As metas de acurácia fixadas na proposta ($\geq 0{,}80$) estavam mal formuladas para um alvo desbalanceado, e por isso a seleção usou precisão média. Entre os seis candidatos, as diferenças de precisão média na validação cruzada ficaram dentro de um desvio-padrão (por exemplo, 0,350 $\pm$ 0,050 para o campeão da tarefa 2 contra 0,345 $\pm$ 0,052 da regressão logística), o que é coerente com um gerador simples e não deve ser lido como superioridade dos \textit{ensembles}. Na interpretabilidade, os atributos históricos dominam: para a tarefa 2, a taxa histórica de resposta a contatos é a que mais custa ao modelo quando embaralhada, e o atraso médio histórico tem o maior valor SHAP médio. Nenhum modelo foi treinado em dados reais de pagamento: a base Home Credit, prevista para isso, não pôde ser obtida (Seção~\ref{sec:limitacoes}).
+\subsection{Componentes}
+\label{sec:res-componentes}
 
-\subsection{Estratégia de contato}
-\label{sec:res-contato}
+A Tabela~\ref{tab:componentes} reúne as medições por componente. \textbf{Contato:} na Bank Marketing, a resposta cai a cada tentativa, de 13,0\% (1ª) a 9,4\% (4ª) e 5,5\% (6ª em diante), uma queda de 58\% que fundamenta o limite de quatro tentativas. \textbf{Recuperação:} o \textit{embedder} não superou a linha de base léxica (MRR 0,804 contra 0,821 em 14 perguntas, dentro do ruído); o \textit{pgvector} se justifica por servir \textit{tenants} e versões, não pela qualidade. \textbf{Múltiplos turnos:} substituir a mensagem pela concatenação com o turno anterior \textit{piorou} a recuperação dos acompanhamentos (0,889 $\to$ 0,778); acrescentar consultas intercaladas a elevou de 0,733 para 0,800.
 
-Na base Bank Marketing, a taxa de resposta cai a cada nova tentativa da mesma campanha (Tabela~\ref{tab:tentativas}): de 13,0\% na primeira para 5,5\% a partir da sexta, uma queda de 58\%. Por volta da quinta tentativa a taxa já caiu quase pela metade, de modo que tentativas adicionais geram sobretudo custo e incômodo; daí o limite padrão de quatro tentativas e o intervalo mínimo de 48 horas. Por canal, os contatos por celular responderam a 14,7\% e os por telefone fixo a 5,2\%. Esse é o primeiro resultado do trabalho sobre comportamento humano real, com a ressalva de que vem de \textit{telemarketing} bancário, não de cobrança.
+O braço LLM foi medido em 06/11/2026 com o \textit{qwen2.5:3b} em CPU, sem chave de um provedor hospedado; é um \textbf{piso}. \textbf{A execução achou um defeito antes de um número:} o modelo respondeu \texttt{NAO\_SEI} seguido de uma citação, o detector só reconhecia a recusa como resposta inteira, e o cliente leria o \textit{token} cru; o detector foi corrigido. A infidelidade mais grave foi oferecer ``até 12 vezes'' a um atraso de 45 dias (condição acima de 60), pega pela verificação de números. O reescritor de acompanhamentos empatou com o léxico porque devolveu 11 de 15 mensagens inalteradas. Nas mensagens proativas, a variedade dobrou, mas 9 de 20 foram reprovadas --- ``último aviso'' a faturas não vencidas, divulgações omitidas, SMS acima de 160 caracteres --- e duas aprovadas mostram o que o checador não vê: uma diz ``você está atrasado'' a quem não venceu.
 
 \begin{table}[t]
 \centering
-\small
-\caption{Taxa de resposta por tentativa na base UCI Bank Marketing (41.188 contatos).}
-\label{tab:tentativas}
+\caption{Medições por componente: controle contra o braço alternativo, na mesma entrada. Detalhes em \texttt{docs/}.}
+\label{tab:componentes}
 \footnotesize
 \begin{tblr}{
   width=\linewidth,
-  colspec={X[l]*{6}{Q[c]}},
+  colspec={X[l]Q[c]Q[c]},
   colsep=3pt,
   row{1}={font=\bfseries},
   hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
+  rowsep=1pt,
 }
-Tentativa & 1 & 2 & 3 & 4 & 5 & 6+ \\
-Contatos & 17.642 & 10.570 & 5.341 & 2.651 & 1.599 & 3.385 \\
-Resposta & 13,0\% & 11,5\% & 10,8\% & 9,4\% & 7,5\% & 5,5\% \\
+Medida & Controle & Alternativo \\
+Recuperação, MRR (14 perg.) & TF-IDF 0,821 & \textit{pgvector} 0,804 \\
+Intenção, acurácia (23 msg.) & léxico 0,913 & --- \\
+Resposta fiel (16 perg.) & \textit{template} 1,000 & \textit{qwen} 0,692 \\
+Resposta com evidência & 0,875 & 0,813 \\
+Latência p95 da resposta & 2~ms & 11,1~s \\
+Acompanhamentos resolvidos (15) & 0,800 & \textit{qwen} 0,800 \\
+Proativas conformes (20) & 20/20 & 11/20 \\
+Distinção entre proativas & 0,307 & 0,672 \\
+Voz a WER 0,099: intenção / valores & \SetCell[c=2]{c} 0,856 / 0,867 &  \\
+Chamada: tempo de turno (mediana) & \SetCell[c=2]{c} 2.184~ms &  \\
 \end{tblr}
 \end{table}
 
-\subsection{Recuperação}
-\label{sec:res-rag}
+\textbf{Voz.} A uma taxa de erro de palavras de 0,099, que produz uma transcrição legível, a intenção concorda em 86\% dos casos, mas um valor falado em sete já está errado (``mil duzentos e cinquenta'' ouvido como ``meu duzentos e cinquenta''), e os valores se corrompem enquanto o reconhecedor está confiante --- por isso todo valor ouvido é confirmado. Na chamada em tempo real, 18 falas sintetizadas por uma sala LiveKit real, num Ryzen 7 5700X3D só com CPU, levaram 2,2~s em mediana do fim da fala ao primeiro áudio: 1,2~s do Whisper \textit{small}, 0,7~s de espera de fim de turno, menos de 0,15~s do agente e do sintetizador, e cerca de 110~ms de rede. A intenção foi acertada em 15 de 18 falas. %% VOZ-DURACAO: no corpo, só a frase seguinte carrega a duração da resposta falada.
+Com o respondedor de \textit{template}, porém, a resposta falada dura em mediana 102~s, porque cita trechos inteiros, e o contrato proíbe o canal de encurtá-la. Uma pessoa falando pelo microfone do navegador não foi verificada.
 
-Com as 16 perguntas, a linha de base TF-IDF atinge revocação@5 de 1,0 e MRR de 0,78. A comparação justa com o caminho servido exige retirar o documento interno dos dois braços --- caso contrário, a linha de base gasta a primeira posição com um documento que o caminho servido nunca pode devolver ---, o que deixa 14 perguntas sobre 4 documentos (Tabela~\ref{tab:rag}). \textbf{O \textit{embedder} pré-treinado não superou a linha de base léxica}: TF-IDF fica à frente em MRR (0,821 contra 0,804) e põe um documento correto em primeiro lugar em 10 de 14 perguntas, contra 9; o \textit{embedder} é melhor em levar a resposta ao top-3 (revocação@3 de 0,929 contra 0,857). Com 14 perguntas, a diferença está dentro do ruído. A hipótese registrada antes da medição --- de que o modelo neural venceria as falhas semânticas da linha de base --- se confirmou em duas perguntas (``vocês podem me ligar no domingo?'' e o parcelamento de um atraso de 45 dias) e falhou em três, das quais duas provavelmente se devem à fragmentação (a tabela de parcelamento é um único trecho no caminho servido e uma linha por trecho na linha de base), e não ao modelo. A mudança para \textit{pgvector} se justifica pelo que o índice em memória não faz --- servir vários \textit{tenants}, sobreviver a uma edição e citar o texto efetivamente mostrado ---, não pela qualidade de recuperação.
-
-\begin{table}[t]
-\centering
-\small
-\caption{Recuperação sobre o corpus voltado ao cliente (14 perguntas, 4 documentos).}
-\label{tab:rag}
-\begin{tblr}{
-  width=\linewidth,
-  colspec={Q[c]*{4}{X[c]}},
-  row{1}={font=\bfseries},
-  hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
-}
-$k$ & Rev.@$k$ TF-IDF & MRR TF-IDF & Rev.@$k$ \textit{pgvector} & MRR \textit{pgvector} \\
-1 & 0,643 & 0,714 & 0,643 & 0,643 \\
-3 & 0,857 & 0,786 & 0,929 & 0,786 \\
-5 & 1,000 & 0,821 & 1,000 & 0,804 \\
-\end{tblr}
-\end{table}
-
-\subsection{Agente responsivo}
-\label{sec:res-responsivo}
-
-O classificador léxico de intenção acertou 0,913 das 23 mensagens rotuladas (1,00 em contestação, \textit{opt-out}, confirmação de pagamento e segunda via; 0,75 em consulta de débito e negociação). O braço de \textit{template} é ilegível --- devolve trechos inteiros ao cliente ---, e é exatamente essa a troca que o braço LLM deveria quantificar. Sem chave de um provedor hospedado, o braço LLM foi medido em 06/11/2026 com o \textit{qwen2.5:3b}, um modelo de 3 bilhões de parâmetros servido pelo Ollama em CPU, sem GPU (Tabela~\ref{tab:responder}). Esse número é um \textbf{piso} para o braço LLM, não o resultado do sistema com um modelo hospedado, que é o mesmo comando com outro provedor.
-
-\begin{table}[t]
-\centering
-\footnotesize
-\caption{Respondedores sobre as mesmas 16 perguntas e a mesma recuperação (06/11/2026).}
-\label{tab:responder}
-\begin{tblr}{
-  width=\linewidth,
-  colspec={X[l]*{5}{Q[c]}},
-  colsep=3pt,
-  row{1}={font=\bfseries},
-  hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
-}
-Braço & Evidência & Fiel & Citações & p50 & p95 \\
-\textit{template} & 0,875 & 1,000 & 0,857 & 2~ms & 2~ms \\
-\textit{qwen2.5:3b} & 0,813 & 0,692 & 0,846 & 4,5~s & 11,1~s \\
-\end{tblr}
-\end{table}
-
-\textbf{A execução encontrou um defeito antes de encontrar um número.} O \textit{prompt} pede \texttt{NAO\_SEI} ``e nada mais''; perguntado se podiam ligar num domingo, o modelo escreveu \texttt{NAO\_SEI Fonte: (politica-de-cobranca.md)} --- a recusa seguida da linha de citação que o mesmo \textit{prompt} exige em toda resposta. O detector só reconhecia a recusa como resposta inteira, de modo que isso contava como resposta e o cliente leria o \textit{token} cru. O detector passou a reconhecê-lo em qualquer posição, e o caso ficou fixado em teste. Um modelo hospedado talvez nunca produzisse essa forma, e esse é o argumento para medir também um modelo fraco. Das quatro respostas marcadas como infiéis, duas são reais: a mais grave ofereceu ``até 12 vezes'' para um atraso de 45 dias, condição da faixa acima de 60 dias, e a verificação de números a pegou; a outra repetiu a pergunta com uma citação, o que revela uma lacuna no que ``com evidência'' significa. As outras duas parafraseiam corretamente e perdem na similaridade por frase --- o lado conservador para errar. A latência p95 é o dobro do orçamento de 5~s; é inferência em CPU, e é o número que exclui um modelo local pequeno do caminho de chat ao vivo.
-
-\subsection{Conversas de múltiplos turnos}
-\label{sec:res-multiturno}
-
-A primeira versão, que substituía a mensagem pela concatenação com o turno anterior, \textit{piorou} a recuperação dos acompanhamentos (de 0,889 para 0,778): uma pergunta anterior longa domina o vetor TF-IDF de uma continuação de quatro palavras. Repetir a continuação duas, três ou cinco vezes não mudou nada, porque o vetorizador usa frequência sublinear. A versão final, com consultas múltiplas intercaladas por posição, elevou a taxa de acerto dos acompanhamentos de 0,733 para 0,800 e eliminou a única escalação causada por um ``sim'' sem contexto, sem piorar o conjunto (0,857 $\to$ 0,886 em todos os turnos). A varredura da janela de contexto mostrou que zero turnos desativa a herança e custa acurácia de intenção (0,600 contra 0,657), que de dois turnos em diante o resultado é igual, e que o custo do \textit{prompt} cresce linearmente; quatro turnos foi escolhido por ser o menor valor que sobrevive a uma troca de cortesia entre a pergunta e a continuação. Com 13 diálogos, esses números indicam direção, não magnitude. O acompanhamento que ainda falha (``e em 6 vezes?'') é recuperado por uma reescrita oráculo, o que localiza a falha na formulação da consulta --- tarefa do braço LLM. Com o \textit{qwen2.5:3b}, o reescritor LLM empatou exatamente com o léxico (0,800 nos acompanhamentos), e o empate não é convergência: dos 15 acompanhamentos, o modelo devolveu 11 inalterados ou apenas com maiúsculas. Só no diálogo com troca de cortesia produziu uma pergunta autônoma (``sim'' $\to$ ``Como envio o comprovante de pagamento?''), e ``e em 6 vezes?'' voltou intocado. A hipótese de que a formulação da consulta precisa de um modelo segue, portanto, não testada: um modelo de 3B instruído a reescrever, na maior parte, copia.
-
-\subsection{Mensagens proativas}
-\label{sec:res-proativo}
-
-A primeira biblioteca de \textit{templates}, com um modelo por faixa de atraso, foi aprovada em 18 de 20 \textit{briefings}. As duas reprovações eram SMS com cerca de 250 caracteres contra o segmento de 160: a mensagem é função de (faixa, canal), e não só da faixa. No canal estreito, o que se sacrifica primeiro é a saudação pelo nome, porque as três divulgações obrigatórias não são negociáveis --- uma restrição legal produzindo uma consequência de produto. Com modelos curtos por canal, o controle passou a 20/20: nenhum valor inventado, nenhuma oferta acima da alçada, todas as divulgações presentes, 231 caracteres em média. A distinção entre mensagens da mesma faixa e do mesmo canal foi de 0,307, piso que um redator com LLM deveria superar sem perder conformidade.
-
-Com o \textit{qwen2.5:3b} (p95 de 9,7~s por mensagem), a troca prevista pelo projeto aparece, e não é boa nesse tamanho de modelo: a distinção mais que dobra (0,307 $\to$ 0,672), mas só 11 das 20 mensagens são conformes, 70\% trazem todas as divulgações obrigatórias, 10\% citam um valor fora do \textit{briefing} e nenhuma oferece acima da alçada. É o checador que torna isso sobrevivível: as nove reprovadas seriam escaladas a uma pessoa, não enviadas. Cinco usaram ``último aviso'' --- duas para faturas ainda não vencidas --- e quatro delas omitiram o aviso de mensagem automática; as duas de SMS passaram de 160 caracteres (284 e 291), exatamente como a primeira versão do controle. Os dois valores ``inventados'' são aritmética correta (15\% e 20\% do débito): a regra conta qualquer valor fora do \textit{briefing} por desenho, porque um valor derivado também é um compromisso que ninguém aprovou. E duas mensagens aprovadas mostram o que o checador não vê: uma diz ``você está atrasado'' a quem ainda não venceu, outra se apresenta como ``um pagamento automático''. Nenhuma verificação compara o que a mensagem afirma sobre o \textit{estado} da dívida com o \textit{briefing}.
-
-\subsection{Voz}
-\label{sec:res-voz}
-
-A Tabela~\ref{tab:voz} mostra o resultado da varredura. O achado está na diferença entre as duas últimas colunas: a uma taxa de erro de palavras de 0,099 --- perto do que um modelo Whisper pequeno costuma apresentar em português, e uma transcrição que se lê sem estranhamento ---, a intenção ainda concorda em 86\% dos casos, mas um em cada sete valores falados já está errado. A intenção é dita de várias formas numa mesma frase e sobrevive; um valor é dito uma vez, e quando o reconhecimento o quebra (``mil duzentos e cinquenta'' ouvido como ``meu duzentos e cinquenta'') nada adiante percebe. Um limiar de confiança não pegaria esse caso, porque os valores se corrompem enquanto o reconhecedor ainda está confiante; por isso todo valor ouvido é confirmado, o que ocorre em 44\% das mensagens do conjunto.
-
-\begin{table}[t]
-\centering
-\small
-\caption{O que sobrevive ao erro de reconhecimento (18 notas de voz rotuladas, 5 sorteios por mensagem e taxa).}
-\label{tab:voz}
-\begin{tblr}{
-  width=\linewidth,
-  colspec={X[c]*{3}{X[c]}},
-  row{1}={font=\bfseries},
-  hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
-}
-Corrupção & WER & Intenção concorda & Valores intactos \\
-0,00 & 0,000 & 1,000 & 1,000 \\
-0,10 & 0,046 & 0,967 & 0,958 \\
-0,20 & 0,068 & 0,956 & 0,908 \\
-0,30 & 0,099 & 0,856 & 0,867 \\
-0,40 & 0,151 & 0,833 & 0,750 \\
-\end{tblr}
-\end{table}
-
-\textbf{Chamada em tempo real.} O tempo de turno --- do fim da fala do cliente à primeira palavra audível da resposta --- foi decomposto por etapa (Tabela~\ref{tab:turno}), porque um número só esconde qual etapa atacar. Mediram-se 18 falas do conjunto rotulado, sintetizadas por uma segunda voz do Piper e faladas por um participante automático numa sala LiveKit real, uma chamada nova por fala, num AMD Ryzen 7 5700X3D só com CPU, com o Whisper \textit{small} e o respondedor de \textit{template}. A mediana é de 2,2~s: uma ligação com uma pausa curta antes de cada resposta, mais lenta que uma pessoa. O Whisper responde por cerca de 60\% do tempo e a espera de fim de turno por 35\%; o agente e o sintetizador, somados, por menos de 7\%. A rede custa pouco: o tempo medido por WebRTC excede a soma das etapas em 110~ms na mediana (em \textit{loopback}). A carga da máquina pesa tanto quanto o modelo: com a CPU compartilhada, o Whisper levou cerca de 2~s em mediana, e uma fala, 6,3~s. O reconhecimento acertou a intenção em 15 das 18 falas (WER mediana de 0,14 sem a sala e 0,17 com ela), e as falhas são do tipo que a varredura previu: ``dois mil e quatrocentos'' transcrito como ``2.400'', notação que o vocabulário do classificador não cobre.
-
-\begin{table}[t]
-\centering
-\footnotesize
-\caption{Tempo de turno da chamada em tempo real (ms, 18 falas sintetizadas por uma sala LiveKit, 06/11/2026).}
-\label{tab:turno}
-\begin{tblr}{
-  width=\linewidth,
-  colspec={X[l]*{2}{Q[r]}},
-  row{1}={font=\bfseries},
-  hline{1,2,6,Z}=0.6pt,
-  rowsep=1.2pt,
-}
-Etapa & Mediana & p90 \\
-Espera de fim de turno & 700 & 700 \\
-Whisper \textit{small} local & 1.247 & 1.939 \\
-Agente (intenção, recuperação, resposta) & 46 & 66 \\
-Piper, primeiro áudio & 91 & 119 \\
-Soma das etapas & 2.070 & 2.852 \\
-\textbf{Medido por WebRTC} & \textbf{2.184} & \textbf{2.934} \\
-\end{tblr}
-\end{table}
-
-O achado que a tabela não mostra é o mais importante: \textbf{a resposta do \textit{template}, falada, dura em mediana 102~s} (máximo de 133~s), porque cita trechos inteiros --- algo já ilegível num balão de chat e inutilizável numa ligação, em que o cliente não pode correr os olhos nem rolar a tela. Só as respostas de escalação e \textit{opt-out}, que são frases fixas, ficam entre 4 e 10~s. Não cabe ao canal encurtar o que o agente diz: o contrato o proíbe. A correção é o respondedor gerativo, com seu limite de 512 \textit{tokens}; até lá, a chamada pode ser demonstrada, mas não usada. Foi verificado ponta a ponta o caminho de fala sintetizada por uma sala LiveKit real; \textbf{não} foi verificada uma pessoa falando pelo microfone do navegador (captura, cancelamento de eco e supressão de ruído do navegador).
-
-\subsection{Qualidade de software e experimento integrado}
+\subsection{Testes e experimento integrado}
 \label{sec:res-experimento}
 
-\textbf{Testes.} A meta do cronograma é cobrir ao menos 80\% das funções críticas --- uma afirmação sobre funções, não linhas, porque uma função não testada pode se esconder atrás de outra longa e bem testada. A lista de críticas é fixa: as do cronograma (\textit{parser}, atributos, motor de regras, intenção, \textit{templates}), mais o orquestrador e o respondedor, pelos quais passa todo fluxo, e as duas fronteiras com serviços externos (cliente de LLM e reconhecedor de fala). Em 06/11/2026, com 730 testes e os serviços de banco ativos, as 144 funções críticas passaram de 90,3\% para \textbf{100\%} executadas (93,1\% inteiramente cobertas); o pacote inteiro tem 85,4\% de cobertura de linhas, e o que falta é sobretudo a ligação da linha de comando e os geradores de relatório. Entre as 14 funções nunca executadas antes estavam os \textit{parsers} de PDF e DOCX, que o cronograma nomeia, e os clientes reais do Whisper e da Anthropic --- afirmações que o projeto fazia sem evidência. Os testes de integração percorrem os três fluxos pelo orquestrador: o proativo, do recebível detectado até a resposta do cliente, mostrando cada forma de interrupção (fora do horário, \textit{opt-out} antes do agendamento, \textit{opt-out} entre o agendamento e a entrega, mensagem que ameaça e inventa um valor); o responsivo, inclusive a contestação, a mensagem sem resposta na base e o \textit{opt-out} digitado no chat; e a escalação, até a fila, o operador que assume e a resolução. Nenhum teste chama um serviço real: os casos que importam (tempo esgotado, recusa, reconhecedor que erra um valor) não podem ser provocados num serviço real.
-
-\textbf{Experimento simulado.} A Figura~\ref{fig:experimento} e a Tabela~\ref{tab:experimento} resumem as 30 replicações (1.500 execuções). Cinco resultados:
-
-\begin{enumerate}
-\item \textbf{A predição só rende quando o contato é escasso.} Com 2 a 4 contatos por dia, o sistema recupera 4,8 e 4,7 pontos percentuais (p.p.) a mais do valor em risco em 30 dias do que o braço semiautomatizado ($d_z$ de 1,80 e 2,25; intervalos longe de zero), a custo menor. Com 8 por dia o ganho cai para 1,3~p.p., e a partir de 16 desaparece: há capacidade para que todo recebível em risco receba suas quatro tentativas dentro da janela, e a ordem deixa de importar.
-\item \textbf{O ganho vem da ordenação, não dos lembretes.} Sem os lembretes preventivos, a ordenação sozinha entrega o ganho inteiro (+4,8~p.p. a 2 por dia); os lembretes acrescentam de 0,0 a 0,1~p.p. Eles chegam justamente aos clientes que menos respondem, e de 7 a 61 lembretes no horizonte inteiro são um erro de arredondamento. A cobrança preventiva foi construída e é lícita, mas, sob este modelo de resposta, não é onde está o valor.
-\item \textbf{A vantagem da automação é custo, não recuperação.} Semiautomatizado e manual recuperam quase o mesmo com a mesma capacidade (+0,2 a +1,8~p.p.), porque trabalham a mesma lista na mesma ordem; mas cada R\$~1.000 recuperados além do piso custa R\$~34,62 a uma mesa de 4 ligações por dia, R\$~6,37 automatizado e R\$~1,94 com a ordenação.
-\item \textbf{Contatos mudam \textit{quando} se paga muito mais do que \textit{se} se paga.} A recuperação até o horizonte sobe no máximo 4,5~p.p. sobre o piso e é igual para todos os braços que contatam a partir de 8 por dia. O ganho também é ponderado por valor: os dias em aberto por recebível quase não mudam entre sistema e semiautomatizado ($-0{,}1$ dia), porque a ordenação por valor esperado persegue os saldos grandes.
-\item \textbf{A direção resiste à sensibilidade, o tamanho não.} Se todos convertem à taxa média, o ganho em capacidade escassa sobe para 6,3--6,5~p.p.: no modelo principal, os clientes mais arriscados também respondem menos, e uma ordenação que mira o risco sem modelar a resposta trabalha parcialmente contra si. Se o chat converte à metade do telefone, o ganho cai para 2,7--2,9~p.p. e continua longe de zero.
-\end{enumerate}
-
-A auditoria independente encontrou \textbf{zero violações} nas 1.500 execuções. Os rankers atingiram AUC de 0,758 (não pago em 30 dias) e 0,788 (mais de 60 dias de atraso) na coorte.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figuras/experimento-capacidade.png}
-\caption{Fração do valor em risco recuperada em 30 dias por capacidade diária de contato (média e IC 95\% sobre 30 replicações; rótulos do gráfico em inglês: \textit{manual}, \textit{semi-automated} = semiautomatizado, \textit{system} = sistema, \textit{no contact} = sem contato). As faixas se sobrepõem porque incluem a variação entre carteiras simuladas; as diferenças pareadas da Tabela~\ref{tab:experimento} a removem.}
-\label{fig:experimento}
-\end{figure}
+As 150 funções críticas (\textit{parser}, atributos, regras, intenção, \textit{templates}, orquestrador, respondedor e as fronteiras com LLM e reconhecedor) estão 100\% executadas pela suíte de 784 testes; antes, 14 delas nunca haviam rodado, entre elas os \textit{parsers} de PDF e DOCX e os clientes reais do Whisper e da Anthropic. Os testes de integração percorrem os três fluxos pelo orquestrador, inclusive o \textit{opt-out} entre o agendamento e a entrega.
 
 \begin{table}[t]
 \centering
-\footnotesize
-\caption{Diferenças pareadas em pontos percentuais do valor em risco recuperado em 30 dias (média e IC 95\% \textit{bootstrap}, 30 replicações). Sist. = sistema; semi = semiautomatizado.}
+\caption{Diferenças pareadas em pontos percentuais do valor em risco recuperado em 30 dias (média e IC 95\%, 30 replicações).}
 \label{tab:experimento}
+\footnotesize
 \begin{tblr}{
   width=\linewidth,
   colspec={Q[c]*{3}{X[c]}},
-  colsep=3pt,
+  colsep=2pt,
   row{1}={font=\bfseries},
   hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
+  rowsep=1pt,
 }
-Contatos/dia & Sist. $-$ semi & Sist. $-$ manual & Semi $-$ manual \\
+Contatos/dia & Sistema $-$ semi & Sistema $-$ manual & Semi $-$ manual \\
 2 & +4,8 [3,9; 5,8] & +5,1 [4,1; 6,1] & +0,2 [0,1; 0,4] \\
 4 & +4,7 [4,0; 5,4] & +5,3 [4,6; 6,1] & +0,7 [0,4; 0,9] \\
 8 & +1,3 [0,6; 2,0] & +3,1 [2,3; 4,0] & +1,8 [1,4; 2,3] \\
@@ -470,7 +272,7 @@ Contatos/dia & Sist. $-$ semi & Sist. $-$ manual & Semi $-$ manual \\
 \end{tblr}
 \end{table}
 
-\textbf{Concorrência.} Com um único processo \textit{uvicorn}, armazenamento em memória, recuperação TF-IDF e o respondedor de \textit{template} --- sem chamada a LLM no turno ---, todos os níveis de 1 a 400 conversas simultâneas (cinco mensagens cada) terminaram com \textbf{zero erros}. A vazão estabiliza em cerca de 380 requisições por segundo a partir de 50 conversas, e daí a latência cresce linearmente: p95 de 0,32~s com 100 conversas e de 1,34~s com 400, abaixo dos 5~s em todos os níveis. A carga é uma rajada, mais dura que tráfego real de chat; mas, com um LLM gerando cada resposta, a latência do turno passa a ser a do provedor, e a parte do servidor medida aqui vira a menor. Escalar além de um processo não foi medido e exige mover para o banco o mapa de sessões que hoje vive na memória do processo.
+O experimento (Tabela~\ref{tab:experimento}; 1.500 execuções) produziu cinco resultados. (1) \textbf{A predição só rende quando o contato é escasso:} com 2 a 4 contatos por dia o sistema recupera 4,7 a 4,8~p.p. a mais que o semiautomatizado ($d_z$ de 1,80 a 2,25); com 16, todo recebível em risco recebe suas quatro tentativas e a ordem deixa de importar. (2) \textbf{O ganho vem da ordenação, não dos lembretes}, que acrescentam de 0,0 a 0,1~p.p. (3) \textbf{A automação reduz custo, não aumenta recuperação:} cada R\$~1.000 recuperados além do piso custam R\$~34,62 à mesa manual, R\$~6,37 automatizados e R\$~1,94 com a ordenação, a 4 contatos por dia. (4) \textbf{Contatos mudam \textit{quando} se paga mais do que \textit{se} se paga:} até o horizonte de 90 dias a recuperação sobe no máximo 4,5~p.p. sobre o piso e é igual em todos os braços que contatam a partir de 8 por dia. (5) \textbf{A direção resiste à sensibilidade, o tamanho não:} o ganho vai a 6,3--6,5~p.p. se todos convertem à taxa média e a 2,7--2,9~p.p. se o chat converte à metade do telefone. A auditoria encontrou \textbf{zero violações}. À parte, 1 a 400 conversas simultâneas num único processo, sem LLM no turno, terminaram sem erros, com p95 de 0,32~s a 100 conversas.
 
 %% ============================================================
 %%  5. DISCUSSÕES E CONCLUSÕES
@@ -481,39 +283,19 @@ Contatos/dia & Sist. $-$ semi & Sist. $-$ manual & Semi $-$ manual \\
 \subsection{Discussão}
 \label{sec:disc}
 
-O resultado metodológico mais útil do trabalho foi a regra do braço de controle. A primeira medida de fidelidade apontou o \textit{template} --- que cita textualmente e não pode inventar nada --- como infiel em quase todas as perguntas. Havia dois defeitos: o cosseno entre oito palavras e um trecho de trezentas é pequeno mesmo quando as oito são uma citação exata, e frases introdutórias estavam sendo pontuadas como afirmações. Sem um braço que \textit{precisa} pontuar perfeitamente, os dois defeitos teriam entrado nos resultados como taxa de alucinação. O mesmo raciocínio revelou o achado do SMS: o checador estava certo, e o controle é que estava errado. O modelo local pequeno cumpriu um papel parecido pelo outro lado: por ser fraco, produziu uma recusa malformada que um modelo hospedado talvez nunca produzisse, e expôs um defeito no detector de \texttt{NAO\_SEI} que teria deixado o cliente ler o \textit{token} cru.
+O resultado metodológico mais útil foi a regra do braço de controle. A primeira medida de fidelidade apontou o \textit{template}, que cita textualmente, como infiel em quase toda pergunta: o cosseno entre uma frase e um trecho longo é pequeno mesmo numa citação exata, e frases introdutórias eram pontuadas como afirmações. Sem um braço que \textit{precisa} pontuar perfeitamente, isso teria entrado nos resultados como alucinação. O mesmo raciocínio revelou que o primeiro \textit{template} de SMS estourava 160 caracteres: o checador estava certo, e o controle errado. O modelo fraco cumpriu papel parecido pelo outro lado, ao produzir a recusa malformada que expôs o detector de \texttt{NAO\_SEI}.
 
-O experimento simulado responde à hipótese de forma mais estreita do que ela foi formulada, e mais útil. A predição não melhora a cobrança em geral: melhora a \textit{ordem} em que se contata, e a ordem só importa quando a capacidade não alcança todos. Uma operação que pode contatar toda a carteira dentro da janela não ganha nada com o módulo preditivo; uma que só alcança uma fração dela ganha cerca de cinco pontos percentuais do valor em risco, a custo menor. A ablação mostra que a cobrança preventiva, um dos diferenciais da proposta (critério P11), não contribuiu sob este modelo de resposta, e a análise de sensibilidade aponta o próximo modelo a construir: um que preveja a \textit{resposta} ao contato (\textit{uplift}), e não só o risco, já que os clientes mais arriscados são também os que menos respondem. No braço gerativo, o resultado com o modelo de 3B confirma a função do checador mais do que a do modelo: ele dobrou a variedade das mensagens, mas quase metade delas teria sido barrada --- e foi o checador, executado fora do redator, que impediu que fossem enviadas.
-
-A chamada de voz deu o achado mais direto sobre o braço gerativo. O \textit{template}, que é o controle ideal porque não pode alucinar, é também o que torna a chamada inutilizável: lidas em voz alta, suas citações duram minutos. O contrato de canal impede a solução tentadora --- o canal encurtar o que o agente diz --- e com isso desloca o problema para onde ele pertence: uma resposta curta e fiel é trabalho do respondedor. Na escolha de arquitetura, manter o reconhecimento dentro do agente, em vez de usar o \textit{pipeline} pronto do LiveKit Agents, custou \textit{barge-in} e detecção de fim de turno aprendida, mas preservou a escalação por confiança e a leitura de volta de valores, que a varredura de erro de voz mostrou serem necessárias.
-
-Um segundo padrão é que várias medições contrariaram a expectativa registrada antes delas: o \textit{embedder} neural não superou o TF-IDF, a concatenação de contexto piorou a recuperação antes de melhorá-la, e a acurácia se mostrou a métrica errada para a seleção de modelos. A primeira versão da avaliação de múltiplos turnos chegou a relatar que o contexto não ajudava nem atrapalhava --- artefato de um conjunto em que todo diálogo tinha dois turnos. A lição é sobre avaliação: um \textit{benchmark} que não consegue expressar a falha não consegue medir a correção.
-
-Por fim, a assimetria do erro de voz é uma decisão de projeto, e não um detalhe: o sistema confia na intenção transcrita e desconfia do valor transcrito, porque é assim que o erro se distribui. No plano legal, a conformidade foi tratada como propriedade verificável --- \textit{opt-out} antes dos agentes, horário no fuso local, divulgações obrigatórias checadas em toda mensagem ---, e não como orientação no \textit{prompt}.
+O experimento responde à hipótese de forma mais estreita e mais útil: a predição melhora a \textit{ordem} dos contatos, e a ordem só importa quando a capacidade não alcança todos. A cobrança preventiva não contribuiu sob este modelo de resposta, e a sensibilidade aponta o próximo modelo: prever a \textit{resposta} ao contato (\textit{uplift}), já que os clientes mais arriscados também respondem menos. No braço gerativo, o modelo de 3B confirmou o valor do checador mais do que o do modelo. Na voz, a assimetria do erro virou decisão de projeto --- confiar na intenção transcrita e desconfiar do valor --- e o contrato de canal deslocou o problema da resposta longa para onde ele pertence, o respondedor. Várias medições contrariaram a expectativa registrada antes delas (o \textit{embedder}, a concatenação de contexto, a acurácia como critério), e a lição é sobre avaliação: um \textit{benchmark} que não expressa a falha não mede a correção.
 
 \subsection{Limitações}
 \label{sec:limitacoes}
 
-\begin{itemize}
-\item \textbf{Sem dados operacionais reais.} Nenhuma base pública liga recebíveis aos contatos de cobrança feitos sobre eles, e o acesso ao ERP não foi obtido. Os modelos preditivos foram treinados apenas em dados sintéticos --- a base pública Home Credit, que daria comportamento real de pagamento, não foi exercitada, porque o acesso aos arquivos da competição não foi obtido ---, e a comparação operacional contra os \textit{baselines} é uma simulação; a taxa de recuperação real, centro da hipótese, permanece não testada.
-\item \textbf{O experimento mede o simulador.} As magnitudes pertencem ao gerador e ao modelo de resposta; as afirmações são a direção, a dependência da capacidade e a ablação. O agente responsivo entra como um único sorteio de conversão, igual para todos os braços; os modelos pontuam a coorte uma única vez; o \textit{baseline} manual obedece a toda regra e nunca erra, o que o favorece; o custo dos braços automatizados não inclui infraestrutura nem LLM, e é um limite inferior; e 30 replicações de um gerador medem a variância do simulador, não a de operações reais.
-\item \textbf{O braço LLM foi medido só com um modelo local de 3B.} Os números são um piso, não o desempenho com um modelo hospedado, que não foi medido por falta de chave. A latência medida (p95 de 11,1~s) é de inferência em CPU e exclui esse modelo do chat ao vivo.
-\item \textbf{A concorrência foi medida sem LLM.} Um processo, armazenamento em memória e respondedor de \textit{template}; com um LLM no turno, a latência passa a ser dominada pelo provedor, e escalar além de um processo não foi medido.
-\item \textbf{Canais simulados.} Os estados \textit{entregue} e \textit{lida} são informados pelo navegador do cliente, não por uma operadora; só \textit{respondida} é observada pelo servidor. Uma conversa semeada não é uma mensagem entregue, e por isso não há métrica de alcance de campanha. A portabilidade do agente de voz para um número telefônico por SIP é uma propriedade documentada pela plataforma, não validada aqui. Perda de pacotes e \textit{codecs} de linha telefônica não foram medidos.
-\item \textbf{Conjuntos pequenos e escritos para o trabalho.} A base de conhecimento tem 5 documentos, e os conjuntos rotulados têm de 13 a 23 itens; os resultados indicam direção, sem intervalos de confiança por célula. A fragmentação e o modelo de \textit{embedding} não foram separados na comparação de recuperação.
-\item \textbf{Voz por modelo de erro.} A varredura responde \textit{o que quebra}, não \textit{com que frequência}; o limiar de confiança da transcrição não foi calibrado com áudio real.
-\item \textbf{Checagem léxica de tom.} O checador detecta vocabulário proibido, não ameaça construída sem ele; nenhuma métrica lê tom. A utilidade de uma resposta fiel também não foi julgada por pessoas.
-\item \textbf{A chamada de voz é uma prova de conceito reduzida.} Não há \textit{barge-in}: enquanto o agente fala, o áudio do cliente é descartado, o que com respostas de 100~s é um problema real. O fim de turno por energia funciona com fone em ambiente silencioso, mas ruído acima do limiar mantém o turno aberto, e uma pausa maior que 700~ms corta o cliente. Não há SIP nem telefonia pública: a portabilidade do agente para um número real é um argumento de projeto, não construído, e \textit{codecs} de operadora (G.711 a 8~kHz) piorariam o reconhecimento medido. Não há discagem ativa: uma mensagem para a chamada espera a próxima ligação do cliente. A divergência de decisões entre chat e voz é zero \textit{por construção}, pois a chamada reutiliza o caminho do chat, mas não foi medida por um teste capaz de detectar uma divergência plantada. Os tempos foram medidos com fala sintetizada, que favorece o reconhecedor, e o caminho do microfone do navegador com uma pessoa real não foi verificado.
-\end{itemize}
+\textbf{Sem dados operacionais reais:} os modelos foram treinados só em dados sintéticos --- a Home Credit não foi obtida --- e a comparação operacional é uma simulação; as magnitudes pertencem ao gerador e ao modelo de resposta, e a recuperação real permanece não testada. O \textit{baseline} manual nunca erra, o que o favorece, e o custo automatizado exclui infraestrutura e LLM. \textbf{O braço LLM foi medido só com um modelo local de 3B}, e a concorrência, sem LLM. \textbf{Canais simulados:} \textit{entregue} e \textit{lida} são informados pelo navegador, e uma conversa semeada não é uma mensagem entregue. \textbf{Conjuntos pequenos} (13 a 23 itens, 5 documentos) indicam direção, não magnitude. \textbf{A voz} foi avaliada por modelo de erro e fala sintetizada; a chamada não tem \textit{barge-in}, SIP nem discagem ativa, usa fim de turno por energia, e a divergência entre chat e voz é zero por construção, não medida. O checador de tom é léxico.
 
 \subsection{Conclusão e trabalhos futuros}
 \label{sec:conclusao}
 
-O trabalho entregou um sistema multiagente de cobrança em que cada decisão --- quem contatar, quando, por qual canal, o que dizer e quando passar a uma pessoa --- é tomada por um componente substituível, registrada com sua causa e medida contra um controle. A parte do problema que dependia de engenharia e de conformidade foi resolvida e verificada; a parte que dependia de uma operação real de cobrança foi substituída por simulação e declarada como tal.
-
-Quanto à hipótese, a resposta é condicional. Na simulação, o sistema recuperou em 30 dias uma fração maior do valor em risco que os dois \textit{baselines}, a custo menor, \textit{quando a capacidade de contato é escassa}, e empatou com eles quando não é; a automação sozinha, sem predição, reduziu muito o custo, mas aumentou pouco a recuperação (+0,2 a +1,8~p.p.). Isso sustenta a hipótese na forma ``a predição melhora a recuperação na medida da escassez da operação'', sob o modelo de resposta declarado, e não a sustenta como afirmação sobre operações reais, que dependem de dados que este trabalho não teve. A parte da hipótese que envolve o canal de voz interativo fica sustentada só como viabilidade técnica: a chamada em tempo real existe, preserva as garantias do chat --- aviso de gravação antes de tudo, escalação por baixa confiança, leitura de volta de valores, \textit{opt-out} --- e responde em cerca de 2~s; mas, com o respondedor que o trabalho pôde medir, cada resposta falada dura minutos. Com o modelo local de 3B, que encurtaria a resposta, a geração acrescentaria cerca de 11~s (p95) a cada turno. A chamada só se torna utilizável com um respondedor gerativo rápido o bastante, e esse braço --- um modelo hospedado --- não foi medido. Que um canal de voz automatizado contribua para a recuperação é, portanto, uma afirmação que este trabalho deixa em aberto.
-
-Como trabalhos futuros: medir os modelos preditivos em dados reais (Home Credit e, sobretudo, um ERP); separar fragmentação e modelo na recuperação, fragmentando a tabela de parcelamento por linha no caminho servido; julgar uma amostra das respostas por pessoas; integrar um adaptador real de mensageria e um tronco SIP, que o contrato de canal permite sem alterar os agentes; calibrar o limiar de confiança da transcrição com áudio real; medir o braço LLM com um modelo hospedado, inclusive na chamada de voz; acrescentar à chamada \textit{barge-in} e detecção de fim de turno aprendida, mantendo o aviso de gravação ininterruptível; acrescentar ao checador uma verificação do estado da dívida afirmado na mensagem; modelar a resposta ao contato (\textit{uplift}) para a ordenação; e variar os parâmetros empíricos do motor de regras (tentativas e intervalo) em um experimento operacional.
+O trabalho entregou um sistema em que cada decisão --- quem contatar, quando, por qual canal, o que dizer e quando passar a uma pessoa --- é tomada por um componente substituível, registrada com sua causa e medida contra um controle. A hipótese é sustentada na forma ``a predição melhora a recuperação na medida da escassez da operação'', sob o modelo de resposta declarado, a custo menor que os dois \textit{baselines}; não como afirmação sobre operações reais. O canal de voz fica sustentado como viabilidade técnica: a chamada preserva as garantias do chat e responde em cerca de 2~s, mas só se torna utilizável com respostas curtas, e se ela contribui para a recuperação fica em aberto. Como trabalhos futuros: dados reais (Home Credit e um ERP), um modelo hospedado no braço LLM e na chamada, julgamento humano das respostas, \textit{uplift} para a ordenação, verificação do estado da dívida no checador, \textit{barge-in} e SIP, e um experimento operacional que varie as regras empíricas.
 
 %% ============================================================
 %%  6. APÊNDICE  (NÃO conta para o limite de páginas)
@@ -521,12 +303,13 @@ Como trabalhos futuros: medir os modelos preditivos em dados reais (Home Credit 
 \section{Apêndice}
 \label{sec:apendice}
 
-Este apêndice reúne a tabela comparativa de trabalhos relacionados (Tabela~\ref{tab:comparativa}) e os comandos que reproduzem cada resultado (Tabela~\ref{tab:reproducao}). Todo resultado relatado na Seção~\ref{sec:resultados} é regenerado por um comando do repositório, sem chave de API, exceto onde indicado.
+A Tabela~\ref{tab:comparativa} compara este trabalho com os relacionados. Os comandos que reproduzem cada resultado estão em \texttt{article/README.md}.
 
+%% VOZ-DURACAO: a legenda abaixo também cita a resposta falada do template.
 \begin{table*}[t]
 \centering
 \footnotesize
-\caption{Tabela comparativa de trabalhos relacionados. Legenda: \atende{}~atende, \parcial{}~parcial, \naoatende{}~não atende; A1--A3 = artigos científicos, S1--S3 = soluções comerciais. A coluna deste trabalho reflete o que foi construído; P6 é parcial porque a chamada sobre WebRTC é uma prova de conceito sem \textit{barge-in} nem telefonia, inutilizável com o respondedor de \textit{template} (Seção~\ref{sec:res-voz}).}
+\caption{Tabela comparativa de trabalhos relacionados. Legenda: \atende{}~atende, \parcial{}~parcial, \naoatende{}~não atende; A1--A3 = artigos científicos, S1--S3 = soluções comerciais. A coluna deste trabalho reflete o que foi construído; P6 é parcial porque a chamada sobre WebRTC é uma prova de conceito sem \textit{barge-in} nem telefonia, inutilizável com o respondedor de \textit{template} (Seção~\ref{sec:res-componentes}).}
 \label{tab:comparativa}
 \begin{tblr}{
   width=\textwidth,
@@ -560,37 +343,7 @@ P12 --- Foco específico em cobrança e recuperação de crédito & \naoatende &
 \end{tblr}
 \end{table*}
 
-\begin{table}[t]
-\centering
-\small
-\caption{Comandos de reprodução (a partir de um clone limpo: \texttt{make setup}).}
-\label{tab:reproducao}
-\begin{tblr}{
-  width=\linewidth,
-  colspec={Q[l,font=\ttfamily\scriptsize]X[l,font=\footnotesize]},
-  row{1}={font=\bfseries},
-  hline{1,2,Z}=0.6pt,
-  rowsep=1.2pt,
-}
-Comando & Resultado \\
-make pipeline & dados, atributos, modelos e métricas (Tabela~\ref{tab:preditivo}) \\
-make eda & taxa de resposta por tentativa (Tabela~\ref{tab:tentativas}) \\
-make rag & recuperação (Tabela~\ref{tab:rag}) \\
-make answer & intenção e braço de \textit{template} \\
-make answer ARGS="-{}-conversations" & múltiplos turnos \\
-make outreach & mensagens proativas e conformidade \\
-make voice & varredura de erro de voz (Tabela~\ref{tab:voz}) \\
-make ollama & sobe o modelo local; com \texttt{LLM\_PROVIDER=openai LLM\_MODEL=qwen2.5:3b}, \texttt{ARGS="-{}-compare"} acrescenta o braço LLM (Tabela~\ref{tab:responder}) \\
-make test & suíte de testes \\
-make coverage & cobertura das funções críticas \\
-make experiment & experimento simulado (Tabela~\ref{tab:experimento}) \\
-make concurrency & teste de concorrência \\
-make call-bench & tempo de turno da chamada; \texttt{ARGS="-{}-live"} mede por uma sala LiveKit (Tabela~\ref{tab:turno}) \\
-\end{tblr}
-\end{table}
-
-%% Garante que as tabelas flutuantes do Apêndice sejam totalmente posicionadas
-%% ANTES das Referências, evitando que a bibliografia seja intercalada com as tabelas.
+%% Garante que a tabela flutuante do Apêndice seja posicionada ANTES das Referências.
 \clearpage
 
 \bibliographystyle{apalike-sol}
