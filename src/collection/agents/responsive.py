@@ -38,6 +38,7 @@ from collection.agents.intent import Classification, Intent, IntentClassifier
 from collection.agents.spoken import select
 from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved, VectorIndex
 from collection.voice.audio import AudioError
+from collection.voice.speak import spoken_words
 from collection.voice.transcribe import (
     MIN_CONFIDENCE,
     Transcriber,
@@ -149,7 +150,7 @@ class TemplateResponder(Responder):
         No `Fonte:` line: a file name read aloud tells the customer nothing. The documents
         stay on `citations`, so the call record still says where the words came from.
         """
-        chosen = select(message, passages, max_words - len(opener.split()))
+        chosen = select(message, passages, max_words - spoken_words(opener))
         return Answer(
             text=" ".join([opener, *(sentence.text for sentence in chosen)]),
             citations=list(dict.fromkeys(sentence.document_id for sentence in chosen)),
@@ -373,7 +374,7 @@ class ResponsiveAgent(Agent):
         confirm = heard is not None and needs_confirmation(message)
         read_back = CONFIRM_PREFIX.format(transcript=heard.text) if confirm else ""
         budget = event.payload.get("reply_max_words")
-        max_words = max(0, int(budget) - len(read_back.split())) if budget else None
+        max_words = max(0, int(budget) - spoken_words(read_back)) if budget else None
 
         # The channel puts the thread on the event; a channel that does not have one
         # (or does not keep it) simply omits it and the agent answers single-turn.

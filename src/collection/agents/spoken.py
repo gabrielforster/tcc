@@ -33,6 +33,7 @@ from dataclasses import dataclass
 
 from collection.rag.embeddings import TfidfEmbedder
 from collection.rag.index import Retrieved
+from collection.voice.speak import spoken_words
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
@@ -47,7 +48,7 @@ class Sentence:
 
     @property
     def words(self) -> int:
-        return len(self.text.split())
+        return spoken_words(self.text)
 
 
 def sentences_of(passage: Retrieved) -> list[Sentence]:
@@ -104,7 +105,7 @@ def select(message: str, passages: list[Retrieved], max_words: int) -> list[Sent
 
     If not even the first sentence fits, it is spoken anyway. An over-long reply is a worse
     call; an empty one is a wrong answer. The corpus has no such sentence (the longest is 28
-    words against a budget of 42), and `tests/test_spoken.py` holds it to that.
+    spoken words against a budget of 43), and `tests/test_spoken.py` holds it to that.
     """
     sections = sections_of(passages)
     if not sections:
