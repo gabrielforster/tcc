@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"
     llm_model: str = "claude-sonnet-5-5"
     anthropic_api_key: str = ""
+    # The `openai` provider: any server speaking the OpenAI chat protocol. The default is
+    # the Ollama service in docker-compose.yml; a hosted one (Groq, OpenRouter) is a base
+    # URL and a key. The timeout is generous because a local model runs on a CPU.
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = ""
+    llm_timeout: float = 180.0
 
     # Parallelism for training, search and permutation importance, passed as `n_jobs`.
     # -1 takes every core, right for `make train`; the test suite lowers it so two runs

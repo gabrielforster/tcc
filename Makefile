@@ -9,6 +9,12 @@ up:               ## start Postgres (pgvector), Redis and MinIO
 down:
 	docker compose down
 
+OLLAMA_MODEL ?= qwen2.5:3b
+.PHONY: ollama
+ollama:           ## start the local model server and pull OLLAMA_MODEL (LLM_PROVIDER=openai)
+	docker compose --profile llm up -d ollama
+	docker compose exec ollama ollama pull $(OLLAMA_MODEL)
+
 seed:             ## create the development tenant, load knowledge/ into it, ingest, activate
 	uv run collection tenant seed
 

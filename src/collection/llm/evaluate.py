@@ -30,6 +30,7 @@ import pandas as pd
 
 from collection.agents.responsive import Responder, ResponsiveAgent, get_responder
 from collection.llm import faithfulness as faith
+from collection.llm.client import stamp
 from collection.rag.evaluate import Question
 from collection.rag.index import VectorIndex
 
@@ -228,6 +229,7 @@ def write_report(table: pd.DataFrame, results: list[ResponderScores], path, retr
         '`make answer ARGS="--compare"` (both arms).',
         "",
         *([_provenance(retriever), ""] if retriever is not None else []),
+        *([stamp(), ""] if any(r.responder == "llm" for r in results) else []),
         "## Summary",
         "",
         table.to_markdown(index=False),
@@ -238,7 +240,8 @@ def write_report(table: pd.DataFrame, results: list[ResponderScores], path, retr
     if len(results) < 2:
         lines += [
             f"> Only the `{results[0].responder}` arm was run, so this is a baseline rather "
-            "than a comparison. The LLM arm needs `ANTHROPIC_API_KEY`: "
+            "than a comparison. The LLM arm needs a provider: `ANTHROPIC_API_KEY`, or "
+            "`LLM_PROVIDER=openai` against the local model from `make ollama`: "
             '`make answer ARGS="--compare"`.',
             "",
         ]
