@@ -6,11 +6,10 @@ setup:            ## install dependencies (uv creates .venv with Python 3.12)
 up:               ## start Postgres (pgvector), Redis, MinIO and LiveKit (the voice call)
 	docker compose up -d
 
-down:
+down:             ## stop the compose services (volumes are kept)
 	docker compose down
 
 OLLAMA_MODEL ?= qwen2.5:3b
-.PHONY: ollama
 ollama:           ## start the local model server and pull OLLAMA_MODEL (LLM_PROVIDER=openai)
 	docker compose --profile llm up -d ollama
 	docker compose exec ollama ollama pull $(OLLAMA_MODEL)
@@ -94,17 +93,17 @@ migrate:          ## apply database migrations (alembic upgrade head)
 pipeline:         ## the whole data pipeline, end to end (set COLLECTION_TENANT)
 	uv run collection pipeline
 
-test:
+test:             ## the test suite (database tests need TEST_DATABASE_URL)
 	uv run pytest
 
 coverage:         ## the suite under coverage, then the critical-function report (target: 80%)
 	uv run pytest --cov --cov-report=term --cov-report=json
 	uv run python scripts/critical_coverage.py
 
-lint:
+lint:             ## ruff over src and tests
 	uv run ruff check src tests
 
-fmt:
+fmt:              ## format, then apply ruff's safe fixes
 	uv run ruff format src tests && uv run ruff check --fix src tests
 
 cronograma:       ## rebuild cronograma.pdf from cronograma.md (pandoc in Docker; no local TeX needed)
