@@ -12,13 +12,14 @@ alta quando forem o caso: a honestidade sobre o que *não* foi medido é parte d
 
 ## Valores que ainda podem mudar
 
-Um valor ainda depende de trabalho em andamento. No deck ele vem de **uma única constante**
-(`DEFESA.vozFala`, no fim de `defesa.html`); aqui ele aparece só nos pontos marcados com
-`VOZ_FALA`. Ao trocar o número, troque os três lugares.
+Um valor depende de remedição. No deck ele vem de **uma única constante** (`DEFESA.vozFala`, no
+fim de `defesa.html`); aqui ele aparece só nos pontos marcados com `VOZ_FALA`. Ao trocar o número,
+troque os três lugares. (Os 102 s da primeira medição são história — o problema achado — e não
+mudam.)
 
 | Chave | Valor atual | Fonte |
 |---|---|---|
-| `VOZ_FALA` — duração mediana de uma resposta falada na chamada | **102 s** | `docs/voice-call.md` |
+| `VOZ_FALA` — duração mediana de uma resposta falada na chamada | **11,7 s** (07/11/2026) | `docs/voice-call.md` |
 
 ---
 
@@ -128,11 +129,16 @@ ação."
 ## Slide 12 — Chamada em tempo real · ~1 min
 
 "A chamada funciona de ponta a ponta numa sala LiveKit real: **2,2 segundos** do fim da fala até a
-primeira palavra da resposta. O Whisper é 60% disso; o agente, menos de 50 milissegundos. Tudo é
-local, porque a resposta lê em voz alta a dívida de uma pessoa nomeada. O achado mais importante
-não está na tabela: a resposta do *template*, falada, dura em mediana
-**102 s** <!-- VOZ_FALA -->. O contrato proíbe o canal de encurtar o que o agente diz, então a
-correção é do respondedor. O que **não** foi verificado: uma pessoa falando pelo microfone do
+primeira palavra da resposta. O Whisper é cerca de 60% disso; o agente, menos de 60 milissegundos.
+Tudo é local, porque a resposta lê em voz alta a dívida de uma pessoa nomeada. A primeira medição
+achou um problema que a tabela não mostra: o *template* lia trechos inteiros, e cada resposta
+falada durava em mediana **102 segundos**. A correção não foi no canal — o contrato proíbe o canal
+de decidir que parte de uma política o cliente ouve. A chamada **declara** quanto cabe: **43
+palavras**, de uma meta de 20 segundos vezes a velocidade mais lenta medida do sintetizador, 2,15
+palavras por segundo. O respondedor escolhe a seção do documento que melhor responde e a lê
+literalmente, sem parafrasear. Medido de novo: mediana de **11,7 s** <!-- VOZ_FALA -->, máximo de
+16,2, as 18 falas dentro da meta — e o chat continua idêntico. Limitação: a recuperação ainda pode
+escolher o trecho errado. O que **não** foi verificado: uma pessoa falando pelo microfone do
 navegador."
 
 *[DEMONSTRAÇÃO AO VIVO — ~3 min. Siga `docs/demo-script.md`: chat semeado pelo agente proativo,
@@ -171,8 +177,8 @@ mostraria o *token* cru ao cliente. Trocar para um modelo hospedado é uma linha
 
 ## Slide 16 — Qualidade de software · ~45 s
 
-"A meta era cobrir 80% das funções críticas; medi por função, não por linha. As 150 funções
-críticas passaram de 90,3% para **100% executadas**, com 784 testes, incluindo os três fluxos de
+"A meta era cobrir 80% das funções críticas; medi por função, não por linha. As 152 funções
+críticas passaram de 90,3% para **100% executadas**, com 802 testes, incluindo os três fluxos de
 ponta a ponta. A medição achou o que o projeto afirmava sem evidência: os *parsers* de PDF e DOCX e
 os clientes reais do Whisper e da Anthropic nunca tinham rodado. Na carga: de 1 a 400 conversas
 simultâneas, **zero erros**, p95 de 0,32 s com 100 — num processo, em memória, sem LLM no turno."
@@ -182,7 +188,8 @@ simultâneas, **zero erros**, p95 de 0,32 s com 100 — num processo, em memóri
 "As limitações, todas no artigo. A maior: **não há dados operacionais reais** — modelos em dados
 sintéticos, experimento simulado; afirmo direção, não magnitude. O braço LLM foi medido só com um
 modelo local pequeno. A carga, sem LLM. Os canais são simulados. A voz é uma prova de conceito
-reduzida, sem *barge-in* nem telefonia, e o microfone real não foi verificado. E os conjuntos
+reduzida, sem *barge-in* nem telefonia; a resposta curta é tão boa quanto o trecho que a
+recuperação escolhe; e o microfone real não foi verificado. E os conjuntos
 rotulados são pequenos."
 
 ## Slide 18 — Conclusão · ~45 s
@@ -192,8 +199,8 @@ dizer e quando passar a uma pessoa — é tomada por um componente substituível
 causa e **medida contra um controle**. A hipótese se sustenta na forma: a predição melhora a
 recuperação **na medida da escassez** da operação. Quem contata toda a carteira não ganha nada com
 o módulo preditivo; quem alcança só uma fração ganha cerca de cinco pontos, a custo menor. A
-automação sozinha reduz custo. E a voz é viável, mas só será útil com um respondedor gerativo
-rápido."
+automação sozinha reduz custo. E a voz funciona: responde em cerca de 2 segundos, com respostas de
+cerca de 12 — depois que a medição mostrou que o *template* falado durava minutos."
 
 ## Slide 19 — Trabalhos futuros e encerramento · ~35 s
 
@@ -250,10 +257,14 @@ Porque com alvo desbalanceado prever sempre a classe majoritária tem acurácia 
 nada: na tarefa 2, a classe majoritária tem 0,836 de acurácia e o modelo útil tem 0,762.
 
 **"A chamada de voz é utilizável?"**
-Ainda não. O turno leva 2,2 s, mas a resposta do *template*, falada, dura em mediana
-**102 s** <!-- VOZ_FALA -->. Falta um respondedor gerativo rápido; com o modelo local de 3B, a
-geração acrescentaria cerca de 11 s por turno. Também não há *barge-in*, e o caminho com uma pessoa
-falando no microfone do navegador não foi verificado por máquina.
+Como prova de conceito, sim, com ressalvas. O turno leva 2,2 s (2.193 ms medidos por WebRTC). A
+primeira medição mostrou que a resposta do *template*, falada, durava 102 s; a chamada passou a
+declarar um orçamento de 43 palavras (20 s × 2,15 palavras/s, a velocidade mais lenta medida do
+Piper), o respondedor escolhe a seção que cabe sem parafrasear, e a resposta falada caiu para uma
+mediana de **11,7 s** <!-- VOZ_FALA --> (máximo 16,2 s; 18 de 18 dentro da meta de 20 s). As
+ressalvas: a resposta curta é tão boa quanto o trecho que a recuperação escolhe, e pode escolher o
+errado; não há *barge-in*; e o caminho com uma pessoa falando no microfone do navegador não foi
+verificado por máquina.
 
 **"Os testes cobrem chamadas reais a serviços externos?"**
 Não, de propósito: os casos que importam — tempo esgotado, recusa, reconhecedor que erra um valor —

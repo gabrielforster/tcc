@@ -56,7 +56,7 @@ Open in browser tabs, in this order: the deck, `http://127.0.0.1:8000/chat/demo`
 | Step | Do | Say / point at |
 |---|---|---|
 | 1 | Open `/chat/demo`. | The thread opens saying it is **automated**, before anyone types (CDC art. 42). The first message was **written by the proactive agent**, passed the compliance checker, and waited in the mailbox until the widget opened — opt-out is checked again at this moment. |
-| 2 | Type `quais são os juros e a multa por atraso?` | The answer **cites its source document**. It is the template responder: faithful, but long — the same length problem slide 12 shows for voice. |
+| 2 | Type `quais são os juros e a multa por atraso?` | The answer **cites its source document**. It is the template responder: faithful, but long in a chat bubble. The chat states no length budget, so its replies are unchanged; only the call asks for a short one. |
 | 3 | Type `consigo parcelar em 6 vezes?` | A negotiation answer from the instalment table, within the authority limits. |
 | 4 | Type `eu nunca contratei esse servico` | A **dispute always goes to a person** (`knowledge/limites-de-alcada.md`): the thread escalates and says so. |
 | 5 | *(optional)* In terminal 3: `COLLECTION_TENANT=desenvolvimento make queue` | Only with a database-backed tenant; with the in-memory demo, skip it and describe the queue → claim → resolve flow instead. |
@@ -70,7 +70,7 @@ recorded and propagated, and every later outbound contact for that customer is s
 |---|---|---|
 | 1 | Open `/call/demo`, press **Ligar**. | The **recording notice plays first and cannot be skipped**: speech during it is discarded. |
 | 2 | Say: "quanto eu tô devendo?" | Whisper and Piper run **locally**; the turn takes about 2 s. |
-| 3 | Let the answer play for a few seconds, then hang up. | This is the finding of slide 12: the template's spoken answer runs for minutes. Do not wait for it to finish. |
+| 3 | Let the answer play to the end (about 12 s), then hang up. | Slide 12's fix, live: the call declares a 43-word budget and the responder reads the one section that answers, verbatim. Before the fix this same answer ran for over a minute and a half. |
 
 ## Fallback — if anything fails live
 
