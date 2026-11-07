@@ -336,12 +336,23 @@ class SyntheticSource(DataSource):
 
     # ----------------------------------------------------------------------- api
     def extract(self) -> RawDataset:
+        return self.extract_with_propensity()[0]
+
+    def extract_with_propensity(self) -> tuple[RawDataset, pd.Series]:
+        """The dataset plus the latent propensity that generated it, by customer id.
+
+        Only the controlled experiment asks for the second half: it simulates how a
+        customer answers a contact, and that response has to come from the same latent
+        variable that drove the receivables, or the simulation would be a second, unrelated
+        world. Nothing a model trains on ever sees it.
+        """
         customers, propensity = self._make_customers()
         invoices = self._make_invoices(customers, propensity)
         events, agreements = self._make_events(invoices, customers, propensity)
-        return RawDataset(
+        dataset = RawDataset(
             customers=customers, invoices=invoices, events=events, agreements=agreements
         )
+        return dataset, pd.Series(propensity, index=customers["customer_id"], name="propensity")
 
 
 def delinquency_stage(days: int) -> str:

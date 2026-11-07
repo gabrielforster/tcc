@@ -148,11 +148,18 @@ def _contact_history(
 
 
 # ----------------------------------------------------------------------- features
-def build_features(task: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+def build_features(
+    task: str, tables: dict[str, pd.DataFrame], *, labelled: bool = True
+) -> pd.DataFrame:
     """Assemble the feature table for one of the two predictive tasks.
 
     `tables` are the anonymized frames, handed in rather than read from a path: where
     they come from (a tenant's object storage, a test) is the caller's decision.
+
+    `labelled=False` keeps the receivables whose outcome is not observable yet and leaves
+    their target empty. That is the population a model is *applied* to -- the open book on
+    the day of the decision -- and the features are the same ones, built from the same
+    past, so nothing about it loosens the leakage rule.
     """
     if task not in TASKS:
         raise ValueError(f"task must be one of {TASKS}")
@@ -183,16 +190,20 @@ def build_features(task: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     if task == "propensity":
         window = pd.Timedelta(days=PROPENSITY_WINDOW_DAYS)
         # Only receivables whose outcome is already observable within the window.
-        d = d[d["due_date"] + window <= as_of]
+        if labelled:
+            d = d[d["due_date"] + window <= as_of]
         paid_in_window = d["payment_date"].notna() & (d["payment_date"] <= d["due_date"] + window)
         d[TARGET_TASK_1] = paid_in_window.astype(int)
         target = TARGET_TASK_1
     else:
         threshold = pd.Timedelta(days=DEFAULT_THRESHOLD_DAYS)
-        d = d[d["due_date"] + threshold <= as_of]
+        if labelled:
+            d = d[d["due_date"] + threshold <= as_of]
         went_default = d["payment_date"].isna() | (d["payment_date"] > d["due_date"] + threshold)
         d[TARGET_TASK_2] = went_default.astype(int)
         target = TARGET_TASK_2
+    if not labelled:
+        d[target] = np.nan
 
     # Attributes of the receivable itself -------------------------------------
     d["term_days"] = (d["due_date"] - d["issue_date"]).dt.days

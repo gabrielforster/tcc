@@ -1,4 +1,4 @@
-.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge queue migrate pipeline test coverage lint fmt cronograma
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -62,6 +62,12 @@ voice:            ## sweep what recognition error costs; ARGS="--audio FILE" tra
 
 contacts:         ## report what the outbound path decides (serve --seed-demo is the live demo)
 	uv run collection contacts
+
+experiment:       ## simulate the system against the manual and semi-automated baselines
+	uv run collection experiment $(ARGS)
+
+concurrency:      ## hold >= 100 chat conversations at once and time every request
+	uv run collection concurrency $(ARGS)
 
 sweep:            ## close the threads nothing is tracking (COLLECTION_TENANT=<slug>)
 	uv run collection conversations sweep $(ARGS)
