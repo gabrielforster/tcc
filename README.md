@@ -85,13 +85,10 @@ automatizados.
 |---|---|
 | [`src/collection/`](./src/collection) | System code: domain, data pipeline, EDA and features. |
 | [`docs/`](./docs) | Pipeline-generated documentation (data dictionary, EDA reports), the [architecture](./docs/architecture.md) and the [data acquisition plan](./docs/data-acquisition-plan.md). |
-| `data/` | `raw` / `interim` / `processed` datasets — **never committed** (LGPD). |
-| [`article/`](./article) | Artigo científico (LaTeX, formato **SBC Reviews 2025**) — proposta de portfólio do PAC 8. Veja o [README do artigo](./article/README.md) para compilar. |
-| [`cronograma.md`](./cronograma.md) | Cronograma de 19 entregas (jul.–dez. 2026). |
+| `data/` | A download cache (`raw/`), Piper voices (`voices/`) and call audio (`calls/`) — **never committed** (LGPD). Pipeline output lives in object storage. |
+| [`article/`](./article) | Artigo científico (LaTeX, formato **SBC Reviews 2025**) sobre o sistema construído e o que foi medido. Veja o [README do artigo](./article/README.md) para compilar. |
+| [`cronograma.md`](./cronograma.md) | Cronograma de 19 entregas (jul.–dez. 2026) e as mudanças de escopo. |
 | [`rfc.pdf`](./rfc.pdf) | RFC do projeto: documento de proposta detalhada. |
-| `tabela-comparativa.pdf` | Tabela comparativa de trabalhos relacionados (artigos e soluções comerciais). |
-| `old-article/` | Versões anteriores do artigo (histórico). |
-| `template/` | Template original da classe SBC Reviews 2025. |
 
 ## Plano de desenvolvimento
 
@@ -110,17 +107,17 @@ O projeto é desenvolvido em oito fases sequenciais:
 
 ## O artigo
 
-A proposta foi consolidada em um artigo científico (4–6 páginas, formato SBC Reviews 2025)
-em [`article/`](./article). Para gerá-lo:
+O artigo em [`article/`](./article) (formato SBC Reviews 2025) descreve o sistema que foi
+construído e os resultados medidos, inclusive as mudanças de escopo e as limitações. Para
+gerá-lo sem TeX local:
 
 ```sh
-cd article
-./build.sh        # XeLaTeX + BibTeX; gera article/main.pdf
+make article      # XeLaTeX + BibTeX num container; gera article/main.pdf
 ```
 
-> O script contorna uma instalação local de TeX Live incompleta e se autoconfigura na
-> primeira execução. Detalhes, alternativas (Overleaf) e notas de compilação estão no
-> [README do artigo](./article/README.md).
+> A primeira execução constrói a imagem de TeX (cerca de 15 minutos); as seguintes a
+> reaproveitam. Com um TeX Live local, `article/build.sh` faz o mesmo. Detalhes e notas de
+> compilação estão no [README do artigo](./article/README.md).
 
 ## Running it
 
@@ -135,8 +132,21 @@ make seed                 # create the development tenant and leave it servable
 export COLLECTION_TENANT=desenvolvimento   # the tenant the pipeline commands work on
 make pipeline             # ingest (extracts) -> dictionary -> eda -> features
 make train                # train, publish a platform model version, write the comparison report
-make test lint
+make test lint            # database tests run only against TEST_DATABASE_URL, never DATABASE_URL
 ```
+
+Every target has a help line in the `Makefile`. The ones that reproduce the evaluation:
+
+| Target | What it does |
+|---|---|
+| `make coverage` | The suite under coverage, then the critical-function report; fails below 80% in any group — see [`docs/testing.md`](./docs/testing.md) |
+| `make ollama` | Starts the local model server (Ollama, `llm` compose profile) and pulls `qwen2.5:3b` for the LLM arms |
+| `make experiment` | The simulated experiment against the manual and semi-automated baselines (about 15 minutes) |
+| `make concurrency` | Holds up to 400 chat conversations at once and times every request |
+| `make voices` | Downloads the two Piper pt-BR voices the call uses into `data/voices` |
+| `make call` | The voice call demo on http://127.0.0.1:8100/call/demo (LiveKit is started for it) |
+| `make call-bench` | The call's turn-time budget on synthesised speech; `ARGS="--live"` goes through LiveKit |
+| `make article` / `make cronograma` | Build the article and the schedule PDFs in Docker |
 
 `make seed` is what makes a fresh clone usable. Everything the serving path reads lives in
 the database now — the tenant, the knowledge, the conversations — so a clone with an empty
@@ -275,7 +285,8 @@ and citations of documents that were never retrieved — and
 [`docs/responder-comparison.md`](./docs/responder-comparison.md) carries the results.
 
 The template arm needs no API key and runs in CI. The LLM arm is run by hand, against
-either provider:
+either provider. The published LLM numbers come from the local model, because no hosted key
+was available — read them as a floor for a hosted model, not an estimate of one:
 
 ```bash
 # hosted Claude
@@ -326,6 +337,33 @@ downstream can tell when it breaks.
 So an amount heard in audio is a proposal to confirm, never an instruction to execute: the
 agent reads it back before acting, and a transcript it is not confident about goes to a
 person with the transcript attached rather than being answered.
+
+### Real-time voice call
+
+`make call` serves a page where a customer presses *Ligar* and talks to the same agent the
+chat uses, over WebRTC through a self-hosted LiveKit — see
+[`docs/voice-call.md`](./docs/voice-call.md). A recording notice plays first and cannot be
+skipped; Whisper recognises and Piper speaks, both locally, because the reply reads out a
+named person's debt. It is a reduced proof of concept: no barge-in, no SIP, no outbound
+dialling. The turn takes a median of 2.2 s end to end over WebRTC on a CPU, but a
+template reply read aloud lasts a median of 102 s, so the call needs a generative responder
+behind it to be usable.
+
+### Testing and the controlled experiment
+
+[`docs/testing.md`](./docs/testing.md) says what the suite proves: every critical function
+the schedule names is executed, and the proactive, responsive and handoff flows run end to
+end through the orchestrator.
+
+[`docs/experiment-protocol.md`](./docs/experiment-protocol.md) fixes how the system is
+compared with a manual desk and a rules-only campaign, and
+[`docs/experiment-results.md`](./docs/experiment-results.md) reports it. With no
+operational data, it is a **simulation**: 30 replications paired by seed, contact response
+taken from the Bank Marketing curve, 95% bootstrap intervals. Prediction recovers about
+4.8 pp more of the at-risk amount within 30 days when contact capacity is scarce, and
+nothing once every receivable can be reached; the compliance audit found zero violations.
+The same document carries the concurrency check: no errors from 1 to 400 simultaneous
+conversations, measured in memory with the template responder.
 
 ### Web chat channel
 
@@ -383,14 +421,18 @@ through a pull request; `master` is never committed to directly.
 
 ## Status
 
-📚 Planejamento completo; o artigo ainda está na versão de proposta e é reescrito com os
-resultados nas entregas 17 e 18. Implementado: o pipeline de dados, o módulo preditivo, a
+🧪 Construído e medido. Implementado: o pipeline de dados, o módulo preditivo, a
 arquitetura multiagente, o RAG e o módulo responsivo — com geração por LLM e medição de
-fidelidade —, o módulo proativo com composição e checagem de conformidade, e o widget de
-chat embedável que recebe áudios, rastreia status de entrega e abre conversas iniciadas pelo
-sistema, atrás de um contrato de canal explícito. Tudo isso grava num registro durável
-multi-inquilino (Postgres + pgvector), com retenção de transcrições e fila de escalação para
-humanos. Falta o canal de voz em tempo real (WebRTC/LiveKit) e a fase de avaliação.
+fidelidade —, o módulo proativo com composição e checagem de conformidade, o widget de chat
+embedável que recebe áudios, rastreia status de entrega e abre conversas iniciadas pelo
+sistema, e a chamada de voz em tempo real (prova de conceito reduzida), todos atrás de um
+contrato de canal explícito. Tudo isso grava num registro durável multi-inquilino
+(Postgres + pgvector), com retenção de transcrições e fila de escalação para humanos.
+
+A avaliação está feita: cobertura das funções críticas, testes dos três fluxos, o
+experimento simulado contra os dois baselines, a concorrência e os braços LLM num modelo
+local. O artigo foi reescrito sobre esses resultados. Falta o braço LLM num modelo
+hospedado (não há chave de API) e a entrega final — *tag*, *slides* e ensaio da defesa.
 
 ---
 

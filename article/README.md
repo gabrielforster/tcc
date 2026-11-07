@@ -5,8 +5,9 @@ Gabriel Forster Rocha — Centro Universitário Católica de Santa Catarina.
 
 Artigo no formato **SBC Reviews 2025**, descrevendo o sistema construído e o que foi medido.
 O Apêndice (tabela comparativa de trabalhos relacionados + comandos de reprodução) e as
-Referências ficam no fim. O que ainda depende de trabalho em andamento aparece no PDF em
-vermelho, pela macro `\pendente{...}`; `grep -n pendente main.tex` lista o que falta.
+Referências ficam no fim. A macro `\pendente{...}` marca em vermelho, no PDF, o que ainda
+depender de trabalho em andamento; hoje nenhuma ocorrência resta, e
+`grep -n 'pendente{' main.tex` confirma.
 
 ## Arquivos
 
