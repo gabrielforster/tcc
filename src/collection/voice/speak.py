@@ -39,6 +39,23 @@ from collection.config import settings
 #: the recogniser is not hearing the agent's own voice back.
 AGENT_VOICE = "pt_BR-faber-medium"
 CUSTOMER_VOICE = "pt_BR-cadu-medium"
+#: The slowest rate, in words per second, at which `AGENT_VOICE` speaks a sentence of the
+#: knowledge base. Measured on 2026-11-07 over the 42 sentences of the Markdown corpus:
+#: 2.90 pooled, 2.91 median, 2.13 slowest. The slowest is the one that matters, because a
+#: word budget derived from it holds for every sentence -- a reply cut to the median rate
+#: overruns its target whenever it happens to be made of the slow sentences.
+#: `make call-bench` re-measures it and reports drift.
+SLOWEST_WORDS_PER_SECOND = 2.13
+
+
+def speaking_rates(synthesizer: "Synthesizer", sentences: list[str]) -> list[float]:
+    """Words per second for each sentence, as `synthesizer` actually speaks it."""
+    rates = []
+    for sentence in sentences:
+        seconds = sum(chunk.duration_s for chunk in synthesizer.synthesize(sentence))
+        if seconds > 0:
+            rates.append(len(sentence.split()) / seconds)
+    return rates
 
 
 class SynthesisError(RuntimeError):
