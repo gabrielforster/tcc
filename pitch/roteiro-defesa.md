@@ -171,8 +171,8 @@ mostraria o *token* cru ao cliente. Trocar para um modelo hospedado é uma linha
 
 ## Slide 16 — Qualidade de software · ~45 s
 
-"A meta era cobrir 80% das funções críticas; medi por função, não por linha. As 144 funções
-críticas passaram de 90,3% para **100% executadas**, com 730 testes, incluindo os três fluxos de
+"A meta era cobrir 80% das funções críticas; medi por função, não por linha. As 150 funções
+críticas passaram de 90,3% para **100% executadas**, com 784 testes, incluindo os três fluxos de
 ponta a ponta. A medição achou o que o projeto afirmava sem evidência: os *parsers* de PDF e DOCX e
 os clientes reais do Whisper e da Anthropic nunca tinham rodado. Na carga: de 1 a 400 conversas
 simultâneas, **zero erros**, p95 de 0,32 s com 100 — num processo, em memória, sem LLM no turno."

@@ -22,9 +22,8 @@ Um valor do deck ainda pode mudar — a duração mediana de uma resposta falada
 voz. Ele está numa única constante (`DEFESA.vozFala`, no fim de `defesa.html`) e nos dois
 pontos marcados com `VOZ_FALA` no roteiro.
 
-Para exportar o PDF, use o navegador (`defesa.html?print-pdf` → `Ctrl/Cmd + P`), como descrito
-abaixo. O comando headless da seção "Exportar PDF" gerou um PDF vazio de uma página para os dois
-decks no Chromium atual (07/11/2026): o navegador imprime antes de o reveal.js montar as páginas.
+Para exportar o PDF: `./export-pdf.sh defesa.html` (uma página por slide, com todos os
+fragmentos visíveis). Veja "Exportar PDF" abaixo.
 
 ## Como apresentar
 
@@ -69,12 +68,17 @@ python3 -m http.server 8000
 2. `Ctrl/Cmd + P` → **Salvar como PDF**.
 3. Layout **Paisagem**, margens **Nenhuma**, **Gráficos de plano de fundo** ligado.
 
-Ou via linha de comando (Chrome headless):
+Ou pela linha de comando, com Chromium/Chrome e `uv` instalados:
 
 ```sh
-google-chrome --headless --no-pdf-header-footer \
-  --print-to-pdf=pitch.pdf "index.html?print-pdf"
+./export-pdf.sh index.html pitch.pdf
+./export-pdf.sh defesa.html defesa.pdf
 ```
+
+O script fotografa cada slide em 1280×720 com todos os fragmentos visíveis e junta as
+imagens num PDF. O `--print-to-pdf` headless sobre `?print-pdf` não serve com o Chromium atual
+(07/11/2026): ele imprime antes de o reveal.js montar o layout de impressão, e sai um PDF vazio
+ou paginado como página web.
 
 ## Editar
 
