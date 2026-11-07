@@ -31,6 +31,7 @@ from collection.voice.speak import (
     SLOWEST_WORDS_PER_SECOND,
     ToneSynthesizer,
     speaking_rates,
+    spoken_words,
     write_wav,
 )
 from collection.voice.transcribe import ScriptedTranscriber
@@ -78,6 +79,12 @@ def test_every_sentence_of_the_corpus_fits_the_budget_on_its_own(index):
     for chunk in index.chunks:
         for sentence in sentences_of(_passage(chunk.text, chunk.document_id)):
             assert sentence.words <= REPLY_MAX_WORDS, sentence.text
+
+
+def test_spoken_words_count_what_a_synthesiser_says_not_what_split_finds():
+    # An identifier is three words aloud, a decimal is two numbers, "%" is "por cento".
+    assert spoken_words("entrada_minima_percentual: 1.5%") == 3 + 2 + 2
+    assert spoken_words("A segunda via sai aqui.") == 5
 
 
 def test_speaking_rates_are_words_over_seconds():
@@ -133,7 +140,7 @@ def test_a_spoken_template_reply_fits_and_quotes_only_the_passages(index):
             continue
         spoken += 1
         text = reply.answer.text
-        assert len(text.split()) <= REPLY_MAX_WORDS, question
+        assert spoken_words(text) <= REPLY_MAX_WORDS, question
         assert "Fonte:" not in text
         assert reply.answer.citations
         verdict = faithfulness.evaluate(text, reply.passages)

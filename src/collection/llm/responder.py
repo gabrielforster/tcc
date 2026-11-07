@@ -33,6 +33,7 @@ from collection.llm.prompt import (
     build_user_prompt,
 )
 from collection.rag.index import Retrieved
+from collection.voice.speak import spoken_words
 
 
 def _is_refusal(text: str) -> bool:
@@ -94,7 +95,7 @@ class LLMResponder(Responder):
             from collection.llm.faithfulness import without_citations
 
             text = without_citations(text)
-            if len(text.split()) > max_words:
+            if spoken_words(text) > max_words:
                 # Asked for a length and ignored it. The budget is what makes the call
                 # usable, so it is held here rather than trusted to the prompt; the
                 # template's spoken reply is grounded by construction and cut to the budget.
