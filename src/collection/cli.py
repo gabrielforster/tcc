@@ -1066,6 +1066,10 @@ def call_bench(
         )
     name = "voice-call-report-live.md" if live else "voice-call-report.md"
     text = bench.write_report(
-        rows, settings.dir_docs / name, whisper_model, "live" if live else "pipeline"
+        rows,
+        settings.dir_docs / name,
+        whisper_model,
+        "live" if live else "pipeline",
+        rate=bench.corpus_speaking_rate(agent, index),
     )
     console.print(text)

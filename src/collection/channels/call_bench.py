@@ -32,10 +32,20 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from collection.agents.spoken import sentences_of
 from collection.channels.endpointing import FRAME_MS, THRESHOLD_DBFS, Endpointer, frame_dbfs
-from collection.channels.voice_call import VoiceCallChannel
+from collection.channels.voice_call import REPLY_MAX_WORDS, REPLY_TARGET_S, VoiceCallChannel
+from collection.rag.index import Retrieved, VectorIndex
 from collection.voice.evaluate import VoiceMessage, load_messages, wer
-from collection.voice.speak import Synthesizer, first_audio, resample, write_wav
+from collection.voice.speak import (
+    SLOWEST_WORDS_PER_SECOND,
+    Synthesizer,
+    first_audio,
+    resample,
+    speaking_rates,
+    spoken_words,
+    write_wav,
+)
 
 RATE = 16_000
 LEAD_SILENCE_S = 0.3
@@ -60,6 +70,7 @@ class BenchRow:
     tts_first_audio_ms: float = 0.0
     #: How long the spoken reply lasts. Pipeline mode only: it synthesises the whole reply.
     reply_s: float | None = None
+    reply_words: int | None = None
     #: Live mode only: end of the bot's speech to the first audible agent frame.
     live_ms: float | None = None
     notes: list[str] = field(default_factory=list)
@@ -160,6 +171,7 @@ def _turn(
         return row
     chunks, first_ms = first_audio(agent_voice, turn.say)
     row.reply_s = sum(chunk.duration_s for chunk in chunks)
+    row.reply_words = spoken_words(turn.say)
     channel.spoke(call.call_id, turn.timing, first_ms)
     channel.hang_up(call.call_id)
 
@@ -324,6 +336,30 @@ STAGES = [
 ]
 
 
+@dataclass(frozen=True)
+class SpeakingRate:
+    """How fast the agent's voice says the knowledge base, which the word budget rests on."""
+
+    sentences: int
+    pooled: float
+    slowest: float
+
+
+def corpus_speaking_rate(voice: Synthesizer, index: VectorIndex) -> SpeakingRate:
+    """Re-measure the rate `SLOWEST_WORDS_PER_SECOND` was set from, on every sentence the
+    responder could speak, so the report shows whether the constant still holds."""
+    seen: dict[str, None] = {}
+    for chunk in index.chunks:
+        for sentence in sentences_of(Retrieved(chunk=chunk, score=1.0)):
+            if len(sentence.text.split()) > 3:
+                seen.setdefault(sentence.text, None)
+    sentences = list(seen)
+    rates = speaking_rates(voice, sentences)
+    seconds = sum(spoken_words(s) / r for s, r in zip(sentences, rates, strict=True))
+    words = sum(spoken_words(s) for s in sentences)
+    return SpeakingRate(sentences=len(rates), pooled=words / seconds, slowest=min(rates))
+
+
 def _quantile(values: list[float], q: float) -> float:
     ordered = sorted(values)
     if not ordered:
@@ -360,7 +396,13 @@ def _cpu() -> str:
     return platform.processor() or platform.machine()
 
 
-def write_report(rows: list[BenchRow], path: Path | str, whisper_model: str, mode: str) -> str:
+def write_report(
+    rows: list[BenchRow],
+    path: Path | str,
+    whisper_model: str,
+    mode: str,
+    rate: SpeakingRate | None = None,
+) -> str:
     audio = [row.audio_s for row in rows]
     stt_rtf = [row.stt_ms / 1000 / row.audio_s for row in rows if row.audio_s]
     intents_ok = sum(1 for row in rows if row.intent == row.expected_intent)
@@ -401,9 +443,21 @@ def write_report(rows: list[BenchRow], path: Path | str, whisper_model: str, mod
     ]
     replies = [row.reply_s for row in rows if row.reply_s is not None]
     if replies:
+        within = sum(1 for reply in replies if reply <= REPLY_TARGET_S)
+        words = [row.reply_words for row in rows if row.reply_words is not None]
+        lines += [
+            f"Spoken reply length: median {statistics.median(replies):.1f} s, "
+            f"max {max(replies):.1f} s -- the time the customer then spends listening. "
+            f"{within}/{len(replies)} within the {REPLY_TARGET_S:.0f} s target; "
+            f"median {statistics.median(words):.0f} spoken words against a budget of "
+            f"{REPLY_MAX_WORDS}.",
+        ]
+    if rate is not None:
+        drift = "holds" if rate.slowest >= SLOWEST_WORDS_PER_SECOND else "**is now too fast**"
         lines.append(
-            f"Spoken reply length: median {statistics.median(replies):.0f} s, "
-            f"max {max(replies):.0f} s -- the time the customer then spends listening."
+            f"Agent voice on the corpus ({rate.sentences} sentences): {rate.pooled:.2f} words/s "
+            f"pooled, {rate.slowest:.2f} slowest; the budget's constant "
+            f"({SLOWEST_WORDS_PER_SECOND:.2f}) {drift}."
         )
     lines += [
         "",
