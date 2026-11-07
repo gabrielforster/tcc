@@ -10,9 +10,19 @@ The remaining work is one stack of pull requests on `gabrielforster/tcc`. Merge 
 up**: each PR's base is the branch below it, so merging out of order merges the lower PR's
 commits through the upper one without review.
 
-- [ ] `gh stack view` (or the stack on GitHub) lists the PRs in order. The base of the stack is
-      `#32` (the test-database fix), then `#33` coverage, `#34` local LLM arm, `#35` experiment,
-      `#36` voice call, `#37` article, followed by the PRs stacked on top of `#37`.
+- [ ] `gh stack view` (or the stack on GitHub) lists the PRs in this order, bottom to top
+      (the last four by branch name; their PR numbers are assigned when they are opened):
+
+      1. `#32` — test-database fix
+      2. `#33` — critical-function coverage and flow tests
+      3. `#34` — local LLM arm (Ollama)
+      4. `#35` — experiment against the baselines
+      5. `#36` — LiveKit voice call
+      6. `#37` — article rewrite
+      7. `feat/spoken-replies` — replies shaped for the ear on the call
+      8. `docs/schedule-and-readme-catch-up` — schedule and README
+      9. `docs/article-within-the-page-limit` — article cut to the page limit
+      10. `docs/defense-deck` — defense deck, demo script and this checklist
 - [ ] Merge each one only after the one below it is on `master`; then retarget the next to
       `master` (GitHub does this when the base branch is deleted on merge).
 - [ ] After the last merge, on a clean checkout of `master`:
