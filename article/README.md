@@ -1,11 +1,12 @@
-# Artigo — Proposta de Portfólio (PAC 8)
+# Artigo de Portfólio (PAC 8)
 
 **Sistema Multiagente Inteligente de Cobrança com LLM, RAG e Machine Learning**
 Gabriel Forster Rocha — Centro Universitário Católica de Santa Catarina.
 
-Artigo no formato **SBC Reviews 2025**. O corpo tem 4 páginas (dentro do limite de 4–6); o
-Apêndice (tabela comparativa de trabalhos relacionados + cronograma de desenvolvimento) e as
-Referências ficam nas páginas 5–6 e não contam para o limite.
+Artigo no formato **SBC Reviews 2025**, descrevendo o sistema construído e o que foi medido.
+O Apêndice (tabela comparativa de trabalhos relacionados + comandos de reprodução) e as
+Referências ficam no fim. O que ainda depende de trabalho em andamento aparece no PDF em
+vermelho, pela macro `\pendente{...}`; `grep -n pendente main.tex` lista o que falta.
 
 ## Arquivos
 
@@ -17,6 +18,8 @@ Referências ficam nas páginas 5–6 e não contam para o limite.
 | `sectsty.sty`, `aas_macros.sty` | Pacotes de apoio (do template) |
 | `apalike-sol.bst` | Estilo bibliográfico (do template) |
 | `sol.jpg` | Logo usado pela classe |
+| `figuras/` | Figuras do artigo (cópias de `docs/images` e dos relatórios) |
+| `Dockerfile` | Imagem de TeX usada por `make article` |
 | `build.sh` | Script de compilação (contorna instalação local quebrada do TeX) |
 
 ## Compilação
@@ -25,7 +28,20 @@ A classe usa `fontspec`, portanto **requer XeLaTeX (ou LuaLaTeX)** — não use 
 A sequência é sempre `xelatex → bibtex → xelatex → xelatex` (o `bibtex` no meio é o passo que
 gera as referências; pular ele deixa a bibliografia vazia).
 
-### Opção 1 — `./build.sh` (recomendado nesta máquina)
+### Opção 0 — `make article` (Docker, sem TeX local)
+
+Na raiz do repositório:
+
+```sh
+make article
+```
+
+Constrói uma imagem a partir de `article/Dockerfile` (`pandoc/extra` mais os pacotes e as
+fontes que a classe SBC exige) e roda `xelatex → bibtex → xelatex → xelatex` dentro dela.
+A primeira execução leva cerca de 15 minutos, por causa do `tlmgr`; as seguintes reaproveitam
+a imagem. Em caso de erro, imprime as linhas `!` do log.
+
+### Opção 1 — `./build.sh` (TeX Live local com instalação incompleta)
 
 ```sh
 cd article
