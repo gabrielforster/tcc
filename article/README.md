@@ -4,8 +4,10 @@
 Gabriel Forster Rocha — Centro Universitário Católica de Santa Catarina.
 
 Artigo no formato **SBC Reviews 2025**, descrevendo o sistema construído e o que foi medido.
-O Apêndice (tabela comparativa de trabalhos relacionados + comandos de reprodução) e as
-Referências ficam no fim. A macro `\pendente{...}` marca em vermelho, no PDF, o que ainda
+O corpo tem 4 páginas (dentro do limite de 4–6); o Apêndice (tabela comparativa de trabalhos
+relacionados) e as Referências ficam nas páginas 5–7 e não contam para o limite. As tabelas
+completas de cada medição ficam em `docs/` e são citadas no texto; os comandos que as
+reproduzem estão abaixo. A macro `\pendente{...}` marca em vermelho, no PDF, o que ainda
 depender de trabalho em andamento; hoje nenhuma ocorrência resta, e
 `grep -n 'pendente{' main.tex` confirma.
 
@@ -22,6 +24,26 @@ depender de trabalho em andamento; hoje nenhuma ocorrência resta, e
 | `figuras/` | Figuras do artigo (cópias de `docs/images` e dos relatórios) |
 | `Dockerfile` | Imagem de TeX usada por `make article` |
 | `build.sh` | Script de compilação (contorna instalação local quebrada do TeX) |
+
+## Reprodução dos resultados
+
+A partir de um clone limpo (`make setup`), cada resultado do artigo é regenerado por um
+comando, sem chave de API:
+
+| Comando | Resultado |
+|---|---|
+| `make pipeline` | dados, atributos, modelos e métricas (Tabela 1) |
+| `make eda` | taxa de resposta por tentativa (Bank Marketing) |
+| `make rag` | recuperação |
+| `make answer` | intenção e braço de *template* |
+| `make answer ARGS="--conversations"` | múltiplos turnos |
+| `make outreach` | mensagens proativas e conformidade |
+| `make voice` | varredura de erro de voz |
+| `make ollama` | sobe o modelo local; com `LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b`, `ARGS="--compare"` acrescenta o braço LLM |
+| `make test` / `make coverage` | suíte de testes e cobertura das funções críticas |
+| `make experiment` | experimento simulado (Tabela 3) |
+| `make concurrency` | teste de concorrência |
+| `make call-bench` | tempo de turno da chamada; `ARGS="--live"` mede por uma sala LiveKit |
 
 ## Compilação
 
