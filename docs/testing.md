@@ -34,21 +34,29 @@ engine, intent, templates), plus the orchestrator and the responder, which every
 passes through, plus the two external-service seams (the LLM client and the speech
 recogniser), whose failure paths decide whether a customer gets an answer or a person.
 
-Measured on 2026-11-06, 730 tests, Postgres and MinIO up (no skips):
+Measured on 2026-11-07 at the top of the stack this document shipped in, 802 tests,
+Postgres and MinIO up (no skips). *Before* is `master` on 2026-11-06, before these tests
+were added. Two groups have grown since: the responder gained two functions with the
+spoken reply (14 → 16) and the service seams gained the OpenAI-compatible client (27 → 33),
+so their
+*before* column is over the smaller set — the newcomers arrived with their tests.
+
 
 | Group | Modules | Functions | Executed (before) | Executed (now) | Fully covered | Lines (before → now) |
 |---|---|---:|---:|---:|---:|---:|
 | Parser / ingest | `data/ingest`, `data/anonymize`, `rag/documents`, `rag/chunking` | 33 | 90.9% | **100%** | 87.9% | 92.4% → 97.6% |
 | Features | `features/build`, `features/preprocess` | 9 | 77.8% | **100%** | 100% | 88.1% → 100% |
-| Rules engine | `rules/policy`, `rules/window` | 9 | 100% | **100%** | 88.9% | 96.6% → 99.2% |
+| Rules engine | `rules/policy`, `rules/window` | 9 | 100% | **100%** | 100% | 96.6% → 100% |
 | Intent | `agents/intent` | 4 | 100% | **100%** | 100% | 100% → 100% |
 | Templates + compliance | `outreach/brief`, `outreach/compose`, `outreach/compliance` | 26 | 92.3% | **100%** | 100% | 98.6% → 100% |
 | Orchestrator | `agents/orchestrator`, `agents/queue`, `agents/events`, `agents/proactive` | 22 | 86.4% | **100%** | 100% | 97.9% → 100% |
-| Responder | `agents/responsive`, `llm/responder`, `llm/prompt` | 14 | 100% | **100%** | 92.9% | 99.5% → 99.5% |
-| Service seams | `llm/client`, `voice/transcribe`, `voice/audio` | 27 | 85.2% | **100%** | 85.2% | 77.2% → 96.1% |
-| **All critical** | | **144** | **90.3%** | **100%** | **93.1%** | |
+| Responder | `agents/responsive`, `llm/responder`, `llm/prompt` | 16 | 100% | **100%** | 93.8% | 99.5% → 99.5% |
+| Service seams | `llm/client`, `voice/transcribe`, `voice/audio` | 33 | 85.2% | **100%** | 84.8% | 77.2% → 96.1% |
+| **All critical** | | **152** | **90.3%** | **100%** | **93.4%** | |
 
-The whole package is at 85.4% line coverage. Most of what is not covered is
+The whole package is at 84.3% line coverage (85.4% before the experiment and the voice
+call landed; both brought command-line and LiveKit wiring the suite does not drive). Most
+of what is not covered is
 `cli.py` (wiring for the `make` targets) and the report writers (`eda/report.py`,
 `models/explain.py`, `models/report.py`), which produce the generated documents and are
 checked by reading those documents, not by the suite.

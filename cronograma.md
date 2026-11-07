@@ -59,7 +59,7 @@ revisão. A entrega 19 — *tag*, *slides* e ensaio — é a que resta.
 
 | # | Data | Entrega | Artefato mostrado | Texto |
 |:--|:-----|:----------------------------------------|:------------------|:--------------|
-| 16 | 12/11 | **Testes e início do experimento.** Testes unitários (parser, *features*, motor de regras, intenção, *templates*) com ≥ 80% das funções críticas cobertas, testes de integração dos três fluxos e dos serviços externos; **experimento controlado iniciado** contra os dois baselines (manual e semiautomatizado sem ML). **Entregue:** as 150 funções críticas executadas pela suíte; o experimento é uma simulação, pela decisão D1 (ver `docs/experiment-protocol.md`) | Suíte de testes verde + experimento coletando dados | Protocolo experimental |
+| 16 | 12/11 | **Testes e início do experimento.** Testes unitários (parser, *features*, motor de regras, intenção, *templates*) com ≥ 80% das funções críticas cobertas, testes de integração dos três fluxos e dos serviços externos; **experimento controlado iniciado** contra os dois baselines (manual e semiautomatizado sem ML). **Entregue:** as 152 funções críticas executadas pela suíte; o experimento é uma simulação, pela decisão D1 (ver `docs/experiment-protocol.md`) | Suíte de testes verde + experimento coletando dados | Protocolo experimental |
 | 17 | 19/11 | **Resultados consolidados.** Métricas preditivas finais vs. baseline, qualidade do RAG (*retrieval* + fidelidade/completude/alucinação das respostas), indicadores operacionais (taxa de recuperação, tempo médio de resolução, custo por contato, ≥ 100 interações concorrentes), análise estatística. **Entregue:** o braço LLM medido num modelo local (ver §2.5) e a concorrência medida em memória, com o respondedor por *templates* | Tabelas e gráficos finais de resultados | Seção de resultados e discussão |
 | 18 | **26/11** | **Revisão final.** Artigo completo revisado (resumo/abstract, referências, tabelas, figuras), limitações e trabalhos futuros, README de reprodução; ajuste dos pontos de revisão apontados | Artigo em PDF, versão candidata | Texto integral fechado |
 | 19 | **03/12** | **Trabalho finalizado.** Versão final entregue, repositório com *tag* de entrega, apresentação/defesa preparada e ensaiada | PDF final + *slides* + demonstração | — |
@@ -182,15 +182,20 @@ do LiveKit, e não o LiveKit Agents, porque o *framework* reconheceria a fala po
 própria e contornaria a escalação por baixa confiança e a confirmação de valores falados.
 
 **O que falta nos resultados.** A tabela de tempo de turno existe (`docs/voice-call.md`):
-mediana de **2.184 ms** medida sobre WebRTC, do fim da fala ao primeiro áudio da resposta,
+mediana de **2.193 ms** medida sobre WebRTC, do fim da fala ao primeiro áudio da resposta,
 em CPU, com Whisper `small` e o respondedor por *templates*. Ficam de fora a interrupção
 pelo cliente, o SIP e a telefonia comutada, a discagem ativa e uma medição da divergência
 entre canais, que é zero por construção mas não foi medida. Uma pessoa falando ao
 microfone do navegador **não foi verificada** — só fala sintetizada atravessando uma sala
-real. E a medição mostrou um limite que a arquitetura não resolve sozinha: lida em voz alta,
-a resposta por *templates* dura uma mediana de **102 s**, porque cita trechos inteiros. A
-chamada só é usável com um respondedor generativo atrás dela, e o canal não pode encurtar o
-que o agente diz.
+real. A primeira medição mostrou o limite que importava: lida em voz alta, a resposta por
+*templates* durava uma mediana de **102 s**, porque citava trechos inteiros. Foi resolvido
+no respondedor, não no canal — o canal não pode decidir que parte de uma política o cliente
+ouve. A chamada declara quanto consegue carregar (43 palavras, derivadas de um turno-alvo
+de 20 s × 2,15 palavras/s, a velocidade mais lenta medida do Piper) e o respondedor escolhe
+a seção dos trechos recuperados que cabe, com as frases intactas. A resposta falada passou
+a durar uma mediana de **11,7 s** (máximo 16,2 s; as 18 falas dentro dos 20 s), e o chat
+ficou idêntico. O que resta: a recuperação às vezes escolhe o trecho errado, e uma resposta
+curta pode ser curta e errada.
 
 ### 2.5 Braço LLM hospedado → modelo local
 
@@ -254,7 +259,7 @@ e defesa.
 |---|---|---|
 | Volume ou qualidade insuficiente dos dados históricos | Bloqueia as entregas 6–8 | Antecipar a extração (13/08) e, se necessário, usar base pública de *credit scoring* para validar o pipeline, mantendo a base real apenas para o modelo final |
 | Aprovação de *templates* na Meta / conta de telefonia | Atrasava 29/10 e 05/11 | **Risco materializado.** Resolvido pelas substituições de §2: canal de chat simulado e chamada por voz em tempo real, ambas atrás do mesmo contrato de canal; a chamada foi entregue como prova de conceito reduzida (§2.4) |
-| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida. **Medida:** mediana de 2.184 ms por turno; o gargalo que apareceu foi outro — a duração da resposta falada (§2.4) |
+| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida. **Medida:** mediana de 2.193 ms por turno; o gargalo que apareceu foi outro — a duração da resposta falada, 102 s → 11,7 s depois de moldada no respondedor (§2.4) |
 | Experimento operacional com amostra pequena | Enfraquece a entrega 17 | Relatar tamanho de efeito e intervalo de confiança; complementar com métricas técnicas e comparação de custo por contato. **Materializado de forma mais forte:** sem dados operacionais (decisão D1), o experimento é uma simulação com 30 replicações pareadas e intervalos de 95%, e o artigo diz isso |
 | Custo de APIs de LLM, STT/TTS e telefonia | Afeta 08/10 em diante | **Resolvido localmente:** Whisper, Piper e o modelo de linguagem rodam na máquina, sem custo por chamada; o preço é a qualidade e a latência de um modelo pequeno (§2.5) |
 
