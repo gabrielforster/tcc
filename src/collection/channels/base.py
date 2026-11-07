@@ -35,6 +35,10 @@ class ChannelCapabilities:
     shows_delivery_status: bool
     #: Whether the customer is present and waiting, as opposed to reading later.
     realtime: bool
+    #: The longest reply, in words, the customer can be expected to sit through, for a
+    #: channel where replies are heard. `None` where they are read: a reader skims. The
+    #: channel states the budget; the responder decides what fits in it.
+    max_reply_words: int | None = None
 
 
 @runtime_checkable

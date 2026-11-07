@@ -58,6 +58,15 @@ Se o cliente contesta a dívida, pede algo fora dos trechos, ou a resposta exigi
 você não tem: escreva {REFUSAL}.
 """
 
+#: Appended to the system prompt when the reply will be heard, not read. The `Fonte:` line
+#: is still asked for -- it is how the answer's citations are recovered -- and the
+#: responder removes it before the text is spoken.
+SPOKEN_INSTRUCTION = """
+A resposta desta vez será FALADA numa ligação, não lida. Além das regras acima:
+- No máximo {max_words} palavras, sem contar a linha `Fonte:`.
+- Frases completas e simples. Sem listas, títulos, asteriscos ou símbolos.
+"""
+
 #: Added to the context when the intent is known, to steer which passage matters most.
 INTENT_HINT = {
     Intent.DEBT_INQUIRY: "O cliente quer saber o que está em aberto.",

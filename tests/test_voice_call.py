@@ -343,7 +343,8 @@ def test_trailing_silence_is_measured_from_the_last_voiced_frame():
 
 @needs_ffmpeg
 def test_the_pipeline_benchmark_times_every_stage(index, tmp_path):
-    from collection.channels.call_bench import run_pipeline, write_report
+    from collection.channels.call_bench import corpus_speaking_rate, run_pipeline, write_report
+    from collection.channels.voice_call import REPLY_MAX_WORDS
     from collection.voice.evaluate import VoiceMessage
 
     line = VoiceMessage(id="b1", text="preciso da segunda via do boleto", intent="second_copy")
@@ -359,8 +360,14 @@ def test_the_pipeline_benchmark_times_every_stage(index, tmp_path):
     assert row.endpointing_ms == 700
     assert row.intent == "second_copy" and row.wer == 0
     assert row.reply_s and row.reply_s > 0
-    report = write_report(rows, tmp_path / "report.md", "scripted", "pipeline")
+    # The call asked for a spoken reply, so it came back inside the budget.
+    assert row.reply_words is not None and row.reply_words <= REPLY_MAX_WORDS
+    rate = corpus_speaking_rate(ToneSynthesizer(), index)
+    assert rate.sentences > 20 and 0 < rate.slowest <= rate.pooled
+    report = write_report(rows, tmp_path / "report.md", "scripted", "pipeline", rate=rate)
     assert "| End-of-turn wait (hangover) | 700 |" in report
+    assert f"against a budget of {REPLY_MAX_WORDS}" in report
+    assert "Agent voice on the corpus" in report
 
 
 # ------------------------------------------------------------------ the page

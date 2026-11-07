@@ -86,6 +86,11 @@ def citations_in(text: str) -> list[str]:
     return list(dict.fromkeys(cited))
 
 
+def without_citations(text: str) -> str:
+    """`text` with its `Fonte:` lines removed: the answer as said, not as recorded."""
+    return _CITATION_LINE.sub("", text).strip()
+
+
 def sentences_in(text: str) -> list[str]:
     """The claims in an answer: what it asserts about the world, and nothing else.
 
