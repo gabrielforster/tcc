@@ -74,12 +74,10 @@ gh release create v1.0-entrega article/main.pdf cronograma.pdf \
       `cd pitch && python3 -m http.server 8000`). Fonts and reveal.js are vendored.
 - [ ] Speaker view (`S`) shows the notes; the timings in `pitch/roteiro-defesa.md` add up to
       about 15–16 minutes of talk plus 3 of demo.
-- [ ] Export a PDF of the deck as a fallback for a projector without a browser: open
-      `pitch/defesa.html?print-pdf` in Chrome or Chromium, `Ctrl+P` → **Save as PDF**, landscape,
-      margins **None**, background graphics **on**. Do not rely on the headless one-liner in
-      `pitch/README.md`: on 07/11/2026 headless Chromium printed `?print-pdf` before reveal.js
-      finished laying out the pages and wrote an empty one-page PDF, for both decks. Check the
-      exported PDF has 19 pages.
+- [ ] Export a PDF of the deck as a fallback for a projector without a browser:
+      `cd pitch && ./export-pdf.sh defesa.html` — one 1280×720 page per slide, every fragment
+      shown. Check it has 19 pages. (Headless `--print-to-pdf` on `?print-pdf` prints before
+      reveal.js lays out the pages, so it is not used.)
 - [ ] Rehearse the demo on the presenting machine the day before, following
       [`docs/demo-script.md`](./demo-script.md), and record the fallback video then.
 - [ ] Rehearse the talk at least twice with a timer; read the likely questions at the end of the
