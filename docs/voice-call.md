@@ -118,17 +118,21 @@ template responder (no API key). Full tables, per line and including what Whispe
 are in [`voice-call-report.md`](./voice-call-report.md) (in-process) and
 [`voice-call-report-live.md`](./voice-call-report-live.md) (through LiveKit).
 
-Measured on 2026-11-06 on an AMD Ryzen 7 5700X3D (8 cores / 16 threads), CPU only,
-faster-whisper `small` int8:
+Measured on 2026-11-07 on an AMD Ryzen 7 5700X3D (8 cores / 16 threads), CPU only,
+faster-whisper `small` int8, with the spoken replies described below:
 
 | Stage | In-process median | p90 | Through LiveKit median | p90 |
 |---|---:|---:|---:|---:|
 | End-of-turn wait (hangover) | 700 | 700 | 700 | 700 |
-| Local Whisper `small` | 1,164 | 1,189 | 1,247 | 1,939 |
-| Agent: intent, retrieval, responder | 51 | 54 | 46 | 66 |
-| Piper, first audio | 58 | 103 | 91 | 119 |
-| **Sum of stages** | **1,976** | 2,028 | **2,070** | 2,852 |
-| **End of speech → first audible reply, over WebRTC** | — | — | **2,184** | 2,934 |
+| Local Whisper `small` | 1,315 | 1,356 | 1,213 | 1,262 |
+| Agent: intent, retrieval, responder | 58 | 59 | 56 | 58 |
+| Piper, first audio | 77 | 108 | 103 | 116 |
+| **Sum of stages** | **2,157** | 2,203 | **2,085** | 2,125 |
+| **End of speech → first audible reply, over WebRTC** | — | — | **2,193** | 2,253 |
+
+The first measurement, on 2026-11-06 with whole-passage replies, gave 2,184 ms over WebRTC.
+Shortening the reply did not move this number, and was not expected to: the table times the
+first audio, and Piper synthesises one sentence at a time.
 
 What the table says:
 
@@ -136,13 +140,14 @@ What the table says:
    noticeably slower than a person, who answers in well under a second. It is usable and
    it is not natural, and the honest description is a call with a short pause before
    every reply.
-2. **Whisper is 60% of it, and the hangover is 35%.** The agent is 2.5% of the turn and
-   the synthesiser 3%, so neither is worth optimising. The two terms worth attacking
+2. **Whisper is 60% of it, and the hangover is a third.** The agent is under 3% of the
+   turn and the synthesiser under 4%, so neither is worth optimising. The two terms worth attacking
    are the recogniser (a smaller model is ruled out by `transcribe.py`'s note that `tiny`
    and `base` mangle pt-BR numerals; a GPU or a streaming recogniser is not) and the
    endpointing wait (a learned end-of-turn model shortens it without cutting people off).
 3. **The network costs about a tenth of a second.** Through LiveKit, end-to-end exceeds
-   the sum of in-process stages by a **median of 110 ms** (range 75–155 ms over 18 lines).
+   the sum of in-process stages by a **median of 111 ms** (range 70–150 ms over 18 lines;
+   110 ms and 75–155 ms in the first run).
    That covers Opus encoding, the room hop, the jitter buffer and playout, on loopback.
    On a real network add the round trip. The transport was never the problem.
 4. **Load matters as much as the model.** This machine was shared with other jobs while it
@@ -154,24 +159,77 @@ What the table says:
    voice. A person on a laptop microphone will be slower to recognise and less accurate.
    The Whisper term is a floor, not an estimate.
 
-### What the agent says is too long to be spoken
+### What the agent says, cut for the ear
 
-The finding the table does not show: **the template responder's spoken reply lasts a
-median of 102 seconds** (max 133 s; `voice-call-report.md`, column *Reply s*). It quotes
-whole retrieved passages. That is already unreadable in a chat bubble
-(`api/chat.py`'s note on `default_responder`) and is unusable on a call, where the customer
-can neither skim nor scroll. Lines that end in a handover or an opt-out are 4–10 s, because
-those are fixed sentences.
+The finding the turn-time table does not show was the one that mattered. In the first
+measurement (2026-11-06) **the template responder's spoken reply lasted a median of 102
+seconds** (max 133 s). It quoted two retrieved passages whole, headings and lists
+included. That is already long in a chat bubble and unusable on a call, where the customer
+can neither skim nor scroll: they sat through a minute and a half to get one answer.
 
-This is not the channel's to fix. Shortening the reply would mean the channel editing what
-the agent says, which the contract forbids. The fix is the LLM responder, with its 512-token
-budget and its instruction to answer in a few sentences. Until there is an API key or a
-local model behind it, the call can be demonstrated but not lived with. It is the
-strongest argument in the repository for the generated arm.
+**Now the median is 11.7 seconds** (max 16.2 s; all 18 lines inside the 20 s target;
+`voice-call-report.md`, column *Reply s*). Lines that end in a handover, an opt-out or small
+talk are 4–5 s, because those are fixed sentences.
+
+**Who shortens it.** Not the channel. A channel that cut replies would be deciding which
+part of a policy the customer hears, and the contract forbids it. The call instead *states*
+what it can carry -- `ChannelCapabilities.max_reply_words` -- and that budget rides on the
+event as `reply_max_words`. The responder decides what fits. The chat states no budget, and
+its replies are byte-for-byte what they were (`make answer`: grounded 0.875, faithful 1.0,
+citation accuracy 0.857, unchanged).
+
+**The budget is derived.** One number is chosen: a 20-second target turn, about five of the
+customer's own turns (their lines run a median 4 s) and room for some twenty exchanges in
+the ten-minute call cap. The rest is measured. Piper's `faber` voice speaks every sentence
+the responder could say -- 47 of them, prose and the instalment table -- at 2.15 words a
+second or faster. A budget at the *slowest* rate holds for any reply, so 20 s × 2.15 = **43
+words** (`voice_call.REPLY_TARGET_S`, `speak.SLOWEST_WORDS_PER_SECOND`). `make call-bench`
+re-measures the rate on every run and says whether the constant still holds; on 2026-11-07
+it measured 2.16 and 2.17 slowest.
+
+**"Words" had to be redefined.** The first derivation counted words with `split()` and the
+re-measurement caught it: the instalment table's rows spoke at 1.15 words a second against
+2.15 for prose. `entrada_minima_percentual` is one token to `split` and three words aloud;
+`1.5` is one token and *"um vírgula cinco"*. `speak.spoken_words` counts runs of letters
+and of digits separately, and `%` as *"por cento"*. With that unit the table and the prose
+speak at the same rate (about 2.2–2.5 words a second against 2.15–3.7), and one budget
+fits both. Piper's synthesis is not bit-identical between runs, so these move in the second
+decimal: three measurements of the slowest sentence gave 2.15, 2.16 and 2.17.
+
+**What gets said.** The template's spoken reply (`agents/spoken.py`) is the one section of
+the retrieved passages -- a heading and what sits under it -- that best matches the question,
+read in the order it was written. The heading is scored, because in the FAQ the heading
+*is* the question, but never spoken. The sentences are verbatim and never cut; the first
+one that would overrun ends the reply. Nothing is paraphrased, so the template keeps its
+guarantee: across the 34 labelled questions and voice lines every spoken reply is inside
+the budget and fully supported (sentence support 1.0, no unsupported figure;
+`tests/test_spoken.py`). A first version took the best sentences from anywhere and filled
+the budget greedily. It filled it with fragments of the escalation list that matched one
+word of the question and meant nothing on their own. A reply shorter than its budget is the
+point, not a waste of it.
+
+The `Fonte:` line is not spoken -- a file name read aloud tells the customer nothing -- but
+the documents stay on the answer's citations and in the call record.
+
+**The LLM arm** is told the budget in its prompt, and its `Fonte:` line is kept as a
+citation and removed from what is said. A model that ignores the length falls back to the
+spoken template, labelled `llm:over_budget`: the budget is what makes the call usable, so it
+is enforced, not requested. A figure heard in audio is still read back first; the read-back
+is the customer's own words and cannot be shortened, so it is paid for out of the answer's
+share.
+
+**What this does not fix.** The section chosen is only as good as retrieval. *"quero
+parcelar em seis vezes"* still gets the policy's sentence on contested debts, because that
+is the passage the lexical index ranks first for it -- a retrieval miss the chat has too,
+only hidden there under a second passage. And the in-memory index the benchmark uses holds
+the internal negotiation script, so a reply can be an instruction to the operator (*"Nunca
+prometer desconto fora da alçada."*). The serving path filters internal documents in SQL
+(`docs/rag.md`); the benchmark's index does not.
 
 ### Recognition, briefly
 
-Whisper `small` got the labelled intent on **15 of 18** lines (median WER 0.14 in-process).
+Whisper `small` got the labelled intent on **15 of 18** lines in the first run and **14 of
+18** in both runs on 2026-11-07 (median WER 0.11 in-process, 0.15 through LiveKit).
 Punctuation is folded before scoring; digits are not, because "6" against "seis" is a real
 difference downstream. The misses are informative:
 
@@ -192,6 +250,7 @@ model. Spoken figures still trigger the read-back on a call, exactly as on a voi
 | Turns go through the orchestrator as `audio_received` labelled `voice` | Unit test spying on `Orchestrator.submit` |
 | The call record holds the transcript, events and timings; erasing audio keeps the transcript | Unit tests |
 | Whisper, the agent and Piper produce the measured turn on real synthesised audio | `make call-bench`, 18 lines |
+| A call's reply fits its budget and quotes only the passages; a chat's is unchanged | `tests/test_spoken.py`; `make call-bench` reports reply length against the target and re-measures the speaking rate |
 | The whole loop over WebRTC: speech in through a LiveKit room, reply audible back out | `make call-bench ARGS="--live"`: a bot participant speaks into a real room and times the first audible frame of the reply, 18 lines |
 | The page starts a call: the token is minted, the browser and the agent join the same room | Done in an automated browser. The browser joined; that browser then refused microphone access, so the spoken leg of the browser call was **not** exercised there |
 
@@ -202,9 +261,13 @@ echo cancellation, noise suppression, and the browser's choice of microphone.
 
 ## Limitations, named
 
-- **No barge-in.** While the agent speaks, the customer's audio is dropped. With 100-second
-  template replies that is a real problem, not a theoretical one. When barge-in is added,
-  the recording notice must remain the one utterance it cannot interrupt.
+- **No barge-in.** While the agent speaks, the customer's audio is dropped. With replies cut
+  to a median 12 s this costs a correction at most one sentence late; with the 100-second
+  replies of the first build it was the call's main defect. When barge-in is added, the
+  recording notice must remain the one utterance it cannot interrupt.
+- **The target turn length is a choice.** Twenty seconds is reasoned, not measured on
+  callers. Only the conversion to words is measured. A study with people on the line would
+  set the target; the derivation would then carry it through unchanged.
 - **Energy endpointing.** It works on a headset in a quiet room. Background noise above
   −45 dBFS keeps a turn open, and a speaker who pauses for more than 700 ms is cut off.
   Silero VAD plus a learned end-of-turn model is the upgrade, and it touches only
