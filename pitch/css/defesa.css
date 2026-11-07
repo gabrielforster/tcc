@@ -1,0 +1,116 @@
+/* ============================================================
+   Defense deck — additions on top of theme.css
+   theme.css stays as the proposal pitch left it; everything the
+   results deck needs beyond it (tables, screenshots, denser slides)
+   lives here.
+   ============================================================ */
+
+/* denser content slides: the defense carries more per slide than the pitch */
+.dense { padding-top: 46px; }
+.dense .kicker { margin-bottom: 16px; }
+.reveal .dense h2.headline { font-size: 46px; max-width: 28ch; margin-bottom: 18px; }
+
+/* ---------- result tables ----------------------------------- */
+.tbl {
+  border-collapse: collapse;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 0;
+}
+.tbl th {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  padding: 0 0 10px 26px;
+  border-bottom: 1px solid var(--hairline-2);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 9px 0 9px 26px;
+  text-align: right;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.tbl th:first-child, .tbl td:first-child { text-align: left; padding-left: 0; }
+.tbl tr.em td { color: var(--blue); font-weight: 600; }
+.tbl tr.base td { color: var(--muted); }
+.tbl.small { font-size: 17px; }
+.tbl.small td { padding-top: 7px; padding-bottom: 7px; }
+
+/* ---------- compact point lists ----------------------------- */
+.points.tight { gap: 14px; }
+.points.tight .point .t { font-size: 21px; }
+.points.tight .point .d { font-size: 17.5px; }
+
+/* plain bullet list for limitations / future work */
+.bul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.bul li {
+  position: relative;
+  padding-left: 26px;
+  font-size: 20px;
+  line-height: 1.32;
+  color: var(--ink);
+}
+.bul li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0.6em;
+  width: 10px; height: 2px;
+  background: var(--blue);
+}
+.bul li b { font-family: var(--font-display); font-weight: 600; }
+.bul.cols2 { grid-template-columns: 1fr 1fr; gap: 12px 44px; }
+
+/* ---------- figures (raster) -------------------------------- */
+.shot {
+  display: block;
+  border: 1px solid var(--hairline-2);
+  border-radius: 14px;
+  background: var(--paper-2);
+  box-shadow: 0 18px 40px -26px rgba(12, 26, 35, 0.45);
+}
+.shots { display: flex; gap: 22px; justify-content: center; }
+.shots .shot { height: 470px; width: auto; }
+.chart { display: block; max-width: 100%; max-height: 430px; margin: 0 auto; }
+
+/* side note beside a table or chart */
+.note {
+  font-size: 19px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.note b { color: var(--ink); font-weight: 600; }
+.note .hl { color: var(--blue); font-weight: 600; }
+
+/* a single big finding under a table */
+.finding {
+  margin-top: 22px;
+  border-left: 3px solid var(--alert);
+  padding: 4px 0 4px 20px;
+  font-size: 21px;
+  line-height: 1.35;
+  max-width: 52ch;
+}
+.finding b { color: var(--alert); }
+
+/* small stat tiles, denser than the pitch's 104px numbers */
+.stat-row.sm { gap: 48px; }
+.stat-row.sm .stat .num { font-size: 66px; }
+.stat-row.sm .stat .cap { font-size: 18px; max-width: 18ch; margin-top: 10px; }
+
+.label-honest {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--alert);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin-bottom: 14px;
+}
