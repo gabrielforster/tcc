@@ -25,7 +25,13 @@ from collection.agents.conversation import Conversation
 from collection.agents.intent import Intent
 from collection.agents.responsive import Answer, Responder, TemplateResponder
 from collection.llm.client import LLMClient, LLMError, get_client
-from collection.llm.prompt import HANDOVER, REFUSAL, SYSTEM_PROMPT, build_user_prompt
+from collection.llm.prompt import (
+    HANDOVER,
+    REFUSAL,
+    SPOKEN_INSTRUCTION,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+)
 from collection.rag.index import Retrieved
 
 
@@ -62,29 +68,52 @@ class LLMResponder(Responder):
         intent: Intent,
         passages: list[Retrieved],
         history: Conversation | None = None,
+        *,
+        max_words: int | None = None,
     ) -> Answer:
         if not passages:
             return Answer(text=HANDOVER, citations=[], grounded=False, responder=self.name)
 
+        system = self.system_prompt
+        if max_words is not None:
+            system += SPOKEN_INSTRUCTION.format(max_words=max_words)
         user = build_user_prompt(message, intent, passages, history)
         try:
-            completion = self.client.complete(self.system_prompt, user)
+            completion = self.client.complete(system, user)
         except LLMError as error:
             self.failures.append(str(error))
-            answer = self.fallback.respond(message, intent, passages, history)
-            answer.responder = f"{self.name}:fallback"
-            return answer
+            return self._fall_back(message, intent, passages, history, max_words, "fallback")
 
         text = completion.text.strip()
         if not text or _is_refusal(text):
             return Answer(text=HANDOVER, citations=[], grounded=False, responder=self.name)
 
-        return Answer(
-            text=text,
-            citations=self._citations(text, passages),
-            grounded=True,
-            responder=self.name,
-        )
+        citations = self._citations(text, passages)
+        if max_words is not None:
+            # The citation line is evidence for the record, not something to say aloud.
+            from collection.llm.faithfulness import without_citations
+
+            text = without_citations(text)
+            if len(text.split()) > max_words:
+                # Asked for a length and ignored it. The budget is what makes the call
+                # usable, so it is held here rather than trusted to the prompt; the
+                # template's spoken reply is grounded by construction and cut to the budget.
+                return self._fall_back(message, intent, passages, history, max_words, "over_budget")
+
+        return Answer(text=text, citations=citations, grounded=True, responder=self.name)
+
+    def _fall_back(
+        self,
+        message: str,
+        intent: Intent,
+        passages: list[Retrieved],
+        history: Conversation | None,
+        max_words: int | None,
+        why: str,
+    ) -> Answer:
+        answer = self.fallback.respond(message, intent, passages, history, max_words=max_words)
+        answer.responder = f"{self.name}:{why}"
+        return answer
 
     def _citations(self, text: str, passages: list[Retrieved]) -> list[str]:
         """What the answer cited, kept to documents that were actually retrieved.

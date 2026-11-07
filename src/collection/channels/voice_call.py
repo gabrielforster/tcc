@@ -52,6 +52,7 @@ from collection.channels.session import (
 from collection.channels.web import GREETING, HANDOVER_NOTICE, ChatChannel, Retriever
 from collection.config import settings
 from collection.voice.audio import AudioClip, AudioError
+from collection.voice.speak import SLOWEST_WORDS_PER_SECOND
 from collection.voice.transcribe import Transcriber, Transcription
 
 #: Spoken first, on every call, before anything else. The wording matches the notice on
@@ -68,6 +69,15 @@ SILENCE_GOODBYE = (
 SILENCE_TIMEOUT_S = 8.0
 #: Prompts on a quiet line before the call is ended.
 MAX_SILENCE_PROMPTS = 1
+#: How long one reply may run before the customer gets the line back. A choice, not a
+#: measurement: twenty seconds is about five of the customer's own turns (median 4.1 s in
+#: the call benchmark), and at that length a ten-minute call still holds some twenty
+#: exchanges. The first benchmark's replies ran a median 102 s -- the customer listened
+#: for a minute and a half to answer one question.
+REPLY_TARGET_S = 20.0
+#: The target in words, at the slowest rate Piper speaks the corpus. Derived rather than
+#: chosen: at any faster rate the reply finishes sooner, so the target holds for all of it.
+REPLY_MAX_WORDS = int(REPLY_TARGET_S * SLOWEST_WORDS_PER_SECOND)
 #: A call is cut here regardless. Collection calls are short; one that runs for ten
 #: minutes is a conversation a person should be having.
 MAX_CALL_S = 600.0
@@ -194,6 +204,7 @@ class VoiceCallChannel:
         # call record says the line was dropped.
         shows_delivery_status=False,
         realtime=True,
+        max_reply_words=REPLY_MAX_WORDS,
     )
 
     def __init__(
@@ -215,6 +226,7 @@ class VoiceCallChannel:
             transcriber=self.transcriber,
         )
         self._core.event_channel = self.name
+        self._core.reply_max_words = self.capabilities.max_reply_words
         self.audio_dir = audio_dir or settings.dir_calls
         self.clock = clock
         self.calls: dict[str, Call] = {}
