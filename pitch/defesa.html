@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Multiagente Inteligente de Cobrança — Defesa</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="vendor/reveal/reset.css">
+  <link rel="stylesheet" href="vendor/reveal/reveal.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/defesa.css">
+</head>
+<body>
+  <div class="deck-brand">SMC · TCC · Defesa</div>
+  <div class="reveal">
+    <div class="slides">
+
+<!-- 1 · Capa -->
+<section class="cover">
+<p class="kicker">TCC · Engenharia de Software · Defesa</p>
+<h1 class="headline">Sistema Multiagente <em>Inteligente</em> de Cobrança</h1>
+<p class="lead">O que foi construído, o que foi medido — e o que ficou em aberto.</p>
+<div class="tagrow"><span class="tag">Preditivo</span><span class="tag">RAG</span><span class="tag">Agentes</span><span class="tag">Regras legais</span><span class="tag">Chat</span><span class="tag">Voz</span></div>
+<div class="cover-meta"><div><span class="role">Autor</span>Gabriel Forster Rocha</div><div><span class="role">Instituição</span>Católica de Santa Catarina</div><div><span class="role">Data</span>03/12/2026</div></div>
+<aside class="notes">Bom dia. Sou Gabriel Forster Rocha e vou apresentar o resultado do meu TCC: um <strong>sistema multiagente de cobrança</strong>. Na proposta eu descrevi o que pretendia construir. Hoje eu mostro o que foi <strong>construído</strong>, o que foi <strong>medido</strong> e — tão importante quanto — o que <strong>ficou em aberto</strong> e por quê.</aside>
+</section>
+
+<!-- 2 · Problema -->
+<section>
+<p class="kicker">01 · O problema</p>
+<h2 class="headline">Muito crédito para recuperar, <em>pouca capacidade</em> de cobrar.</h2>
+<div class="stat-row"><div class="stat"><span class="num">R$ 213 <small>bi</small></span><span class="cap">em dívidas de empresas no fim de 2025</span></div><div class="stat"><span class="num">8,9 <small>mi</small></span><span class="cap">de empresas inadimplentes (CNPJ)</span></div></div>
+<ul class="bul" style="margin-top:34px"><li>Priorização por intuição, canais fragmentados, custo alto por contato.</li><li>E a cobrança tem regras: horário, frequência, <em>opt-out</em>, LGPD, superendividamento.</li></ul>
+<p class="source">Fonte: Serasa Experian — Indicador de Inadimplência das Empresas, dez/2025.</p>
+<aside class="notes">O ponto de partida é o mesmo da proposta: inadimplência recorde — 213 bilhões de reais, 8,9 milhões de empresas — e uma cobrança que ainda é majoritariamente manual. Mas tem um detalhe que pesou no projeto inteiro: cobrança é uma atividade <strong>regulada</strong>. Horário permitido, frequência, opt-out, LGPD, a lei do superendividamento. Qualquer automação que esqueça isso é um passivo, não um produto.</aside>
+</section>
+
+<!-- 3 · Pergunta e resposta curta -->
+<section>
+<p class="kicker">02 · Pergunta de pesquisa</p>
+<p class="rq">Um sistema multiagente — LLM com RAG, agentes proativos e ML preditivo — <em>aumenta a eficiência</em> da recuperação de crédito frente à cobrança manual e semiautomatizada?</p>
+<div class="impact"><div class="it"><span class="k">Resposta curta</span><span class="v">Sim — na medida da escassez de contato</span></div><div class="it"><span class="k">Onde</span><span class="v">Em simulação, não em operação real</span></div></div>
+<aside class="notes">A pergunta de pesquisa é esta. Vou adiantar a resposta, para que vocês possam julgar o resto da apresentação contra ela: <strong>sim, mas de forma condicional</strong>. A predição melhora a recuperação <strong>na medida em que a capacidade de contato é escassa</strong>. E isso foi mostrado em <strong>simulação</strong>, não numa operação real — porque os dados de uma operação real não estavam disponíveis. Vou mostrar como cheguei a isso.</aside>
+</section>
+
+<!-- 4 · Arquitetura -->
+<section class="slide-fig">
+<p class="kicker">03 · O que foi construído</p>
+<h2 class="headline">Um orquestrador, três agentes, <em>dois canais</em>.</h2>
+<div class="figure"><svg viewBox="0 0 1080 470" role="img" aria-label="Arquitetura construída">
+<defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#074d71"/></marker></defs>
+<g><rect class="dg-node-em" x="300" y="6" width="480" height="60" rx="30"/><text class="dg-name on" text-anchor="middle" x="540" y="33">Orquestrador central</text><text class="dg-sub on" text-anchor="middle" x="540" y="53">opt-out verificado antes de qualquer agente · prioridade responsivo &gt; proativo</text></g>
+<g class="fragment" data-fragment-index="1"><path class="dg-flow" d="M540 66 V86 M200 86 H880"/><line class="dg-flow" x1="200" y1="86" x2="200" y2="118" marker-end="url(#ah)"/><line class="dg-flow" x1="540" y1="86" x2="540" y2="118" marker-end="url(#ah)"/><line class="dg-flow" x1="880" y1="86" x2="880" y2="118" marker-end="url(#ah)"/>
+<rect class="dg-node" x="40" y="118" width="320" height="118" rx="14"/><text class="dg-type" x="62" y="158">Agente · Responsivo</text><text class="dg-name" x="62" y="182">Intenção + RAG</text><text class="dg-sub" x="62" y="204">responde com citação ou escala</text>
+<rect class="dg-node" x="380" y="118" width="320" height="118" rx="14"/><text class="dg-type" x="402" y="158">Agente · Proativo</text><text class="dg-name" x="402" y="182">Regras + redação</text><text class="dg-sub" x="402" y="204">horário, tentativas, checador legal</text>
+<rect class="dg-node-em" x="720" y="118" width="320" height="118" rx="14"/><text class="dg-type on" x="742" y="158">Agente · Preditivo</text><text class="dg-name on" x="742" y="182">XGBoost / Random Forest</text><text class="dg-sub on" x="742" y="204">ordena quem contatar · POST /score</text></g>
+<g class="fragment" data-fragment-index="2"><line class="dg-flow" x1="540" y1="236" x2="540" y2="290" marker-end="url(#ah)"/><text class="dg-band" x="40" y="282">CANAIS (contrato único) &amp; SERVIÇOS LOCAIS</text><rect class="dg-node-tint" x="40" y="290" width="1000" height="62" rx="14"/>
+<rect class="dg-chip" x="58" y="305" width="178" height="32" rx="16"/><text class="dg-chip-tx" text-anchor="middle" x="147" y="325.5">Chat (widget)</text>
+<rect class="dg-chip" x="252" y="305" width="178" height="32" rx="16"/><text class="dg-chip-tx" text-anchor="middle" x="341" y="325.5">Voz · LiveKit</text>
+<rect class="dg-chip" x="446" y="305" width="178" height="32" rx="16"/><text class="dg-chip-tx" text-anchor="middle" x="535" y="325.5">STT · Whisper</text>
+<rect class="dg-chip" x="640" y="305" width="178" height="32" rx="16"/><text class="dg-chip-tx" text-anchor="middle" x="729" y="325.5">TTS · Piper</text>
+<rect class="dg-chip" x="834" y="305" width="188" height="32" rx="16"/><text class="dg-chip-tx" text-anchor="middle" x="928" y="325.5">LLM · OpenAI-compat.</text></g>
+<g class="fragment" data-fragment-index="3"><line class="dg-flow" x1="540" y1="352" x2="540" y2="398" marker-end="url(#ah)"/><text class="dg-band" x="40" y="390">REGISTRO DURÁVEL MULTI-TENANT</text><rect class="dg-node" x="40" y="398" width="1000" height="56" rx="14"/>
+<rect class="dg-chip" x="64" y="411" width="300" height="30" rx="15"/><text class="dg-chip-tx" text-anchor="middle" x="214" y="430.5">Postgres + pgvector</text>
+<rect class="dg-chip" x="390" y="411" width="300" height="30" rx="15"/><text class="dg-chip-tx" text-anchor="middle" x="540" y="430.5">Objetos (MinIO)</text>
+<rect class="dg-chip" x="716" y="411" width="300" height="30" rx="15"/><text class="dg-chip-tx" text-anchor="middle" x="866" y="430.5">Pseudônimos por tenant</text></g>
+</svg></div>
+<aside class="notes"><em>[Avance com → revelando cada camada.]</em> A arquitetura que existe hoje. No topo, o <strong>orquestrador</strong>: ele recebe eventos e decide quem age. Uma decisão importante: o <strong>opt-out é verificado antes de qualquer agente rodar</strong> — a conformidade não depende de nenhum agente lembrar dela. → Três agentes: o <strong>responsivo</strong> classifica a intenção e responde com base em documentos recuperados, ou escala para uma pessoa; o <strong>proativo</strong> decide quem contatar, quando e com que mensagem, sob o motor de regras; o <strong>preditivo</strong> ordena a carteira. → Os canais seguem um <strong>contrato único</strong>: chat e voz. Nenhum agente importa um canal — um teste garante isso. Reconhecimento e síntese de fala rodam <strong>localmente</strong>. → Por baixo, um registro durável multi-tenant, com chave de pseudonimização derivada por cliente.</aside>
+</section>
+
+<!-- 5 · Dados e D1 -->
+<section class="dense">
+<p class="kicker">04 · Dados</p>
+<h2 class="headline">Não existe base pública de <em>cobrança</em>. Isso mudou o projeto.</h2>
+<ul class="points tight"><li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></span><span><span class="t">Decisão D1 — dados públicos agora, ERP em paralelo</span><span class="d">Nenhuma base pública liga recebíveis aos contatos de cobrança feitos sobre eles. O acesso ao ERP não foi obtido.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16"/></svg></span><span><span class="t">Gerador sintético para o pipeline e os modelos</span><span class="d">Verifica o protocolo de treino — não descreve comportamento real de pagamento.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18l5-6 4 3 7-9"/></svg></span><span><span class="t">UCI Bank Marketing — 41.188 contatos reais</span><span class="d">Telemarketing bancário: o único comportamento humano real do trabalho.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span><span><span class="t">LGPD por construção</span><span class="d">Identificadores suprimidos, pseudônimo HMAC-SHA256 com chave por tenant, quase-identificadores generalizados.</span></span></li></ul>
+<aside class="notes">A primeira descoberta do trabalho foi sobre dados, e ela moldou todo o resto. <strong>Não existe base pública</strong> que ligue recebíveis aos contatos de cobrança feitos sobre eles — e o acesso ao ERP não aconteceu. Então tomei a decisão que chamo de D1: trabalhar com dados públicos e sintéticos, e tratar a comparação operacional como uma <strong>limitação declarada</strong>, não como resultado. O gerador sintético serve para verificar o protocolo de treino. A base Bank Marketing, com 41 mil contatos reais, é o único comportamento humano real do trabalho. E a LGPD foi tratada por construção: pseudônimo com HMAC e chave por tenant.</aside>
+</section>
+
+<!-- 6 · Preditivo -->
+<section class="dense">
+<p class="kicker">05 · Módulo preditivo</p>
+<span class="label-honest">dados sintéticos · verifica o protocolo</span>
+<h2 class="headline">Acurácia era a <em>métrica errada</em>.</h2>
+<div class="cols" style="grid-template-columns:1.25fr 0.75fr;align-items:start">
+<table class="tbl small"><thead><tr><th>Tarefa / modelo</th><th>PM</th><th>AUC</th><th>F1</th><th>Acur.</th></tr></thead><tbody>
+<tr class="em"><td>1 · XGBoost (scale_pos_weight)</td><td>0,860</td><td>0,746</td><td>0,818</td><td>0,709</td></tr>
+<tr class="base"><td>1 · classe majoritária</td><td>0,692</td><td>0,500</td><td>—</td><td>0,692</td></tr>
+<tr class="em"><td>2 · Random Forest (pesos)</td><td>0,414</td><td>0,818</td><td>0,495</td><td>0,762</td></tr>
+<tr class="base"><td>2 · classe majoritária</td><td>0,165</td><td>0,500</td><td>—</td><td>0,836</td></tr></tbody></table>
+<p class="note">Tarefa 2 (inadimplência futura): o campeão tem acurácia <b>menor</b> que a classe majoritária e é o único útil — <span class="hl">PM × 2,5</span> e 71% dos inadimplentes recuperados.<br><br>Seleção por <b>precisão média</b>; validação <b>TimeSeriesSplit</b>, split cronológico 70/15/15.</p>
+</div>
+<p class="source">PM = precisão média. Teste avaliado uma única vez. Fonte: docs/model-synthetic-*.md.</p>
+<aside class="notes">O módulo preditivo tem duas tarefas: propensão a pagar e inadimplência futura. <strong>Atenção: estes números vêm do gerador sintético</strong> — eles mostram que o protocolo de treino funciona e não tem vazamento, não que o modelo prevê pagamento real. O achado útil é metodológico: na tarefa 2, o campeão tem <strong>acurácia menor</strong> que prever sempre "não inadimplente" — 0,762 contra 0,836 — e mesmo assim é o único modelo útil: multiplica a precisão média por 2,5. A meta de acurácia da proposta estava mal formulada para um alvo desbalanceado; por isso a seleção usa precisão média, com validação temporal.</aside>
+</section>
+
+<!-- 7 · Contato -->
+<section class="dense">
+<p class="kicker">06 · Estratégia de contato</p>
+<h2 class="headline">A resposta cai <em>58%</em> em seis tentativas.</h2>
+<table class="tbl"><thead><tr><th>Tentativa</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6+</th></tr></thead><tbody>
+<tr><td>Contatos</td><td>17.642</td><td>10.570</td><td>5.341</td><td>2.651</td><td>1.599</td><td>3.385</td></tr>
+<tr class="em"><td>Resposta</td><td>13,0%</td><td>11,5%</td><td>10,8%</td><td>9,4%</td><td>7,5%</td><td>5,5%</td></tr></tbody></table>
+<div class="finding">Daí o motor de regras: <b>no máximo 4 tentativas</b> e <b>48 h</b> entre elas — números derivados, não chutados. Janela de horário avaliada em <b>America/Sao_Paulo</b>, nunca em UTC.</div>
+<p class="source">UCI Bank Marketing, 41.188 contatos. Telemarketing bancário, não cobrança.</p>
+<aside class="notes">Este é o primeiro resultado sobre comportamento humano real. Na base Bank Marketing, a taxa de resposta cai a cada nova tentativa: de <strong>13% na primeira para 5,5% a partir da sexta</strong> — uma queda de 58%. Por volta da quinta tentativa, ela já caiu quase pela metade. Por isso o motor de regras limita a <strong>quatro tentativas com 48 horas</strong> de intervalo: os números vêm daqui. E um detalhe que parece pequeno: a janela de horário é avaliada no fuso de São Paulo — oito da manhã UTC são cinco da manhã aqui, um horário ilegal de contato. A ressalva: é telemarketing bancário, não cobrança.</aside>
+</section>
+
+<!-- 8 · RAG + responsivo -->
+<section class="dense">
+<p class="kicker">07 · Agente responsivo</p>
+<h2 class="headline">Responder com <em>citação</em> — ou passar para uma pessoa.</h2>
+<div class="cols" style="grid-template-columns:1.1fr 0.9fr;align-items:start">
+<div><div class="stat-row sm"><div class="stat"><span class="num">0,913</span><span class="cap">acurácia de intenção (23 mensagens)</span></div><div class="stat"><span class="num">1,0</span><span class="cap">revocação@5 do TF-IDF</span></div></div>
+<ul class="bul" style="margin-top:28px"><li>O <em>embedder</em> neural <b>não superou</b> o TF-IDF (MRR 0,804 contra 0,821).</li><li>Contexto de conversa: concatenar <b>piorou</b> (0,889 → 0,778); consultas intercaladas melhoraram os acompanhamentos (0,733 → 0,800).</li><li>Sem evidência, o agente <b>escala</b>; o operador assume e resolve.</li></ul></div>
+<img class="shot" src="assets/img/chat-rag-answer.png" alt="Resposta com citação no chat" style="height:430px;justify-self:center">
+</div>
+<aside class="notes">O agente responsivo classifica a intenção — 0,913 de acurácia em 23 mensagens rotuladas — e responde com base em trechos recuperados, sempre com citação. Se não há evidência, ele <strong>escala para uma pessoa</strong>. Duas expectativas registradas antes da medição falharam, e eu acho isso importante: o modelo neural de embeddings <strong>não superou</strong> o TF-IDF, e acrescentar o contexto da conversa por concatenação <strong>piorou</strong> a recuperação antes de uma versão com consultas intercaladas melhorá-la. A lição é sobre avaliação: um benchmark que não consegue expressar a falha não consegue medir a correção.</aside>
+</section>
+
+<!-- 9 · Proativo + conformidade -->
+<section class="dense">
+<p class="kicker">08 · Agente proativo e conformidade</p>
+<h2 class="headline">Conformidade como <em>propriedade verificável</em>, não como prompt.</h2>
+<ul class="points cols2 tight"><li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span><span><span class="t">Opt-out antes dos agentes</span><span class="d">Verificado no agendamento e de novo na entrega.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg></span><span><span class="t">Horário, frequência, cooldown</span><span class="d">Motor de regras com os parâmetros da Bank Marketing.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/></svg></span><span><span class="t">Checador com 5 verificações</span><span class="d">Valores inventados, alçada, 3 divulgações obrigatórias, tom, tamanho.</span></span></li>
+<li class="point"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h6"/></svg></span><span><span class="t">O achado do SMS</span><span class="d">Um template por faixa: 18/20. As 2 falhas eram SMS de ~250 caracteres. Por (faixa, canal): 20/20.</span></span></li></ul>
+<div class="finding">Uma restrição legal virou consequência de produto: no SMS, o que cai primeiro é a <b>saudação pelo nome</b> — as divulgações obrigatórias não são negociáveis.</div>
+<aside class="notes">No agente proativo, a decisão de projeto foi tratar a conformidade como uma <strong>propriedade verificável</strong>, não como uma instrução no prompt. O opt-out é verificado antes dos agentes — e de novo no momento da entrega, porque o cliente pode se descadastrar entre um e outro. Toda mensagem passa por um checador com cinco verificações. E o checador achou um problema real no meu próprio controle: um template por faixa de atraso passou em 18 de 20 casos; as duas falhas eram SMS com 250 caracteres. A mensagem é função da faixa <strong>e</strong> do canal. No SMS, o que sai primeiro é a saudação pelo nome, porque as divulgações obrigatórias não podem sair.</aside>
+</section>
+
+<!-- 10 · Canais -->
+<section class="dense">
+<p class="kicker">09 · Mudança de escopo</p>
+<h2 class="headline">Sem WhatsApp nem telefonia: <em>o mesmo contrato</em>, outros canais.</h2>
+<div class="cols" style="grid-template-columns:1fr 1fr;align-items:center">
+<ul class="bul"><li><b>Por quê:</b> conta comercial, aprovação de templates e cobrança — nenhuma decisão nova para os agentes.</li><li><b>No lugar:</b> canal de chat simulado (widget) e chamada de voz por WebRTC, autohospedada.</li><li><b>O que se mantém:</b> um contrato de canal; nenhum agente importa um canal (teste de AST).</li><li><b>O que se perde:</b> "entregue" e "lida" vêm do navegador, não da operadora; não há métrica de alcance de campanha.</li></ul>
+<div class="shots"><img class="shot" src="assets/img/chat-conversa-semeada.png" alt="Conversa semeada pelo agente proativo" style="height:420px"><img class="shot" src="assets/img/chat-escalacao.png" alt="Escalação para uma pessoa" style="height:420px"></div>
+</div>
+<aside class="notes">Aqui está a principal mudança de escopo, e eu quero ser transparente sobre ela. A proposta previa WhatsApp Business e telefonia real. As duas exigiam conta comercial, aprovação de templates e custo — e <strong>não acrescentavam nenhuma decisão nova</strong> aos agentes. Troquei por um canal de chat simulado e uma chamada de voz por WebRTC autohospedada, atrás do <strong>mesmo contrato de canal</strong>. O que se perde, e está no artigo: "entregue" e "lida" vêm do navegador, não de uma operadora, então não há métrica de alcance de campanha. À direita, uma conversa iniciada pelo agente proativo e uma escalação para uma pessoa.</aside>
+</section>
+
+<!-- 11 · Voz: assimetria do erro -->
+<section class="dense">
+<p class="kicker">10 · Voz · erro de reconhecimento</p>
+<h2 class="headline">A intenção sobrevive ao erro. <em>O valor, não.</em></h2>
+<div class="cols" style="grid-template-columns:1.05fr 0.95fr;align-items:start">
+<table class="tbl"><thead><tr><th>WER</th><th>Intenção concorda</th><th>Valores intactos</th></tr></thead><tbody>
+<tr><td>0,000</td><td>1,000</td><td>1,000</td></tr><tr><td>0,046</td><td>0,967</td><td>0,958</td></tr><tr><td>0,068</td><td>0,956</td><td>0,908</td></tr><tr class="em"><td>0,099</td><td>0,856</td><td>0,867</td></tr><tr><td>0,151</td><td>0,833</td><td>0,750</td></tr></tbody></table>
+<p class="note">A WER 0,099 — uma transcrição que se lê bem — <b>um valor falado em sete já está errado</b>, e nada adiante percebe.<br><br>"mil duzentos e cinquenta" → "meu duzentos e cinquenta".<br><br>Por isso <span class="hl">todo valor ouvido é lido de volta</span> antes de virar ação. Um limiar de confiança não pegaria: o valor se corrompe com o reconhecedor ainda confiante.</p>
+</div>
+<p class="source">18 notas de voz rotuladas, 5 sorteios por mensagem e taxa; modelo de erro pt-BR determinístico.</p>
+<aside class="notes">Na voz, o achado é uma <strong>assimetria</strong>. A intenção é dita de várias formas numa mesma frase, e sobrevive ao erro de reconhecimento. Um valor é dito uma vez só. Com uma taxa de erro de palavras de 0,099 — uma transcrição que se lê sem estranhamento — um em cada sete valores falados já está errado: "mil duzentos e cinquenta" vira "meu duzentos e cinquenta". E o reconhecedor continua confiante. Por isso a decisão de projeto: <strong>todo valor ouvido é lido de volta</strong> ao cliente antes de virar ação.</aside>
+</section>
+
+<!-- 12 · Chamada em tempo real -->
+<section class="dense">
+<p class="kicker">11 · Chamada em tempo real</p>
+<h2 class="headline">2,2 s por turno — e uma resposta <em>longa demais</em>.</h2>
+<div class="cols" style="grid-template-columns:1fr 1fr;align-items:start">
+<table class="tbl"><thead><tr><th>Etapa (ms)</th><th>Mediana</th><th>p90</th></tr></thead><tbody>
+<tr><td>Espera de fim de turno</td><td>700</td><td>700</td></tr><tr><td>Whisper small, local</td><td>1.247</td><td>1.939</td></tr><tr><td>Agente</td><td>46</td><td>66</td></tr><tr><td>Piper, primeiro áudio</td><td>91</td><td>119</td></tr><tr class="em"><td>Medido por WebRTC</td><td>2.184</td><td>2.934</td></tr></tbody></table>
+<div><ul class="bul"><li>LiveKit autohospedado; Whisper e Piper <b>locais</b> (LGPD: a resposta lê a dívida de uma pessoa).</li><li>Aviso de gravação antes de tudo; fala durante ele é descartada.</li><li>SDK de baixo nível, não LiveKit Agents: preserva a escalação por confiança e a leitura de valores.</li></ul>
+<div class="finding">A resposta do <i>template</i>, falada, dura em mediana <b class="v-voz-fala">102 s</b>. A chamada pode ser demonstrada, mas ainda não usada.</div></div>
+</div>
+<p class="source">18 falas sintetizadas numa sala LiveKit real, Ryzen 7 5700X3D só CPU, respondedor de template, 06/11/2026.</p>
+<aside class="notes">A chamada em tempo real funciona de ponta a ponta numa sala LiveKit real: <strong>2,2 segundos</strong> do fim da fala do cliente até a primeira palavra da resposta. O Whisper é 60% disso; o agente, menos de 50 milissegundos. Tudo roda localmente — porque a resposta lê em voz alta a dívida de uma pessoa nomeada. O achado mais importante não está na tabela: a resposta do template, falada, dura em mediana <span class="v-voz-fala">102 s</span>. O contrato proíbe o canal de encurtar o que o agente diz — então a correção é trabalho do respondedor. O que <strong>não</strong> foi verificado: uma pessoa falando pelo microfone do navegador; só fala sintetizada.</aside>
+</section>
+
+<!-- 13 · Experimento — figura -->
+<section class="dense">
+<p class="kicker">12 · Experimento contra os baselines</p>
+<h2 class="headline">A predição só rende quando o contato é <em>escasso</em>.</h2>
+<img class="chart" src="assets/img/experimento-capacidade.png" alt="Recuperação em 30 dias por capacidade diária de contato" style="max-height:420px">
+<p class="source" style="margin-top:14px">Simulação: 30 replicações pareadas por semente, 1.500 execuções, IC 95% bootstrap. Resposta ao contato: curva da Bank Marketing.</p>
+<aside class="notes">Este é o resultado central. Como não havia operação real, o experimento é uma <strong>simulação declarada</strong>: uma carteira sintética, quatro braços — manual, semiautomatizado, só a ordenação, e o sistema completo — todos sob as mesmas regras, com a resposta ao contato vinda da curva da Bank Marketing. Trinta replicações pareadas por semente. No eixo horizontal, quantos contatos por dia a operação consegue fazer. Quando a capacidade é escassa, à esquerda, o sistema se separa dos baselines. Quando há capacidade para contatar todo mundo, à direita, as curvas se encontram: a ordem deixa de importar.</aside>
+</section>
+
+<!-- 14 · Experimento — números -->
+<section class="dense">
+<p class="kicker">12 · Experimento · números</p>
+<h2 class="headline">+4,8 p.p. a custo menor — e o ganho vem da <em>ordem</em>.</h2>
+<div class="cols" style="grid-template-columns:1.1fr 0.9fr;align-items:start">
+<table class="tbl small"><thead><tr><th>Contatos/dia</th><th>Sist. − semi</th><th>Sist. − manual</th></tr></thead><tbody>
+<tr class="em"><td>2</td><td>+4,8 [3,9; 5,8]</td><td>+5,1 [4,1; 6,1]</td></tr><tr class="em"><td>4</td><td>+4,7 [4,0; 5,4]</td><td>+5,3 [4,6; 6,1]</td></tr><tr><td>8</td><td>+1,3 [0,6; 2,0]</td><td>+3,1 [2,3; 4,0]</td></tr><tr class="base"><td>16</td><td>−0,1 [−0,2; 0,2]</td><td>−0,0 [−0,2; 0,2]</td></tr></tbody></table>
+<ul class="bul"><li>Lembretes preventivos: <b>+0,0 a +0,1 p.p.</b> — a ordenação faz o trabalho.</li><li>Custo por R$ 1.000 recuperados (4/dia): <b>R$ 34,62</b> manual, <b>R$ 6,37</b> semi, <b>R$ 1,94</b> sistema.</li><li>Em 90 dias, todos recuperam o mesmo: contato muda <b>quando</b> se paga, não <b>se</b>.</li><li><b>Zero violações</b> de conformidade em 1.500 execuções.</li></ul>
+</div>
+<p class="source">Pontos percentuais do valor em risco recuperado em 30 dias; média e IC 95%. docs/experiment-results.md.</p>
+<aside class="notes">Os números. Com 2 a 4 contatos por dia, o sistema recupera <strong>4,8 pontos percentuais a mais</strong> do valor em risco em 30 dias do que o semiautomatizado, com intervalos longe de zero. Com 8 por dia, 1,3; com 16, nada. A ablação mostra que <strong>o ganho vem da ordenação</strong>: os lembretes preventivos — um diferencial da proposta — acrescentam no máximo 0,1 ponto. A automação, sozinha, reduz muito o custo: 34 reais por mil recuperados numa mesa manual, 6 no semiautomatizado, menos de 2 com o sistema. Em 90 dias todos recuperam o mesmo: o contato muda <strong>quando</strong> o cliente paga, não <strong>se</strong> paga. E a auditoria independente achou zero violações. Ressalva: as magnitudes pertencem ao simulador; o que eu afirmo é a direção e a dependência da capacidade.</aside>
+</section>
+
+<!-- 15 · LLM local -->
+<section class="dense">
+<p class="kicker">13 · Braço gerativo</p>
+<span class="label-honest">qwen2.5:3b local, CPU · um piso, não um teto</span>
+<h2 class="headline">Um modelo pequeno mostra <em>para que serve o checador</em>.</h2>
+<div class="cols" style="grid-template-columns:1fr 1fr;align-items:start">
+<table class="tbl small"><thead><tr><th>Respondedor</th><th>Evidência</th><th>Fiel</th><th>p95</th></tr></thead><tbody>
+<tr><td>template</td><td>0,875</td><td>1,000</td><td>2 ms</td></tr><tr class="em"><td>qwen2.5:3b</td><td>0,813</td><td>0,692</td><td>11,1 s</td></tr></tbody></table>
+<ul class="bul"><li>Ofereceu "até 12 vezes" para 45 dias de atraso — a checagem de números pegou.</li><li>Mensagens: variedade 0,307 → 0,672, mas só <b>11 de 20</b> conformes; "último aviso" para fatura não vencida.</li><li>Defeito real achado: <code>NAO_SEI Fonte: (…)</code> contava como resposta — o cliente leria o token cru.</li></ul>
+</div>
+<p class="source">Sem chave de provedor hospedado; medido em 06/11/2026 com Ollama. Trocar de modelo é configuração, não código.</p>
+<aside class="notes">O braço com LLM. Eu não tinha chave de um provedor hospedado, então medi com um modelo de <strong>3 bilhões de parâmetros, local, em CPU</strong>. Esses números são um <strong>piso</strong>. O modelo foi menos fiel que o template e lento demais para chat ao vivo: 11 segundos no p95. Nas mensagens proativas, dobrou a variedade, mas só 11 de 20 passaram no checador — e é o checador, rodando fora do redator, que impede que essas mensagens sejam enviadas. E um modelo fraco tem uma utilidade: ele respondeu "NAO_SEI" seguido de uma citação, e isso expôs um defeito no detector que teria mostrado o token cru ao cliente. Trocar para um modelo hospedado é uma linha de configuração.</aside>
+</section>
+
+<!-- 16 · Qualidade -->
+<section class="dense">
+<p class="kicker">14 · Qualidade de software</p>
+<h2 class="headline">Testado onde importa, medido <em>sob carga</em>.</h2>
+<div class="stat-row sm"><div class="stat"><span class="num">100%</span><span class="cap">das 144 funções críticas executadas (eram 90,3%)</span></div><div class="stat"><span class="num">730</span><span class="cap">testes, incluindo os três fluxos de ponta a ponta</span></div><div class="stat"><span class="num">0</span><span class="cap">erros de 1 a 400 conversas simultâneas</span></div></div>
+<ul class="bul" style="margin-top:30px"><li>Nunca tinham rodado: os <em>parsers</em> de PDF e DOCX, e os clientes reais do Whisper e da Anthropic.</li><li>Concorrência: p95 de <b>0,32 s</b> com 100 conversas e <b>1,34 s</b> com 400 — um processo, em memória, sem LLM no turno.</li></ul>
+<aside class="notes">Na qualidade de software, a meta do cronograma era cobrir 80% das funções críticas. Medi por função, não por linha. As 144 funções críticas passaram de 90 para <strong>100% executadas</strong>, com 730 testes, incluindo os três fluxos de ponta a ponta pelo orquestrador. E a medição achou o que o projeto afirmava sem evidência: os parsers de PDF e DOCX e os clientes reais do Whisper e da Anthropic nunca tinham rodado. Na carga, de 1 a 400 conversas simultâneas, zero erros e p95 de 0,32 segundo com 100 conversas — num processo, em memória e sem LLM no turno.</aside>
+</section>
+
+<!-- 17 · Limitações -->
+<section class="dense">
+<p class="kicker">15 · Limitações</p>
+<h2 class="headline">O que este trabalho <em>não</em> mostra.</h2>
+<ul class="bul cols2"><li><b>Sem dados operacionais reais.</b> Modelos treinados em dados sintéticos; Home Credit não obtida.</li><li><b>O experimento mede o simulador.</b> Afirmo direção e dependência da capacidade, não magnitudes.</li><li><b>LLM só com um modelo local de 3B.</b> Modelo hospedado não medido.</li><li><b>Concorrência sem LLM</b> e em um único processo.</li><li><b>Canais simulados.</b> Sem WhatsApp, sem operadora, sem alcance de campanha.</li><li><b>Voz reduzida.</b> Sem <em>barge-in</em>, sem SIP; microfone real não verificado.</li><li><b>Conjuntos pequenos</b> (13 a 23 itens): direção, não magnitude.</li><li><b>Checagem léxica de tom</b>: não lê ameaça construída sem vocabulário proibido.</li></ul>
+<aside class="notes">As limitações, que estão todas no artigo. A maior: <strong>não há dados operacionais reais</strong>. Os modelos foram treinados em dados sintéticos e o experimento é uma simulação — então eu afirmo a direção e a dependência da capacidade, não as magnitudes. O braço LLM foi medido só com um modelo local pequeno. A carga foi medida sem LLM. Os canais são simulados. A voz é uma prova de conceito reduzida, sem barge-in e sem telefonia, e o microfone real não foi verificado. E os conjuntos rotulados são pequenos.</aside>
+</section>
+
+<!-- 18 · Conclusão -->
+<section>
+<p class="kicker">16 · Conclusão</p>
+<p class="rq">A predição melhora a recuperação <em>na medida da escassez</em> da operação — sob o modelo de resposta declarado. A automação sozinha reduz custo; a voz é <em>viável</em>, ainda não útil.</p>
+<div class="impact"><div class="it"><span class="k">Escassez (2–4/dia)</span><span class="v">+4,8 p.p. · custo menor</span></div><div class="it"><span class="k">Capacidade folgada</span><span class="v">empate</span></div><div class="it"><span class="k">Conformidade</span><span class="v">0 violações</span></div></div>
+<aside class="notes">Para concluir. O trabalho entregou um sistema em que cada decisão — quem contatar, quando, por qual canal, o que dizer e quando passar a uma pessoa — é tomada por um componente substituível, registrada com sua causa e <strong>medida contra um controle</strong>. Quanto à hipótese: a predição melhora a recuperação <strong>na medida da escassez</strong> da operação. Uma operação que contata toda a carteira dentro da janela não ganha nada com o módulo preditivo; uma que só alcança uma fração ganha cerca de cinco pontos, a custo menor. A automação sozinha reduz custo, mas pouco a recuperação. E a voz é viável tecnicamente, mas só se torna útil com um respondedor gerativo rápido.</aside>
+</section>
+
+<!-- 19 · Trabalhos futuros + obrigado -->
+<section class="dense">
+<p class="kicker">17 · Trabalhos futuros</p>
+<h2 class="headline">Próximos passos — <em>e obrigado</em>.</h2>
+<ul class="bul cols2"><li>Dados reais: Home Credit e, sobretudo, um ERP.</li><li>Modelar a <b>resposta</b> ao contato (<em>uplift</em>), não só o risco.</li><li>Medir o braço LLM com um modelo hospedado — inclusive na voz.</li><li>Adaptador real de mensageria e tronco SIP, sem tocar nos agentes.</li><li><em>Barge-in</em> e fim de turno aprendido na chamada.</li><li>Checador que confere o <b>estado da dívida</b> afirmado na mensagem.</li><li>Julgamento humano de uma amostra das respostas.</li><li>Experimento operacional com tentativas e intervalo variados.</li></ul>
+<p class="source" style="margin-top:40px">Obrigado. · Gabriel Forster Rocha — Católica de Santa Catarina · github.com/gabrielforster/tcc</p>
+<aside class="notes">Os próximos passos seguem das limitações: dados reais, de preferência de um ERP; um modelo que preveja a <strong>resposta</strong> ao contato e não só o risco — a análise de sensibilidade mostrou que os clientes mais arriscados são também os que menos respondem; medir um modelo hospedado; e levar o mesmo agente a um número real por SIP, o que o contrato de canal permite sem alterar os agentes. Muito obrigado. Fico à disposição para as perguntas.</aside>
+</section>
+
+    </div>
+  </div>
+  <script>
+    // Values that can still change before 03/12, kept in one place. Every element with the
+    // matching class (slides and speaker notes alike) is filled from here at load time.
+    const DEFESA = {
+      vozFala: '102 s',   // median length of a spoken reply on the voice call (docs/voice-call.md)
+    };
+    document.querySelectorAll('.v-voz-fala').forEach(el => { el.textContent = DEFESA.vozFala; });
+  </script>
+  <script src="vendor/reveal/reveal.js"></script>
+  <script src="vendor/reveal/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.2,
+      maxScale: 2.0,
+      center: true,
+      hash: true,
+      fragments: !/[?&]allfrags/.test(location.search),
+      transition: 'fade',
+      transitionSpeed: 'default',
+      slideNumber: 'c/t',
+      controlsTutorial: false,
+      plugins: [ RevealNotes ]
+    });
+  </script>
+</body>
+</html>
