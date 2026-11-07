@@ -7,6 +7,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+.coverage
+coverage.json
 *.egg-info/
 
 # Data (LGPD: never commit the real dataset)

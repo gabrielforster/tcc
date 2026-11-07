@@ -60,6 +60,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.coverage.run]
+source = ["collection"]
+
+[tool.coverage.report]
+precision = 1
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

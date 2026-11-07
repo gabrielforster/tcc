@@ -254,6 +254,78 @@ def test_the_anthropic_client_without_a_key_raises_a_wrapped_error(monkeypatch):
         AnthropicClient().complete("system", "user")
 
 
+class _FakeAnthropic:
+    """Stands in for the SDK's client: records the request and returns a canned response."""
+
+    requests: list[dict] = []
+    raises: Exception | None = None
+
+    def __init__(self, api_key: str, timeout: float) -> None:
+        self.api_key = api_key
+        self.messages = self
+
+    def create(self, **request):
+        type(self).requests.append(request)
+        if type(self).raises is not None:
+            raise type(self).raises
+        from types import SimpleNamespace as Reply
+
+        # A leading space, a non-text block and an empty one: only the text survives, trimmed.
+        content = [
+            Reply(type="text", text=" Os juros são de 1% ao mês."),
+            Reply(type="tool_use"),
+            Reply(type="text", text=""),
+        ]
+        return Reply(content=content, usage=Reply(input_tokens=120, output_tokens=30))
+
+
+@pytest.fixture
+def fake_sdk(monkeypatch):
+    import sys
+    import types
+
+    _FakeAnthropic.requests = []
+    _FakeAnthropic.raises = None
+    module = types.ModuleType("anthropic")
+    module.Anthropic = _FakeAnthropic
+    monkeypatch.setitem(sys.modules, "anthropic", module)
+    monkeypatch.setattr(settings, "anthropic_api_key", "sk-test")
+    return _FakeAnthropic
+
+
+def test_the_anthropic_client_sends_a_reproducible_request_and_reads_text_only(fake_sdk):
+    from collection.llm.client import AnthropicClient
+
+    completion = AnthropicClient(model="claude-test").complete("system", "user")
+
+    [request] = fake_sdk.requests
+    assert request["temperature"] == 0.0, "the same question must get the same plan"
+    assert request["max_tokens"] == 512
+    assert request["system"] == "system"
+    assert request["messages"] == [{"role": "user", "content": "user"}]
+    assert completion.text == "Os juros são de 1% ao mês."
+    assert completion.model == "claude-test"
+    assert completion.tokens == 150
+
+
+def test_an_sdk_error_becomes_an_llm_error_the_responder_can_fall_back_on(fake_sdk):
+    from collection.llm.client import AnthropicClient
+
+    fake_sdk.raises = TimeoutError("read timed out")
+    with pytest.raises(LLMError, match="TimeoutError: read timed out"):
+        AnthropicClient().complete("system", "user")
+
+
+def test_a_missing_sdk_is_an_llm_error_that_says_what_to_install(monkeypatch):
+    import sys
+
+    from collection.llm.client import AnthropicClient
+
+    monkeypatch.setitem(sys.modules, "anthropic", None)
+    with pytest.raises(LLMError, match="uv sync --extra llm"):
+        AnthropicClient().complete("system", "user")
+
+
 def test_the_echo_client_is_a_client():
     completion = EchoClient().complete("system", "user text")
     assert isinstance(EchoClient(), LLMClient)

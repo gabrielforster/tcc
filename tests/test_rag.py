@@ -176,6 +176,84 @@ def test_an_unsupported_file_type_is_rejected(tmp_path):
         load_file(path)
 
 
+def _pdf(pages: list[str]) -> bytes:
+    """A minimal valid PDF, one Helvetica text line per page, xref offsets computed.
+
+    Written by hand because nothing in the dependency set writes PDFs, and a fixture file
+    would hide what the parser is being asked to read.
+    """
+    kids = " ".join(f"{3 + 2 * i} 0 R" for i in range(len(pages)))
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>",
+    ]
+    font = 3 + 2 * len(pages)
+    for i, text in enumerate(pages):
+        stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET"
+        objects.append(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {4 + 2 * i} 0 R "
+            f"/Resources << /Font << /F1 {font} 0 R >> >> >>"
+        )
+        objects.append(f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream")
+    objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
+    trailer = f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+    return out + trailer.encode()
+
+
+def test_a_pdf_policy_is_read_page_by_page_into_one_document(tmp_path):
+    path = tmp_path / "politica.pdf"
+    path.write_bytes(_pdf(["Parcelamento em ate 12 vezes", "Desconto de 10 por cento a vista"]))
+
+    [document] = load_file(path, tmp_path)
+
+    assert document.document_id == "politica.pdf"
+    assert document.metadata == {"source": str(path), "format": "pdf", "pages": 2}
+    assert "Parcelamento em ate 12 vezes" in document.text
+    assert "Desconto de 10 por cento" in document.text
+    assert document.text.index("Parcelamento") < document.text.index("Desconto")
+
+
+def test_a_docx_script_keeps_its_paragraphs_and_drops_the_empty_ones(tmp_path):
+    import docx
+
+    path = tmp_path / "roteiro.docx"
+    written = docx.Document()
+    written.add_paragraph("Bom dia, falo da Simplifica.")
+    written.add_paragraph("   ")
+    written.add_paragraph("Posso oferecer o parcelamento em seis vezes.")
+    written.save(str(path))
+
+    [document] = load_file(path, tmp_path)
+
+    assert document.metadata["format"] == "docx"
+    assert document.text == (
+        "Bom dia, falo da Simplifica.\n\nPosso oferecer o parcelamento em seis vezes."
+    )
+
+
+def test_a_pdf_and_a_docx_are_retrievable_once_indexed(tmp_path):
+    (tmp_path / "politica.pdf").write_bytes(_pdf(["Parcelamento em ate 12 vezes no boleto"]))
+    import docx
+
+    written = docx.Document()
+    written.add_paragraph("A segunda via do boleto sai pelo portal do cliente.")
+    written.save(str(tmp_path / "faq.docx"))
+
+    index = VectorIndex().add_documents(load_directory(tmp_path)).build()
+
+    assert index.search("segunda via do boleto", top_k=1)[0].document_id == "faq.docx"
+    assert index.search("parcelamento em 12 vezes", top_k=1)[0].document_id == "politica.pdf"
+
+
 # ---------------------------------------------------------------------- embedding
 def test_vectors_are_unit_normalised_so_cosine_is_a_dot_product():
     embedder = TfidfEmbedder().fit(["cobranca de boleto", "parcelamento da divida"])

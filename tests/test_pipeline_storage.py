@@ -18,7 +18,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from collection.config import settings
-from collection.data.ingest import IngestReport, ingest, load_interim, source_metadata
+from collection.data.ingest import (
+    IngestReport,
+    extract,
+    ingest,
+    load_interim,
+    source_metadata,
+)
 from collection.data.sources.base import DataSource, RawDataset
 from collection.db.models import (
     Customer,
@@ -140,6 +146,21 @@ def test_ingest_stores_the_raw_frame_as_an_object_and_writes_no_file(
     assert set(load_interim(scope)) == {"customers", "invoices", "collection_events", "agreements"}
     assert list(cache.iterdir()) == [], "dir_raw was written to"
     assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.db
+def test_extract_stores_only_the_raw_frames_and_anonymizes_nothing(db, dataset):
+    """`extract` is the first half of `ingest`: nothing past the raw layer exists after it."""
+    scope = _scope(db, "one")
+
+    extracted = extract(scope, _Fixed(dataset))
+
+    assert len(extracted.customers) == len(dataset.customers)
+    assert {row.kind for row in scope.all(StoredObject)} == {"raw"}
+    assert scope.all(Customer) == []
+    assert source_metadata(scope)["source"] == "unknown", "no interim metadata yet"
+    with pytest.raises(FileNotFoundError, match="No ingested data"):
+        load_interim(scope)
 
 
 @pytest.mark.db
