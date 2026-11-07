@@ -200,8 +200,12 @@ class WhisperTranscriber(Transcriber):
         with tempfile.TemporaryDirectory() as workdir:
             wav = to_wav(clip, Path(workdir) / "clip.wav")
             try:
+                # The samples, not the path. Given a path, faster-whisper 1.2 decodes with
+                # PyAV and passes it an argument PyAV 19 no longer accepts, so every clip
+                # failed as "unintelligible". ffmpeg has already produced 16 kHz mono PCM,
+                # which is exactly the array the model wants, so PyAV is not needed at all.
                 segments, info = model.transcribe(
-                    str(wav), language=self.language, beam_size=self.beam_size
+                    _samples(wav), language=self.language, beam_size=self.beam_size
                 )
                 segments = list(segments)
             except Exception as error:
@@ -217,6 +221,17 @@ class WhisperTranscriber(Transcriber):
             duration_s=clip.duration_s or getattr(info, "duration", 0.0),
             language=getattr(info, "language", self.language),
         )
+
+
+def _samples(wav: Path):
+    """A 16-bit mono WAV as the float32 array in [-1, 1] Whisper consumes."""
+    import wave
+
+    import numpy as np
+
+    with wave.open(str(wav), "rb") as source:
+        frames = source.readframes(source.getnframes())
+    return np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
 
 
 def _confidence(segments: list) -> float:
