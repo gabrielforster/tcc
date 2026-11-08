@@ -122,10 +122,38 @@ report rather than as a complaint.
 | composer | messages | compliant | invented | over-authority | disclosures | distinctness | mean chars |
 |---|---|---|---|---|---|---|---|
 | template | 20 | 1.000 | 0.000 | 0.000 | 1.000 | 0.307 | 231 |
+| qwen2.5:3b | 20 | 0.550 | 0.100 | 0.000 | 0.700 | 0.672 | 223 |
 
-**The LLM arm is unmeasured.** It needs `ANTHROPIC_API_KEY`; the row above is the control
-only, and `docs/outreach-comparison.md` is regenerated with both arms by
-`make outreach ARGS="--compare"`.
+The LLM row was measured 2026-11-06 against `qwen2.5:3b`, a three-billion-parameter model
+served by Ollama on a CPU (p95 9.7 s per message), because no hosted key was available. It
+is a floor for the LLM arm, not its result; the hosted arm is the same command with a
+different `LLM_PROVIDER`. `docs/outreach-comparison.md` has every message.
+
+**The trade the design predicted is there, and it is not a good trade at this size.** The
+model more than doubles distinctness (0.307 → 0.672), which is what the LLM arm is for, and
+pays for it with nine messages out of twenty that the agent would refuse to send. The
+checker is what makes that survivable: those nine are escalated to a person, not delivered.
+
+What the nine failed on, and what each says:
+
+- **"Último aviso" in five messages, two of them pre-due.** A debt that is not yet late
+  was told it was on its final warning. That is the tone escalation the templates are
+  written to avoid (see above), and the lexicon catches the phrase. Four of the five also
+  dropped the automated-message disclosure, so the model treats the warning and the
+  disclosure as interchangeable openers.
+- **Both SMS messages ran past 160 characters** (284 and 291). The model was told the
+  channel and wrote a chat message anyway, exactly as the control arm's first version did.
+  The cap belongs to the channel and only the checker enforces it.
+- **The two "invented" figures are correct arithmetic.** R$ 597,00 is 15% of R$ 3.980,00 and
+  R$ 336,00 is 20% of R$ 1.680,00. The check counts any figure not in the brief, by design:
+  a derived amount is still a commitment nobody approved, and verifying arithmetic would
+  mean the checker trusting the composer's maths. Read these as the rule being strict, not
+  as hallucinations.
+
+**And what the checker cannot see.** One message that passed tells a customer whose bill
+is not yet due "você está atrasado"; another calls itself "um pagamento automático". Both
+clear every check, because no check compares the message's claims about the debt's
+*state* with the brief. Those are the reason the report prints messages rather than rates.
 
 What a reader should take from the control row is narrow and worth stating plainly: it says
 the checker and the templates agree, not that the messages are good. No check in this

@@ -84,7 +84,17 @@ def test_no_passages_means_no_call_to_the_model():
     assert client.calls == [], "the model was asked to answer with no evidence"
 
 
-@pytest.mark.parametrize("reply", [REFUSAL, f"{REFUSAL}.", f"  {REFUSAL}  ", ""])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        REFUSAL,
+        f"{REFUSAL}.",
+        f"  {REFUSAL}  ",
+        "",
+        # qwen2.5:3b, 2026-11-06: the token followed by the citation line the prompt asks for.
+        f"{REFUSAL} Fonte: (politica-de-cobranca.md)",
+    ],
+)
 def test_a_refusal_is_not_grounded_and_reaches_a_human(passages, reply):
     answer = LLMResponder(client=scripted(reply)).respond("?", Intent.NEGOTIATION, passages)
     assert not answer.grounded
@@ -324,6 +334,105 @@ def test_a_missing_sdk_is_an_llm_error_that_says_what_to_install(monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", None)
     with pytest.raises(LLMError, match="uv sync --extra llm"):
         AnthropicClient().complete("system", "user")
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int, body=None, text: str = "") -> None:
+        self.status_code = status_code
+        self._body = body
+        self.text = text or str(body)
+
+    def json(self):
+        if self._body is None:
+            raise ValueError("not json")
+        return self._body
+
+
+class _FakeSession:
+    """Stands in for `requests.Session`: records the request, returns a prepared reply."""
+
+    def __init__(self, response=None, error: Exception | None = None) -> None:
+        self.response = response
+        self.error = error
+        self.requests: list[dict] = []
+
+    def post(self, url, json, headers, timeout):
+        self.requests.append({"url": url, "json": json, "headers": headers, "timeout": timeout})
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+def _openai(session, **kwargs):
+    from collection.llm.client import OpenAICompatibleClient
+
+    return OpenAICompatibleClient(
+        model="qwen2.5:3b", base_url="http://llm.test/v1/", session=session, **kwargs
+    )
+
+
+def _chat_body(text: str) -> dict:
+    return {
+        "model": "qwen2.5:3b",
+        "choices": [{"message": {"role": "assistant", "content": text}}],
+        "usage": {"prompt_tokens": 120, "completion_tokens": 30},
+    }
+
+
+def test_the_openai_client_sends_one_deterministic_chat_request():
+    session = _FakeSession(_FakeResponse(200, _chat_body("  Pode sim.  ")))
+    completion = _openai(session, api_key="").complete("system text", "user text")
+
+    request = session.requests[0]
+    assert request["url"] == "http://llm.test/v1/chat/completions"
+    assert request["json"]["messages"] == [
+        {"role": "system", "content": "system text"},
+        {"role": "user", "content": "user text"},
+    ]
+    assert request["json"]["temperature"] == 0.0
+    assert request["json"]["max_tokens"] == 512
+    # A local server needs no key, so none is sent.
+    assert "Authorization" not in request["headers"]
+    assert completion.text == "Pode sim."
+    assert (completion.input_tokens, completion.output_tokens) == (120, 30)
+    assert completion.model == "qwen2.5:3b"
+
+
+def test_the_openai_client_sends_a_key_only_when_one_is_set():
+    session = _FakeSession(_FakeResponse(200, _chat_body("ok")))
+    _openai(session, api_key="sk-test").complete("s", "u")
+    assert session.requests[0]["headers"]["Authorization"] == "Bearer sk-test"
+
+
+@pytest.mark.parametrize(
+    "session",
+    [
+        _FakeSession(error=ConnectionError("refused")),
+        _FakeSession(_FakeResponse(500, text="model not loaded")),
+        _FakeSession(_FakeResponse(200, None, text="<html>")),
+        _FakeSession(_FakeResponse(200, {"choices": []})),
+    ],
+    ids=["transport", "http-error", "not-json", "bad-shape"],
+)
+def test_every_openai_client_failure_is_an_llm_error(session):
+    with pytest.raises(LLMError):
+        _openai(session).complete("s", "u")
+
+
+def test_an_openai_client_failure_still_falls_back_to_the_template(passages):
+    responder = LLMResponder(client=_openai(_FakeSession(error=TimeoutError("slow"))))
+    answer = responder.respond("posso parcelar?", Intent.NEGOTIATION, passages)
+    assert answer.responder == "llm:fallback"
+    assert responder.failures
+
+
+def test_the_openai_provider_is_registered(monkeypatch):
+    from collection.llm.client import OpenAICompatibleClient, describe
+
+    monkeypatch.setattr(settings, "llm_provider", "openai")
+    monkeypatch.setattr(settings, "llm_model", "qwen2.5:3b")
+    assert isinstance(get_client(), OpenAICompatibleClient)
+    assert "qwen2.5:3b" in describe() and "openai" in describe()
 
 
 def test_the_echo_client_is_a_client():

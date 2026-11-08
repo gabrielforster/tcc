@@ -32,10 +32,13 @@ from collection.rag.index import Retrieved
 def _is_refusal(text: str) -> bool:
     """True when the model took the exit the prompt gave it.
 
-    Matched on a stripped, punctuation-free form: models append a full stop to a bare token
-    often enough that exact equality would miss real refusals.
+    Matched anywhere in the reply, not as the whole of it. The prompt asks for the token
+    "and nothing else", and a small model still appends the citation line it was told to
+    end every answer with -- `NAO_SEI Fonte: (politica-de-cobranca.md)`. An exact match
+    scored that as an answer and would have sent the raw token to the customer; a reply
+    carrying the token is never something to send, whatever surrounds it.
     """
-    return text.strip().strip(".!").upper() == REFUSAL
+    return REFUSAL in text.upper()
 
 
 class LLMResponder(Responder):
