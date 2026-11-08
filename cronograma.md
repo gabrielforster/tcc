@@ -15,6 +15,11 @@ Cada encontro tem **uma entrega pequena, verificável e acumulativa** — códig
 gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no encontro; a coluna
 *Texto* é o que avança no artigo, para que a redação não fique concentrada no fim.
 
+**Situação em 07/11/2026.** As entregas 1–14 estão integradas. As entregas 15, 16 e 17
+estão construídas e medidas, em revisão nos *pull requests* #32–#37, e duas delas mudaram de
+forma (§2.4 e §2.5). O artigo da entrega 18 está redigido sobre esses resultados e aguarda a
+revisão. A entrega 19 — *tag*, *slides* e ensaio — é a que resta.
+
 ### Bloco I — Fundação: requisitos e dados (30/07 a 27/08)
 
 | # | Data | Entrega | Artefato mostrado | Texto |
@@ -48,14 +53,14 @@ gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no e
 |:--|:-----|:----------------------------------------|:------------------|:--------------|
 | 13 | 22/10 | **Detecção + regras.** *Job* periódico de documentos vencidos, consumo do *ranking* preditivo para cobrança preventiva, motor de regras (horário permitido, frequência máxima, canal, *cooldown*, limite de tentativas) | Fila de cobrança populada com prioridade preditiva | Módulo ativo (parte 1) |
 | 14 | 29/10 | **Abordagem multicanal por texto.** *Templates* por estágio de atraso (1–7, 8–30, 31–60, 60+ dias) personalizados por LLM, envio pelo **canal de chat simulado**, *tracking* de status (enviada/entregue/lida/respondida, com `entregue`/`lida` informados pelo cliente e não pela operadora), respeito imediato a *opt-out*, transferência ao agente responsivo quando o cliente responde | Escalonamento progressivo executando em ambiente de teste | Módulo ativo (parte 2) |
-| 15 | 05/11 | **Chamada por voz em tempo real (WebRTC/LiveKit).** No lugar da telefonia comutada: fluxo TTS de abertura → STT em tempo real → resposta → encerramento, com *barge-in*, aviso de gravação que não pode ser pulado e registro completo da chamada. O mesmo agente é levado a um número real por SIP, sem alteração no agente (ver §2) | Chamada em tempo real demonstrada no navegador + tabela de tempo de turno | Integração de voz (tempo real) |
+| 15 | 05/11 | **Chamada por voz em tempo real (WebRTC/LiveKit).** No lugar da telefonia comutada: fluxo TTS de abertura → STT em tempo real → resposta → encerramento, com *barge-in*, aviso de gravação que não pode ser pulado e registro completo da chamada. O mesmo agente é levado a um número real por SIP, sem alteração no agente (ver §2). **Entregue reduzida a prova de conceito:** sem *barge-in* e sem SIP (ver §2.4) | Chamada em tempo real demonstrada no navegador + tabela de tempo de turno | Integração de voz (tempo real) |
 
 ### Bloco V — Avaliação e fechamento (12/11 a 03/12)
 
 | # | Data | Entrega | Artefato mostrado | Texto |
 |:--|:-----|:----------------------------------------|:------------------|:--------------|
-| 16 | 12/11 | **Testes e início do experimento.** Testes unitários (parser, *features*, motor de regras, intenção, *templates*) com ≥ 80% das funções críticas cobertas, testes de integração dos três fluxos e dos serviços externos; **experimento controlado iniciado** contra os dois baselines (manual e semiautomatizado sem ML) | Suíte de testes verde + experimento coletando dados | Protocolo experimental |
-| 17 | 19/11 | **Resultados consolidados.** Métricas preditivas finais vs. baseline, qualidade do RAG (*retrieval* + fidelidade/completude/alucinação das respostas), indicadores operacionais (taxa de recuperação, tempo médio de resolução, custo por contato, ≥ 100 interações concorrentes), análise estatística | Tabelas e gráficos finais de resultados | Seção de resultados e discussão |
+| 16 | 12/11 | **Testes e início do experimento.** Testes unitários (parser, *features*, motor de regras, intenção, *templates*) com ≥ 80% das funções críticas cobertas, testes de integração dos três fluxos e dos serviços externos; **experimento controlado iniciado** contra os dois baselines (manual e semiautomatizado sem ML). **Entregue:** as 152 funções críticas executadas pela suíte; o experimento é uma simulação, pela decisão D1 (ver `docs/experiment-protocol.md`) | Suíte de testes verde + experimento coletando dados | Protocolo experimental |
+| 17 | 19/11 | **Resultados consolidados.** Métricas preditivas finais vs. baseline, qualidade do RAG (*retrieval* + fidelidade/completude/alucinação das respostas), indicadores operacionais (taxa de recuperação, tempo médio de resolução, custo por contato, ≥ 100 interações concorrentes), análise estatística. **Entregue:** o braço LLM medido num modelo local (ver §2.5) e a concorrência medida em memória, com o respondedor por *templates* | Tabelas e gráficos finais de resultados | Seção de resultados e discussão |
 | 18 | **26/11** | **Revisão final.** Artigo completo revisado (resumo/abstract, referências, tabelas, figuras), limitações e trabalhos futuros, README de reprodução; ajuste dos pontos de revisão apontados | Artigo em PDF, versão candidata | Texto integral fechado |
 | 19 | **03/12** | **Trabalho finalizado.** Versão final entregue, repositório com *tag* de entrega, apresentação/defesa preparada e ensaiada | PDF final + *slides* + demonstração | — |
 
@@ -63,7 +68,7 @@ gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no e
 
 ## 2. Mudanças de escopo
 
-Três entregas deste cronograma mudaram de forma depois de aprovadas. Elas estão reunidas
+Cinco entregas deste cronograma mudaram de forma depois de aprovadas. Elas estão reunidas
 aqui, com data, o que foi substituído, por quê e o que deixa de existir nos resultados —
 para que o leitor encontre as substituições em um lugar só, e não as descubra espalhadas
 pelo texto.
@@ -76,8 +81,10 @@ modelo preditivo consegue conduzir a cobrança de forma autônoma, segura e dent
 restrições legais. Isso é respondido pelo que os **agentes decidem**, não por qual API
 comercial transporta os bytes. Uma integração só entra no escopo se acrescentar uma decisão
 nova a algum agente; se acrescenta apenas transporte, fila de aprovação e contrato de
-faturamento, ela é substituível sem perda para a tese. As três mudanças abaixo seguem esse
-critério, e cada uma lista o que de fato se perde com ela.
+faturamento, ela é substituível sem perda para a tese. As três primeiras mudanças abaixo
+seguem esse critério, decididas em 22/10. As duas últimas (§2.4 e §2.5) vieram depois, de
+outra natureza: não trocam um transporte por outro, reduzem o que foi entregue ou o que foi
+medido — e por isso dizem com o mesmo cuidado o que deixa de ser afirmado.
 
 ### 2.1 WhatsApp Business API → canal de chat simulado
 
@@ -112,7 +119,8 @@ impostas pela aprovação de *templates* da Meta.
 
 **O que foi substituído.** Número *outbound*, tronco SIP e operadora, por uma chamada de
 voz em tempo real no navegador, com detecção de fim de turno, interrupção pelo cliente
-(*barge-in*) e aviso de gravação.
+(*barge-in*) e aviso de gravação. A chamada foi entregue menor do que esta descrição: ver
+§2.4.
 
 **Por quê.** Os problemas interessantes de uma ligação automatizada são a alternância de
 turnos, a interrupção, o orçamento de latência e a abertura legal. Os quatro existem
@@ -152,7 +160,68 @@ semeado não é uma mensagem que chegou, e um cliente que nunca abre o widget nu
 nada. O *opt-out* é verificado duas vezes por causa disso — no agendamento e de novo no
 momento da entrega, porque o cliente pode se descadastrar entre um e outro.
 
-### 2.4 O que não mudou
+### 2.4 Chamada por voz completa → prova de conceito reduzida
+
+*Entrega 15 (05/11), concluída depois da data.*
+
+**O que foi substituído.** A chamada descrita em 2.2, com interrupção pelo cliente e um
+caminho até um número real por SIP, por uma prova de conceito: um LiveKit hospedado
+localmente, em modo de desenvolvimento e sem conta de fornecedor; o aviso de gravação
+tocado antes de tudo, com a fala do cliente durante ele descartada; Whisper local para
+reconhecer; o **mesmo** agente responsivo do chat; Piper local para sintetizar
+(`pt_BR-faber-medium`); e o registro completo da chamada, com o áudio apagável e a
+transcrição mantida. O fim do turno é detectado por energia, não por um modelo treinado.
+
+**Por quê.** É exatamente o que §4 previa: a chamada por voz era a primeira candidata a
+virar prova de conceito, e virou. O que a tese precisa da voz — a alternância de turnos, o
+aviso de gravação obrigatório, o orçamento de latência e a prova de que um segundo canal
+reaproveita o agente sem alterá-lo — está construído e medido. A síntese é local pelo mesmo
+motivo do Whisper: a resposta lê em voz alta a dívida de uma pessoa identificada, e um
+serviço de TTS na nuvem passaria a tratar esse dado. A integração usa o SDK de baixo nível
+do LiveKit, e não o LiveKit Agents, porque o *framework* reconheceria a fala por conta
+própria e contornaria a escalação por baixa confiança e a confirmação de valores falados.
+
+**O que falta nos resultados.** A tabela de tempo de turno existe (`docs/voice-call.md`):
+mediana de **2.193 ms** medida sobre WebRTC, do fim da fala ao primeiro áudio da resposta,
+em CPU, com Whisper `small` e o respondedor por *templates*. Ficam de fora a interrupção
+pelo cliente, o SIP e a telefonia comutada, a discagem ativa e uma medição da divergência
+entre canais, que é zero por construção mas não foi medida. Uma pessoa falando ao
+microfone do navegador **não foi verificada** — só fala sintetizada atravessando uma sala
+real. A primeira medição mostrou o limite que importava: lida em voz alta, a resposta por
+*templates* durava uma mediana de **102 s**, porque citava trechos inteiros. Foi resolvido
+no respondedor, não no canal — o canal não pode decidir que parte de uma política o cliente
+ouve. A chamada declara quanto consegue carregar (43 palavras, derivadas de um turno-alvo
+de 20 s × 2,15 palavras/s, a velocidade mais lenta medida do Piper) e o respondedor escolhe
+a seção dos trechos recuperados que cabe, com as frases intactas. A resposta falada passou
+a durar uma mediana de **11,7 s** (máximo 16,2 s; as 18 falas dentro dos 20 s), e o chat
+ficou idêntico. O que resta: a recuperação às vezes escolhe o trecho errado, e uma resposta
+curta pode ser curta e errada.
+
+### 2.5 Braço LLM hospedado → modelo local
+
+*Entregas 11 e 17.*
+
+**O que foi substituído.** A geração por um modelo hospedado (Claude) nas três comparações
+que têm um braço LLM — o respondedor, a reescrita de consultas em conversas de vários turnos
+e a composição da mensagem ativa — por um modelo pequeno rodando localmente:
+`qwen2.5:3b`, servido pelo Ollama no `docker-compose`, em CPU, por um cliente que fala o
+protocolo da OpenAI.
+
+**Por quê.** Não havia chave de API de um provedor hospedado, e os braços LLM nunca tinham
+rodado. O cliente novo atende qualquer servidor compatível (Ollama, vLLM, OpenRouter,
+Groq), então a troca é de configuração: quando houver uma chave, o mesmo comando acrescenta
+uma linha às tabelas, sem código novo. Cada relatório gerado registra o provedor, o modelo
+e a data do braço LLM.
+
+**O que falta nos resultados.** Um número de modelo hospedado. Os resultados publicados são
+um **piso**, não uma estimativa do que um modelo grande faria: no respondedor, fidelidade
+de 0,69 contra 1,0 do *template* e p95 de 11,1 s contra um orçamento de 5 s; na mensagem
+ativa, 55% das mensagens conformes contra 100% do *template*, embora a distinção entre
+mensagens mais que dobre (0,307 → 0,672); na reescrita, empate com a concatenação simples
+(0,800), porque o modelo devolveu quase todas as perguntas de seguimento sem reescrevê-las.
+A conclusão que o artigo tira disso é restrita ao modelo medido.
+
+### 2.6 O que não mudou
 
 A anotação é tão importante quanto as substituições. O vocabulário de dados do ERP
 (`whatsapp`, `phone`, `email`, `sms` em `preferred_channel` e no histórico de contatos)
@@ -189,14 +258,15 @@ e defesa.
 | Risco | Impacto | Contingência |
 |---|---|---|
 | Volume ou qualidade insuficiente dos dados históricos | Bloqueia as entregas 6–8 | Antecipar a extração (13/08) e, se necessário, usar base pública de *credit scoring* para validar o pipeline, mantendo a base real apenas para o modelo final |
-| Aprovação de *templates* na Meta / conta de telefonia | Atrasava 29/10 e 05/11 | **Risco materializado.** Resolvido pelas substituições de §2: canal de chat simulado e chamada por voz em tempo real, ambas atrás do mesmo contrato de canal |
-| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida; se o total for ruim, a tabela honesta ainda é melhor resultado que uma lisonjeira |
-| Experimento operacional com amostra pequena | Enfraquece a entrega 17 | Relatar tamanho de efeito e intervalo de confiança; complementar com métricas técnicas e comparação de custo por contato |
-| Custo de APIs de LLM, STT/TTS e telefonia | Afeta 08/10 em diante | Cache de respostas, modelo menor para tarefas simples, Whisper local como alternativa |
+| Aprovação de *templates* na Meta / conta de telefonia | Atrasava 29/10 e 05/11 | **Risco materializado.** Resolvido pelas substituições de §2: canal de chat simulado e chamada por voz em tempo real, ambas atrás do mesmo contrato de canal; a chamada foi entregue como prova de conceito reduzida (§2.4) |
+| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida. **Medida:** mediana de 2.193 ms por turno; o gargalo que apareceu foi outro — a duração da resposta falada, 102 s → 11,7 s depois de moldada no respondedor (§2.4) |
+| Experimento operacional com amostra pequena | Enfraquece a entrega 17 | Relatar tamanho de efeito e intervalo de confiança; complementar com métricas técnicas e comparação de custo por contato. **Materializado de forma mais forte:** sem dados operacionais (decisão D1), o experimento é uma simulação com 30 replicações pareadas e intervalos de 95%, e o artigo diz isso |
+| Custo de APIs de LLM, STT/TTS e telefonia | Afeta 08/10 em diante | **Resolvido localmente:** Whisper, Piper e o modelo de linguagem rodam na máquina, sem custo por chamada; o preço é a qualidade e a latência de um modelo pequeno (§2.5) |
 
 **Escopo mínimo garantido** (se algo precisar cair): os módulos responsivo e preditivo mais o
 fluxo proativo por texto são obrigatórios; a chamada por voz em tempo real é a primeira
-candidata a virar prova de conceito reduzida, com a limitação documentada no artigo.
+candidata a virar prova de conceito reduzida, com a limitação documentada no artigo. Foi o
+que aconteceu (§2.4), e os três módulos obrigatórios foram entregues inteiros.
 
 ---
 
