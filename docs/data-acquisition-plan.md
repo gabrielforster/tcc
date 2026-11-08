@@ -3,6 +3,12 @@
 > Status: **decided on 2026-09-10** (D1 below). The project proceeds on public datasets
 > now; the company ERP stays open as a parallel track that would upgrade the results if
 > it lands in time. Decisions D2-D6 remain open and are tracked at the bottom.
+>
+> **A historical record.** It is kept because D1 is the decision the experiment protocol
+> (`docs/experiment-protocol.md`) rests on. No ERP data arrived, so the operational
+> comparison was simulated, as D1 anticipated; the open items below are as they stood in
+> September. The EDA it cites is now `docs/eda-synthetic.md` and
+> `docs/eda-bank-marketing.md`.
 
 ## Decision in one paragraph
 
@@ -22,8 +28,8 @@ The pipeline is complete and runs end to end, but every number it has produced s
 comes from `SyntheticSource` — a generator I wrote, seeded at 42, producing 1,200
 customers and 12,000 receivables. No ERP was touched.
 
-That matters more than it might look. The patterns visible in `docs/eda.md` are ones the
-generator was built to contain:
+That matters more than it might look. The patterns visible in `docs/eda-synthetic.md` are
+ones the generator was built to contain:
 
 | What the chart shows | Where it actually comes from |
 |---|---|
@@ -223,8 +229,8 @@ its own subsection, clearly separated from results. Your advisor may have a stro
 
 Currently yes, in PR #1, so the article can reference them. They will be replaced wholesale
 when real data arrives, and PNG diffs are noise in review. The alternative is generating
-them on demand and keeping only `docs/eda.md`. Low stakes, but it is easier to change now
-than after the history fills up.
+them on demand and keeping only `docs/eda-synthetic.md`. Low stakes, but it is easier to
+change now than after the history fills up.
 
 ### D6 — How is the research question restated? **Most urgent of the open items**
 

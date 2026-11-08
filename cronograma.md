@@ -15,10 +15,10 @@ Cada encontro tem **uma entrega pequena, verificável e acumulativa** — códig
 gerado, ou seção de texto escrita. A coluna *Artefato* é o que se mostra no encontro; a coluna
 *Texto* é o que avança no artigo, para que a redação não fique concentrada no fim.
 
-**Situação em 07/11/2026.** As entregas 1–14 estão integradas. As entregas 15, 16 e 17
-estão construídas e medidas, em revisão nos *pull requests* #32–#37, e duas delas mudaram de
-forma (§2.4 e §2.5). O artigo da entrega 18 está redigido sobre esses resultados e aguarda a
-revisão. A entrega 19 — *tag*, *slides* e ensaio — é a que resta.
+**Situação em 08/11/2026.** As entregas 1–18 estão integradas ao `master`; duas delas
+mudaram de forma (§2.4 e §2.5). O artigo da entrega 18 está redigido sobre esses resultados,
+com o corpo em 4 páginas. Da entrega 19 restam o ensaio da defesa e a *tag* de entrega em
+03/12; os *slides* e o roteiro já estão prontos.
 
 ### Bloco I — Fundação: requisitos e dados (30/07 a 27/08)
 

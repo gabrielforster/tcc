@@ -10,9 +10,9 @@
 "de onde vem isso?", a resposta é sempre um arquivo. Diga "simulação" e "dados sintéticos" em voz
 alta quando forem o caso: a honestidade sobre o que *não* foi medido é parte do argumento.
 
-## Valores que ainda podem mudar
+## Valor que vem de uma remedição
 
-Um valor depende de remedição. No deck ele vem de **uma única constante** (`DEFESA.vozFala`, no
+Um valor depende de uma medição que pode ser refeita. No deck ele vem de **uma única constante** (`DEFESA.vozFala`, no
 fim de `defesa.html`); aqui ele aparece só nos pontos marcados com `VOZ_FALA`. Ao trocar o número,
 troque os três lugares. (Os 102 s da primeira medição são história — o problema achado — e não
 mudam.)

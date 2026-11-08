@@ -41,10 +41,6 @@
 \newcommand{\parcial}{\textcolor{orange!90!black}{$\sim$}}
 \newcommand{\naoatende}{\textcolor{red!70!black}{\ding{55}}}
 
-%% Marca visível do que ainda depende de trabalho em andamento. Antes da versão
-%% final, `grep -n pendente main.tex` precisa voltar vazio (exceto esta definição).
-\newcommand{\pendente}[1]{\textcolor{red!75!black}{\textbf{[PENDENTE: #1]}}}
-
 \jid{ROCS}
 \jtitle{SBC Computing Reviews, 202X, XX:1}
 \issn{2966-3938}
@@ -243,7 +239,7 @@ Chamada: turno / resposta falada & \SetCell[c=2]{c} 2.193~ms / 11,7~s &  \\
 \end{tblr}
 \end{table}
 
-\textbf{Voz.} A uma taxa de erro de palavras de 0,099, que produz uma transcrição legível, a intenção concorda em 86\% dos casos, mas um valor falado em sete já está errado (``mil duzentos e cinquenta'' ouvido como ``meu duzentos e cinquenta''), e os valores se corrompem enquanto o reconhecedor está confiante --- por isso todo valor ouvido é confirmado. Na chamada em tempo real, 18 falas sintetizadas por uma sala LiveKit real, num Ryzen 7 5700X3D só com CPU, levaram 2,2~s em mediana do fim da fala ao primeiro áudio: 1,2~s do Whisper \textit{small}, 0,7~s de espera de fim de turno, menos de 0,2~s do agente e do sintetizador, e cerca de 110~ms de rede. A intenção foi acertada em 15 de 18 falas. %% VOZ-DURACAO: no corpo, só a frase seguinte carrega a duração da resposta falada.
+\textbf{Voz.} A uma taxa de erro de palavras de 0,099, que produz uma transcrição legível, a intenção concorda em 86\% dos casos, mas um valor falado em sete já está errado (``mil duzentos e cinquenta'' ouvido como ``meu duzentos e cinquenta''), e os valores se corrompem enquanto o reconhecedor está confiante --- por isso todo valor ouvido é confirmado. Na chamada em tempo real, 18 falas sintetizadas por uma sala LiveKit real, num Ryzen 7 5700X3D só com CPU, levaram 2,2~s em mediana do fim da fala ao primeiro áudio: 1,2~s do Whisper \textit{small}, 0,7~s de espera de fim de turno, menos de 0,2~s do agente e do sintetizador, e cerca de 110~ms de rede. A intenção foi acertada em 14 de 18 falas.
 Na primeira medição, a resposta do \textit{template} citava trechos inteiros e durava em mediana 102~s; agora a chamada declara quanto comporta --- 43 palavras, derivadas de uma meta de 20~s de fala e da taxa mais lenta do Piper (2,15 palavras/s) --- e o respondedor escolhe a seção recuperada que cabe, sem que o canal encurte nada: a resposta falada dura 11,7~s em mediana (máximo 16,2~s, 18 de 18 abaixo da meta) e segue integralmente apoiada nos trechos. Resta que a recuperação às vezes escolhe o trecho errado, e a resposta sai curta e errada. Uma pessoa falando pelo microfone do navegador não foi verificada.
 
 \subsection{Testes e experimento integrado}

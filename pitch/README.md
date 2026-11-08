@@ -13,14 +13,14 @@ A apresentação de defesa fica ao lado do pitch, no mesmo formato e tema:
 | `defesa.html` | Deck de 19 slides (~16 min de fala + ~3 min de demonstração). Abre como o `index.html`. |
 | `roteiro-defesa.md` | Roteiro falado com tempos por slide e as perguntas prováveis da banca com respostas. |
 | `css/defesa.css` | Estilos que a defesa usa além do `theme.css` (tabelas, capturas de tela). |
-| `assets/img/` | Figuras copiadas de `docs/images/` e `article/figuras/`, para o deck continuar offline. |
+| `assets/img/` | Figuras copiadas de `docs/images/`, para o deck continuar offline. |
 
 O roteiro da demonstração ao vivo está em [`docs/demo-script.md`](../docs/demo-script.md), e o
 checklist de entrega em [`docs/delivery-checklist.md`](../docs/delivery-checklist.md).
 
-Um valor do deck ainda pode mudar — a duração mediana de uma resposta falada na chamada de
-voz. Ele está numa única constante (`DEFESA.vozFala`, no fim de `defesa.html`) e nos dois
-pontos marcados com `VOZ_FALA` no roteiro.
+A duração mediana de uma resposta falada na chamada de voz vem de uma medição, e a única
+que pode ser refeita: está numa única constante (`DEFESA.vozFala`, no fim de `defesa.html`) e
+nos dois pontos marcados com `VOZ_FALA` no roteiro. Se for remedida, troque os três.
 
 Para exportar o PDF: `./export-pdf.sh defesa.html` (uma página por slide, com todos os
 fragmentos visíveis). Veja "Exportar PDF" abaixo.
