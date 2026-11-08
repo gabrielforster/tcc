@@ -1,4 +1,4 @@
-.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge queue migrate pipeline test lint fmt cronograma
+.PHONY: setup up down seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice contacts sweep purge queue migrate pipeline test coverage lint fmt cronograma
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -74,6 +74,10 @@ pipeline:         ## the whole data pipeline, end to end (set COLLECTION_TENANT)
 
 test:
 	uv run pytest
+
+coverage:         ## the suite under coverage, then the critical-function report (target: 80%)
+	uv run pytest --cov --cov-report=term --cov-report=json
+	uv run python scripts/critical_coverage.py
 
 lint:
 	uv run ruff check src tests

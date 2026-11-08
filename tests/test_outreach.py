@@ -61,7 +61,14 @@ def test_terms_come_from_the_instalment_table_not_from_python() -> None:
 
 
 def test_pre_due_has_no_offer_to_make() -> None:
-    assert Brief(customer_id="c", amount=100.0, days_late=-2).terms is None
+    pre_due = Brief(customer_id="c", amount=100.0, days_late=-2)
+    assert pre_due.terms is None
+    assert pre_due.instalments == 0
+    assert pre_due.discount_percent == 0.0
+
+
+def test_the_discount_on_offer_is_the_stage_s_row_of_the_table() -> None:
+    assert Brief(customer_id="c", amount=900.0, days_late=12).discount_percent == 10
 
 
 def test_the_instalment_floor_binds_before_the_table_does() -> None:
@@ -152,6 +159,19 @@ def test_a_message_without_the_opt_out_is_not_sendable(brief: Brief) -> None:
     result = check(text, brief)
     assert result.missing_disclosures == ["opt_out"]
     assert not result.sendable
+
+
+def test_the_comparison_row_counts_each_kind_of_violation(brief: Brief) -> None:
+    """The evaluation tables are built from this row, so each count must be the real one."""
+    text = f"Vamos protocolar uma ação judicial por R$ 97,30. {OPT_OUT_TOKEN}"
+    result = check(text, brief)
+    row = result.as_row()
+    assert row["compliant"] is False
+    assert row["invented_numbers"] == len(result.invented_numbers) == 1
+    assert row["forbidden_terms"] == len(result.forbidden_terms) >= 1
+    assert row["missing_disclosures"] == len(result.missing_disclosures) >= 1
+    assert row["over_authority"] == 0
+    assert row["chars"] == len(text)
 
 
 def test_an_offer_beyond_the_stage_is_caught_even_when_the_digits_are_legitimate(
