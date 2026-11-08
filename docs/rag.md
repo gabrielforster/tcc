@@ -82,22 +82,25 @@ is where passages come from.
 This has to be settled before any number is read, because it decides which table is the
 result.
 
-`limites-de-alcada.md` is published `INTERNAL`, and the pgvector retriever filters on the
-audience in SQL, so that document can never occupy a result slot — by design, because it
-holds the discount ceilings. The in-memory index has no such notion and indexes all five
-files. Two of the sixteen labelled questions (*"quando o atendimento precisa chamar um
-humano?"* and *"qual o valor minimo de cada parcela?"*) are answered only by that file, so
-they are unavoidable misses for the serving arm.
+Two documents are published `INTERNAL`: `limites-de-alcada.md`, which holds the discount
+ceilings, and `script-de-negociacao.md`, which tells an operator how to negotiate
+(*"nunca prometer desconto fora da alçada"*) and is guidance for staff, not text to quote to
+a debtor. The pgvector retriever filters on the audience in SQL, so neither can ever occupy
+a result slot. The in-memory index has no such notion and indexes all five files. Four of
+the sixteen labelled questions are answered only by those two files (*"quando o atendimento
+precisa chamar um humano?"*, *"qual o valor minimo de cada parcela?"*, and the two operator
+questions *"como comecar a conversa de cobranca por telefone?"* and *"o cliente disse que
+esta desempregado, o que ofereco?"*), so they are unavoidable misses for the serving arm.
 
-Withholding the document from the *labels* alone does not fix this, and the first version
-of this measurement got it wrong that way: the baseline still ranks the internal document,
-spends rank 1 on it for two questions, and is then scored as having missed — a handicap,
-not an equalisation. **`--customer-only` withholds it from the corpus as well**, so both
-arms rank the same four customer-facing documents, and the same two unanswerable questions
+Withholding the documents from the *labels* alone does not fix this, and the first version
+of this measurement got it wrong that way: the baseline still ranks an internal document,
+spends rank 1 on it, and is then scored as having missed — a handicap, not an
+equalisation. **`--customer-only` withholds them from the corpus as well**, so both arms
+rank the same three customer-facing documents, and the same four unanswerable questions
 are dropped from both. That is the comparable measurement.
 
 The arms still chunk differently, and that difference is real rather than procedural: the
-index makes one document per CSV row (5 documents → 9 chunks, 4 → 8 under
+index makes one document per CSV row (5 documents → 9 chunks, 3 → 7 under
 `--customer-only`), while the database versions a file as a whole (5 documents →
 5 chunks). It is part of what is being compared, and it turns out to matter.
 
@@ -105,55 +108,48 @@ index makes one document per CSV row (5 documents → 9 chunks, 4 → 8 under
 
 | k | precision@k (tfidf) | recall@k (tfidf) | MRR (tfidf) | precision@k (pgvector) | recall@k (pgvector) | MRR (pgvector) |
 |--:|--:|--:|--:|--:|--:|--:|
-|  1 | 0.6250 | 0.5833 | 0.6250 | 0.5625 | 0.5625 | 0.5625 |
-|  3 | 0.3750 | 0.9062 | 0.7708 | 0.3125 | 0.7917 | 0.6875 |
-|  5 | 0.2500 | 1.0000 | 0.7833 | 0.2000 | 0.8229 | 0.7031 |
-| 10 | 0.1250 | 1.0000 | 0.7833 | 0.1000 | 0.8229 | 0.7031 |
+|  1 | 0.6250 | 0.5833 | 0.6250 | 0.5000 | 0.5000 | 0.5000 |
+|  3 | 0.3750 | 0.9062 | 0.7708 | 0.2500 | 0.6458 | 0.6146 |
+|  5 | 0.2500 | 1.0000 | 0.7833 | 0.1500 | 0.6458 | 0.6146 |
+| 10 | 0.1250 | 1.0000 | 0.7833 | 0.0750 | 0.6458 | 0.6146 |
 
 This is each arm against the question set as written, and it is reported for completeness
-only. pgvector's 0.8229 is not a shortfall to explain: it is the arithmetic ceiling for any
-retriever that cannot return the withheld document — `(12·1 + 1/2 + 2/3)/16 = 0.8229`. The
-gap is the audience filter, not the embedder, and the table must not be read as a quality
-comparison.
+only. pgvector's 0.6458 is not a shortfall to explain: it is the arithmetic ceiling for any
+retriever that cannot return the withheld documents — nine questions fully answerable, two
+that lose half their gold set, one that loses two thirds, four that lose all of it:
+`(9 + 1/2 + 1/2 + 1/3)/16 = 0.6458`. The gap is the audience filter, not the embedder, and
+the table must not be read as a quality comparison.
 
-### Customer-facing corpus (14 questions) — the comparison
+### Customer-facing corpus (12 questions) — the comparison
 
-Both arms over the same four documents, `--customer-only` on each.
+Both arms over the same three documents, `--customer-only` on each. Measured 2026-11-08,
+after the negotiation script became internal.
 
 | k | precision@k (tfidf) | recall@k (tfidf) | MRR (tfidf) | precision@k (pgvector) | recall@k (pgvector) | MRR (pgvector) |
 |--:|--:|--:|--:|--:|--:|--:|
-|  1 | 0.7143 | 0.6429 | 0.7143 | 0.6429 | 0.6429 | 0.6429 |
-|  3 | 0.3333 | 0.8571 | 0.7857 | 0.3571 | 0.9286 | 0.7857 |
-|  5 | 0.2286 | 1.0000 | 0.8214 | 0.2286 | 1.0000 | 0.8036 |
-| 10 | 0.1143 | 1.0000 | 0.8214 | 0.1143 | 1.0000 | 0.8036 |
+|  1 | 0.7500 | 0.7500 | 0.7500 | 0.6667 | 0.6667 | 0.6667 |
+|  3 | 0.3333 | 1.0000 | 0.8472 | 0.3333 | 1.0000 | 0.8194 |
+|  5 | 0.2000 | 1.0000 | 0.8472 | 0.2000 | 1.0000 | 0.8194 |
+| 10 | 0.1000 | 1.0000 | 0.8472 | 0.1000 | 1.0000 | 0.8194 |
 
 **The pretrained embedder does not beat the lexical baseline on this corpus.** TF-IDF is
-ahead on MRR — 0.8214 against 0.8036, a difference of 0.018 — and puts a gold document
-first on 10 of 14 questions against pgvector's 9. The result went the other way from the
+ahead on MRR — 0.8472 against 0.8194, a difference of 0.028 — and puts the gold document
+first on 9 of 12 questions against pgvector's 8. The result went the other way from the
 hypothesis this document wrote down in advance, and it is reported as measured.
 
-It is a mixed result rather than a rout, and the mixture is the interesting part:
+Only rank 1 and MRR carry information here. With three documents in the corpus, every
+retriever's recall@3 is 1.0 by construction, so the depths below rank 1 cannot separate the
+arms. (An earlier version of this measurement, with the negotiation script still
+customer-facing, had four documents and fourteen questions: MRR 0.8214 against 0.8036, the
+same direction and a similar margin, with pgvector ahead on recall@3.)
 
-| | tfidf | pgvector | ahead |
-|---|--:|--:|---|
-| MRR@5 | **0.8214** | 0.8036 | tfidf, by 0.018 |
-| MRR@3 | 0.7857 | 0.7857 | tie |
-| recall@1 | 0.6429 | 0.6429 | tie |
-| questions with a gold document at rank 1 | **10 / 14** | 9 / 14 | tfidf, by one question |
-| recall@3 | 0.8571 | **0.9286** | pgvector |
-| recall@5 | 1.0000 | 1.0000 | tie |
-
-(recall@1 ties while the rank-1 counts differ because two questions have two gold
-documents each: TF-IDF's extra rank-1 hits are on those, and score 0.5 apiece.)
-
-So the embedder is *better at getting the answer into the top three* and *worse at putting
-it first*. On fourteen questions over four documents, a 0.018 MRR difference is a quarter
-of a reciprocal-rank point in total — about what one question moving from second place to
-fourth would cost — which is well inside what a corpus this size can resolve. **The honest
-statement is that the two retrievers are within noise of each other here, with the lexical
-baseline nominally ahead.** Nothing in these numbers justifies the move to pgvector on
-retrieval quality; the move is justified by what the in-memory index cannot do at all —
-serve many tenants, survive an edit, and cite the text a customer was actually shown.
+On twelve questions over three documents, a 0.028 MRR difference is a third of a
+reciprocal-rank point in total — one question moving from first place to second, give or
+take — which is well inside what a corpus this size can resolve. **The honest statement is
+that the two retrievers are within noise of each other here, with the lexical baseline
+nominally ahead.** Nothing in these numbers justifies the move to pgvector on retrieval
+quality; the move is justified by what the in-memory index cannot do at all — serve many
+tenants, survive an edit, and cite the text a customer was actually shown.
 
 ## What changed, question by question
 
@@ -169,20 +165,20 @@ customer-facing corpus; a bold entry is a hit.
 | voces podem me ligar no domingo? | faq.md | **politica-de-cobranca.md** | politica-de-cobranca.md |
 | em quantas vezes consigo dividir um atraso de 45 dias? | faq.md | **tabela-de-parcelamento.csv** | tabela-de-parcelamento.csv |
 | nao quero mais receber mensagens de cobranca | **politica-de-cobranca.md** | **politica-de-cobranca.md** | politica-de-cobranca.md |
-| posso parcelar minha divida? | **script-de-negociacao.md** | faq.md | tabela-de-parcelamento.csv, script-de-negociacao.md |
+| posso parcelar minha divida? | **tabela-de-parcelamento.csv** | faq.md | tabela-de-parcelamento.csv |
 | quantas vezes voces podem me contatar por semana? | **politica-de-cobranca.md** | tabela-de-parcelamento.csv | politica-de-cobranca.md |
-| nao reconheco essa divida, o valor esta errado | **script-de-negociacao.md** | tabela-de-parcelamento.csv | politica-de-cobranca.md, script-de-negociacao.md |
-| qual o desconto para pagamento a vista? | script-de-negociacao.md | faq.md | tabela-de-parcelamento.csv |
-| como comecar a conversa de cobranca por telefone? | faq.md | politica-de-cobranca.md | script-de-negociacao.md |
+| nao reconheco essa divida, o valor esta errado | **politica-de-cobranca.md** | tabela-de-parcelamento.csv | politica-de-cobranca.md |
+| qual o desconto para pagamento a vista? | faq.md | faq.md | tabela-de-parcelamento.csv |
 
 The prediction partly held. *"Voces podem me ligar no domingo?"* against a policy that says
 *"não há contato aos domingos"* is the case the hypothesis was built on, and the embedder
 does fix it where TF-IDF still answers `faq.md`; it also fixes the 45-day instalment
 lookup. But *"nao quero mais receber mensagens de cobranca"*, the other question the
-hypothesis rested on, was never a semantic failure at all — TF-IDF had ranked the internal
-document first, and once that document is withheld from both arms the baseline gets it
-right unaided. One of the two supporting cases was an artefact of the corpus, not of the
-representation.
+hypothesis rested on, was never a semantic failure at all — TF-IDF had ranked an internal
+document first, and once the internal documents are withheld from both arms the baseline
+gets it right unaided. One of the two supporting cases was an artefact of the corpus, not
+of the representation. *"Qual o desconto para pagamento a vista?"* is missed by both: the
+discount lives in the instalment table, and both arms answer from the FAQ.
 
 Against those two genuine fixes, the embedder loses three questions the baseline gets
 right: `posso parcelar minha divida?`, `quantas vezes voces podem me contatar por semana?`
@@ -213,9 +209,9 @@ being too weak, so the floor is not part of the result.
 
 The knowledge base under `knowledge/` is **written for this work, not extracted from a real
 company**. It is realistic in shape — policy, FAQ, negotiation script, instalment table,
-approval limits — and it is in Portuguese because that is what the agent will answer in and
-because retrieval behaves differently across languages. But it is small (5 documents,
-~660 words), so the numbers above characterise the pipeline, not a production corpus. With
-documents this short, each file becomes a single chunk and the chunking configuration is
-effectively untested by the corpus itself; the chunking behaviour is covered by tests
-instead.
+approval limits, the script and the limits for operators only — and it is in Portuguese
+because that is what the agent will answer in and because retrieval behaves differently
+across languages. But it is small (5 documents, ~660 words), so the numbers above
+characterise the pipeline, not a production corpus. With documents this short, each file
+becomes a single chunk and the chunking configuration is effectively untested by the corpus
+itself; the chunking behaviour is covered by tests instead.
