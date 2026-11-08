@@ -51,11 +51,21 @@ def index():
 def db_engine():
     """An engine on a migrated database.
 
-    Skips when Postgres is unreachable so the suite runs on a laptop with nothing started;
-    fails instead when COLLECTION_REQUIRE_DB=1, which CI sets, so a CI run cannot go green
-    by skipping every database test.
+    Only ever TEST_DATABASE_URL. Falling back to DATABASE_URL migrated a developer's own
+    database and ran the suite against whatever it held -- a model published by a real
+    `make train` turned "nothing was trained" tests red. A git worktree has no `.env`, so
+    the fallback was the default there, not an edge case.
+
+    Skips when the test database is unset or unreachable so the suite runs on a laptop with
+    nothing started; fails instead when COLLECTION_REQUIRE_DB=1, which CI sets, so a CI run
+    cannot go green by skipping every database test.
     """
-    url = settings.test_database_url or settings.database_url
+    url = settings.test_database_url
+    if not url:
+        message = "TEST_DATABASE_URL is not set; the suite never falls back to DATABASE_URL"
+        if os.environ.get("COLLECTION_REQUIRE_DB") == "1":
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message)
     engine = create_engine(url, connect_args={"connect_timeout": 3})
     try:
         with engine.connect() as conn:
