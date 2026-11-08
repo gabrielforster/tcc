@@ -13,8 +13,26 @@ make coverage    # the suite under coverage, then the critical-function report
 Tests that need Postgres or MinIO **skip** when the services are unreachable, so the suite
 runs on a laptop with nothing started. `COLLECTION_REQUIRE_DB=1` turns those skips into
 failures; CI sets it, so a CI run cannot go green by skipping every database test.
-Thread pools are capped at 2 per run (`COLLECTION_TEST_THREADS` raises it), so two suites
-side by side do not saturate the machine.
+
+### Resource limits
+
+One run peaks near 1.8 GB and one core (measured 2026-11-08: 802 tests, 1 min 55 s). Several
+at once, one per worktree, once pushed a 32 GB laptop into swap until it stopped responding.
+Three limits keep that from happening again:
+
+- **One suite at a time per machine.** `tests/conftest.py` takes a lock in the system's
+  temporary directory; a second run, from any checkout or worktree, prints
+  `waiting for another test run to finish` and starts when the first ends.
+  `COLLECTION_TEST_LOCK=0` opts out.
+- **A memory and CPU ceiling.** `make test` and `make coverage` run through
+  `scripts/bounded.sh`, a systemd scope capped at 4G of memory, no swap, two cores and low
+  priority. A run past the ceiling is killed with a message, instead of the machine
+  thrashing. Raise the limits with `TEST_MEMORY=6G TEST_CPU=400% make test`, or remove them
+  with `TEST_BOUNDED=0`. Without systemd (macOS) only the low priority applies.
+- **Thread pools capped at 2** (`COLLECTION_TEST_THREADS` raises it), so numpy, torch and
+  the boosters do not each start a thread per core.
+
+`uv run pytest` directly still gets the lock and the thread cap, not the ceiling.
 
 No test touches the network. The language model, the speech recogniser and the embedding
 model each sit behind an interface, and the tests use a scripted or fake implementation:

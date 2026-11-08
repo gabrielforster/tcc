@@ -8,7 +8,11 @@ for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_var, _THREADS)
 os.environ.setdefault("N_JOBS", _THREADS)
 
+import fcntl  # noqa: E402
+import sys  # noqa: E402
+import tempfile  # noqa: E402
 import uuid  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import boto3  # noqa: E402
 import pytest  # noqa: E402
@@ -24,6 +28,29 @@ from collection.data.sources.synthetic import SyntheticSource  # noqa: E402
 from collection.db.migrations import alembic_config  # noqa: E402
 from collection.rag.documents import load_directory  # noqa: E402
 from collection.rag.index import VectorIndex  # noqa: E402
+
+#: One suite at a time per machine, across every checkout and worktree. Each run is
+#: affordable alone; five at once is what took a laptop down. A run that finds the lock
+#: taken waits for it rather than failing. The holder exports COLLECTION_TEST_LOCK_HELD so
+#: the suites a test starts in a subprocess (tests/test_db_setup.py) do not wait on their
+#: own parent. COLLECTION_TEST_LOCK=0 opts out.
+_LOCK_PATH = Path(tempfile.gettempdir()) / "collection-tests.lock"
+
+
+def pytest_configure(config):
+    if os.environ.get("COLLECTION_TEST_LOCK") == "0":
+        return
+    if os.environ.get("COLLECTION_TEST_LOCK_HELD") == "1":
+        return
+    handle = _LOCK_PATH.open("w")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print(f"waiting for another test run to finish ({_LOCK_PATH})", file=sys.stderr)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    # Held until the process exits; the kernel releases it even if the run is killed.
+    config._collection_test_lock = handle
+    os.environ["COLLECTION_TEST_LOCK_HELD"] = "1"
 
 
 @pytest.fixture(scope="session")

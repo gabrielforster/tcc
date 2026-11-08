@@ -93,11 +93,11 @@ migrate:          ## apply database migrations (alembic upgrade head)
 pipeline:         ## the whole data pipeline, end to end (set COLLECTION_TENANT)
 	uv run collection pipeline
 
-test:             ## the test suite (database tests need TEST_DATABASE_URL)
-	uv run pytest
+test:             ## the test suite, capped at 4G and 2 cores (database tests need TEST_DATABASE_URL)
+	scripts/bounded.sh uv run pytest
 
 coverage:         ## the suite under coverage, then the critical-function report (target: 80%)
-	uv run pytest --cov --cov-report=term --cov-report=json
+	scripts/bounded.sh uv run pytest --cov --cov-report=term --cov-report=json
 	uv run python scripts/critical_coverage.py
 
 lint:             ## ruff over src and tests
