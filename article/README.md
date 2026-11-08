@@ -7,9 +7,7 @@ Artigo no formato **SBC Reviews 2025**, descrevendo o sistema construído e o qu
 O corpo tem 4 páginas (dentro do limite de 4–6); o Apêndice (tabela comparativa de trabalhos
 relacionados) e as Referências ficam nas páginas 5–7 e não contam para o limite. As tabelas
 completas de cada medição ficam em `docs/` e são citadas no texto; os comandos que as
-reproduzem estão abaixo. A macro `\pendente{...}` marca em vermelho, no PDF, o que ainda
-depender de trabalho em andamento; hoje nenhuma ocorrência resta, e
-`grep -n 'pendente{' main.tex` confirma.
+reproduzem estão abaixo.
 
 ## Arquivos
 
@@ -21,7 +19,6 @@ depender de trabalho em andamento; hoje nenhuma ocorrência resta, e
 | `sectsty.sty`, `aas_macros.sty` | Pacotes de apoio (do template) |
 | `apalike-sol.bst` | Estilo bibliográfico (do template) |
 | `sol.jpg` | Logo usado pela classe |
-| `figuras/` | Figuras do artigo (cópias de `docs/images` e dos relatórios) |
 | `Dockerfile` | Imagem de TeX usada por `make article` |
 | `build.sh` | Script de compilação (contorna instalação local quebrada do TeX) |
 

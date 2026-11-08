@@ -52,7 +52,7 @@ engine, intent, templates), plus the orchestrator and the responder, which every
 passes through, plus the two external-service seams (the LLM client and the speech
 recogniser), whose failure paths decide whether a customer gets an answer or a person.
 
-Measured on 2026-11-07 at the top of the stack this document shipped in, 802 tests,
+Measured on 2026-11-07, re-run on `master` on 2026-11-08 with the same result: 802 tests,
 Postgres and MinIO up (no skips). *Before* is `master` on 2026-11-06, before these tests
 were added. Two groups have grown since: the responder gained two functions with the
 spoken reply (14 → 16) and the service seams gained the OpenAI-compatible client (27 → 33),

@@ -4,33 +4,18 @@ The final delivery (meeting 19): the article in its final version, a tagged repo
 defense presented and rehearsed. Work through the sections in order; each box is something to
 check, not something that happens on its own.
 
-## 1. Merge the open stack (by 26/11)
+## 1. Verify `master`
 
-The remaining work is one stack of pull requests on `gabrielforster/tcc`. Merge it **bottom
-up**: each PR's base is the branch below it, so merging out of order merges the lower PR's
-commits through the upper one without review.
+Everything built for the delivery is merged (the last stack, #32–#42, on 08/11). With CI
+unavailable, the local run is the verification; repeat it after any later fix.
 
-- [ ] `gh stack view` (or the stack on GitHub) lists the PRs in this order, bottom to top
-      (the last four were numbered out of stack order, so go by this list, not by number):
-
-      1. `#32` — test-database fix
-      2. `#33` — critical-function coverage and flow tests
-      3. `#34` — local LLM arm (Ollama)
-      4. `#35` — experiment against the baselines
-      5. `#36` — LiveKit voice call
-      6. `#37` — article rewrite
-      7. #42 `feat/spoken-replies` — replies shaped for the ear on the call
-      8. #39 `docs/schedule-and-readme-catch-up` — schedule and README
-      9. #40 `docs/article-within-the-page-limit` — article cut to the page limit
-      10. #41 `docs/defense-deck` — defense deck, demo script and this checklist
-- [ ] Merge each one only after the one below it is on `master`; then retarget the next to
-      `master` (GitHub does this when the base branch is deleted on merge).
-- [ ] After the last merge, on a clean checkout of `master`:
+- [ ] On a clean checkout of `master`:
 
 ```sh
 git switch master && git pull
 make setup
-make test                 # with TEST_DATABASE_URL set in .env and `make up` running
+make test                 # with TEST_DATABASE_URL set in .env and `make up` running;
+                          # capped at 4G and 2 cores, one suite at a time (docs/testing.md)
 make lint
 make coverage             # fails if any critical group is under 80%
 ```
@@ -39,24 +24,23 @@ GitHub Actions has been failing in 2 s without starting, because of a billing lo
 account. Until that is fixed, a green check means nothing — the local run above is the
 verification.
 
-## 2. Rebuild the documents (after the merge)
+## 2. Rebuild the documents
 
 ```sh
 make article              # article/main.pdf — XeLaTeX + BibTeX in Docker; first build ~15 min
 make cronograma           # cronograma.pdf from cronograma.md
 ```
 
-- [ ] `article/main.pdf` builds with no `!` errors and has no `\pendente` text left
-      (`grep -c pendente article/main.tex` returns 0).
-- [ ] Every number in the article matches its source in `docs/` (the PR descriptions list
-      where each one comes from). In particular the spoken-reply duration of the voice call, which
+- [ ] `article/main.pdf` builds with no `!` errors.
+- [ ] Every number in the article matches its source in `docs/` (the reproduction table in
+      `article/README.md` lists the command behind each one). In particular the spoken-reply duration of the voice call, which
       also appears in `pitch/defesa.html` (constant `DEFESA.vozFala`) and twice in
       `pitch/roteiro-defesa.md` (marked `VOZ_FALA`).
 - [ ] The page count against the venue's limit: the proposal's `article/README.md` states a
       4–6 page body; confirm with the advisor whether that limit applies to the final article.
 - [ ] `cronograma.pdf` is committed if `cronograma.md` changed (it is tracked; `main.pdf` is not).
 
-## 3. Tag the delivery (on 03/12, after the final merge)
+## 3. Tag the delivery (on 03/12)
 
 Tag the exact commit that is delivered, so the article's reproduction commands point at code that
 does not move. The tag is annotated so it carries a date and a message.
@@ -75,7 +59,7 @@ gh release create v1.0-entrega article/main.pdf cronograma.pdf \
   --notes "Artigo final, cronograma e o código no estado entregue."
 ```
 
-- [ ] The tag points at the merged `master`, not at a stack branch.
+- [ ] The tag points at `master`, not at a feature branch.
 - [ ] The release shows both PDFs.
 
 ## 4. The defense
