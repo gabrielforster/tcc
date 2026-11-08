@@ -146,6 +146,10 @@ class ChatChannel:
         shows_delivery_status=True,
         realtime=False,
     )
+    #: The transport label the events carry into the audit trail. The voice call drives
+    #: this channel's routing and sets it to "voice", so a call's turns are not recorded
+    #: as having arrived over the web.
+    event_channel = "web"
 
     def __init__(
         self,
@@ -300,7 +304,7 @@ class ChatChannel:
                 customer_id=session.customer_id,
                 payload={
                     "text": text,
-                    "channel": "web",
+                    "channel": self.event_channel,
                     "session_id": session_id,
                     # The thread so far, excluding the message being answered: the agent
                     # needs it to resolve "e em 6 vezes?" into a question it can retrieve
@@ -364,7 +368,7 @@ class ChatChannel:
                 customer_id=session.customer_id,
                 payload={
                     "audio_path": str(path),
-                    "channel": "web",
+                    "channel": self.event_channel,
                     "session_id": session_id,
                     "history": history,
                 },
@@ -485,6 +489,9 @@ class ChatChannel:
                     "Pronto, registrei o seu pedido: não enviaremos mais mensagens de "
                     "cobrança por este canal."
                 )
+                reply.intent = "opt_out"
+                if event.payload.get("transcript"):
+                    reply.transcript = str(event.payload["transcript"])
                 return reply
 
         for event in produced:

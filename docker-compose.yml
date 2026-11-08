@@ -59,6 +59,18 @@ services:
     volumes:
       - ollamadata:/root/.ollama
 
+  # The voice call's WebRTC server, self-hosted: no vendor account and no credentials to
+  # hold. Dev mode uses the well-known devkey/secret pair, which only makes sense on this
+  # machine. 7880 is signalling, 7881 the TCP fallback, 7882 the UDP media port.
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    container_name: collection-livekit
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
 volumes:
   pgdata:
   miniodata:

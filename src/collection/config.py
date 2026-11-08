@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     # is all the reporting needs, and the words are a liability without a purpose.
     transcript_retention_days: int = 180
 
+    # The voice call. LiveKit runs self-hosted from docker-compose in dev mode, whose
+    # well-known key pair is `devkey`/`secret`; a deployment overrides all three. The
+    # recordings and voices live under `data/`, which is never committed: a recording is
+    # biometric personal data, and a voice model is a 60 MB download, not source.
+    livekit_url: str = "ws://127.0.0.1:7880"
+    livekit_api_key: str = "devkey"
+    livekit_api_secret: str = "secret"
+    dir_calls: Path = ROOT / "data" / "calls"
+    dir_voices: Path = ROOT / "data" / "voices"
+
     # `dir_raw` is a download cache, not pipeline output: the public sources read local
     # files, so a fetched Kaggle or UCI archive is kept here rather than downloaded
     # again. Everything the pipeline produces -- frames, splits, preprocessors, models,
