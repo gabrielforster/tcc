@@ -35,8 +35,10 @@ from collection.agents.conversation import (
 )
 from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
+from collection.agents.spoken import select
 from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved, VectorIndex
 from collection.voice.audio import AudioError
+from collection.voice.speak import spoken_words
 from collection.voice.transcribe import (
     MIN_CONFIDENCE,
     Transcriber,
@@ -77,8 +79,15 @@ class Responder(ABC):
         intent: Intent,
         passages: list[Retrieved],
         history: Conversation | None = None,
+        *,
+        max_words: int | None = None,
     ) -> Answer:
-        """Compose an answer from the retrieved passages, in the context of the thread."""
+        """Compose an answer from the retrieved passages, in the context of the thread.
+
+        `max_words` is set when the reply will be heard rather than read: the channel says
+        how much it can carry, and the responder -- not the channel -- decides what fits.
+        `None` is a reader, and the answer is whatever the responder would always write.
+        """
 
 
 class TemplateResponder(Responder):
@@ -106,6 +115,8 @@ class TemplateResponder(Responder):
         intent: Intent,
         passages: list[Retrieved],
         history: Conversation | None = None,
+        *,
+        max_words: int | None = None,
     ) -> Answer:
         # The template quotes passages, so the thread changes nothing for it: history is
         # accepted to satisfy the interface and deliberately unused. That is also what
@@ -120,11 +131,29 @@ class TemplateResponder(Responder):
                 responder=self.name,
             )
         opener = self.OPENERS.get(intent, self.OPENERS[Intent.UNKNOWN])
+        if max_words is not None:
+            return self._spoken(message, opener, passages, max_words)
         body = "\n\n".join(" ".join(p.text.split()) for p in passages[:2])
         citations = list(dict.fromkeys(p.document_id for p in passages[:2]))
         return Answer(
             text=f"{opener}\n\n{body}\n\nFonte: {', '.join(citations)}",
             citations=citations,
+            grounded=True,
+            responder=self.name,
+        )
+
+    def _spoken(
+        self, message: str, opener: str, passages: list[Retrieved], max_words: int
+    ) -> Answer:
+        """The same quotation, cut to the sentences that answer, for a listener.
+
+        No `Fonte:` line: a file name read aloud tells the customer nothing. The documents
+        stay on `citations`, so the call record still says where the words came from.
+        """
+        chosen = select(message, passages, max_words - spoken_words(opener))
+        return Answer(
+            text=" ".join([opener, *(sentence.text for sentence in chosen)]),
+            citations=list(dict.fromkeys(sentence.document_id for sentence in chosen)),
             grounded=True,
             responder=self.name,
         )
@@ -190,6 +219,7 @@ class ResponsiveAgent(Agent):
         message: str,
         customer_id: str = "anonymous",
         history: Conversation | None = None,
+        max_words: int | None = None,
     ) -> Reply:
         started = self.clock()
         classification = resolve_intent(
@@ -238,7 +268,9 @@ class ResponsiveAgent(Agent):
         # would have found; adding a query cannot.
         queries = self.rewriter.queries(message, history)
         passages = self._retrieve(queries)
-        answer = self.responder.respond(message, classification.intent, passages, history)
+        answer = self.responder.respond(
+            message, classification.intent, passages, history, max_words=max_words
+        )
 
         return Reply(
             answer=answer,
@@ -336,6 +368,14 @@ class ResponsiveAgent(Agent):
         if not message:
             return [event.caused(EventType.ESCALATED_TO_HUMAN, reason="empty_message")]
 
+        # A figure heard in audio is read back before the answer. The read-back is the
+        # customer's own words and cannot be shortened, so on a channel with a word budget
+        # it is paid for out of the answer's share, not added on top of it.
+        confirm = heard is not None and needs_confirmation(message)
+        read_back = CONFIRM_PREFIX.format(transcript=heard.text) if confirm else ""
+        budget = event.payload.get("reply_max_words")
+        max_words = max(0, int(budget) - spoken_words(read_back)) if budget else None
+
         # The channel puts the thread on the event; a channel that does not have one
         # (or does not keep it) simply omits it and the agent answers single-turn.
         history = event.payload.get("history")
@@ -343,6 +383,7 @@ class ResponsiveAgent(Agent):
             message,
             customer_id=event.customer_id,
             history=history if isinstance(history, Conversation) else None,
+            max_words=max_words,
         )
 
         if reply.classification.intent is Intent.OPT_OUT:
@@ -376,10 +417,10 @@ class ResponsiveAgent(Agent):
                 "transcript": heard.text,
                 "transcription_confidence": round(heard.confidence, 3),
                 "transcriber": heard.transcriber,
-                "needs_confirmation": needs_confirmation(message),
+                "needs_confirmation": confirm,
             }
-            if spoken["needs_confirmation"]:
-                text = CONFIRM_PREFIX.format(transcript=heard.text) + " " + text
+            if confirm:
+                text = read_back + " " + text
 
         return [
             event.caused(

@@ -150,6 +150,9 @@ class ChatChannel:
     #: this channel's routing and sets it to "voice", so a call's turns are not recorded
     #: as having arrived over the web.
     event_channel = "web"
+    #: Put on every turn's event for the responder to honour. The chat has none; the voice
+    #: call drives this channel's routing and sets its own.
+    reply_max_words: int | None = None
 
     def __init__(
         self,
@@ -306,6 +309,7 @@ class ChatChannel:
                     "text": text,
                     "channel": self.event_channel,
                     "session_id": session_id,
+                    **self._reply_budget(),
                     # The thread so far, excluding the message being answered: the agent
                     # needs it to resolve "e em 6 vezes?" into a question it can retrieve
                     # on. It rides on the event rather than being handed to the agent
@@ -370,6 +374,7 @@ class ChatChannel:
                     "audio_path": str(path),
                     "channel": self.event_channel,
                     "session_id": session_id,
+                    **self._reply_budget(),
                     "history": history,
                 },
             )
@@ -395,6 +400,12 @@ class ChatChannel:
             session.escalated = True
         self._track_reply(session, reply)
         return reply
+
+    def _reply_budget(self) -> dict[str, int]:
+        """The word budget for the event payload, absent when there is none."""
+        if self.reply_max_words is None:
+            return {}
+        return {"reply_max_words": self.reply_max_words}
 
     def _record_answer(self, session: Session, reply: ChatReply, produced: list[Event]) -> None:
         """Record the agent's turn with the evidence behind it.

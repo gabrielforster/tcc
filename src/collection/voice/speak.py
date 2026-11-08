@@ -24,6 +24,7 @@ than on whichever exception a backend happens to raise.
 """
 
 import math
+import re
 import struct
 import time
 import wave
@@ -39,6 +40,38 @@ from collection.config import settings
 #: the recogniser is not hearing the agent's own voice back.
 AGENT_VOICE = "pt_BR-faber-medium"
 CUSTOMER_VOICE = "pt_BR-cadu-medium"
+#: The slowest rate, in `spoken_words` per second, at which `AGENT_VOICE` speaks a
+#: sentence the responder can say. Measured on 2026-11-07 over all 47 such sentences of
+#: the knowledge base, the instalment table's rows included: 2.15 slowest. The slowest is
+#: the one that matters, because a budget derived from it holds for every sentence -- a
+#: reply cut to the median rate overruns whenever it is made of the slow ones.
+#: `make call-bench` re-measures it and reports drift.
+SLOWEST_WORDS_PER_SECOND = 2.15
+
+_SPOKEN_TOKEN = re.compile(r"\d+|[^\W\d_]+|%")
+
+
+def spoken_words(text: str) -> int:
+    """Words as a synthesiser says them, which is not words as whitespace splits them.
+
+    The budget was first counted with `str.split`, and the re-measurement caught it: the
+    instalment table's rows spoke at 1.15 "words" per second against 2.15 for prose,
+    because `entrada_minima_percentual` is one token to `split` and three words to Piper,
+    and `1.5` is one token and "um vírgula cinco". Counting runs of letters and runs of
+    digits separately, and `%` as the two words "por cento", puts the table and the prose
+    on the same rate (about 2.2-2.5 words a second against 2.15-3.7), so one budget fits both.
+    """
+    return sum(2 if token == "%" else 1 for token in _SPOKEN_TOKEN.findall(text))
+
+
+def speaking_rates(synthesizer: "Synthesizer", sentences: list[str]) -> list[float]:
+    """`spoken_words` per second for each sentence, as `synthesizer` actually speaks it."""
+    rates = []
+    for sentence in sentences:
+        seconds = sum(chunk.duration_s for chunk in synthesizer.synthesize(sentence))
+        if seconds > 0:
+            rates.append(spoken_words(sentence) / seconds)
+    return rates
 
 
 class SynthesisError(RuntimeError):
