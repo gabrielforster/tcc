@@ -22,8 +22,10 @@ Re-running is safe and is the expected thing to do after editing a file under
 version and an edit mints the next one, and ingestion replaces the tenant's rows rather
 than adding to them. A tenant that is already `ACTIVE` simply stays there.
 
-`limites-de-alcada.md` is published `INTERNAL` and everything else `CUSTOMER`, because
-that file holds the discount ceilings and the escalation triggers. The retriever filters
+`limites-de-alcada.md` and `script-de-negociacao.md` are published `INTERNAL` and
+everything else `CUSTOMER`: the first holds the discount ceilings and the escalation
+triggers, the second tells an operator how to negotiate ("nunca prometer desconto fora da
+alçada") and is guidance for staff, not text to quote to a debtor. The retriever filters
 on the audience; this is where the filter is given something to act on, and getting it
 wrong here is the disclosure the filter exists to prevent.
 """
@@ -44,8 +46,9 @@ from collection.db.session import unit_of_work
 from collection.rag.documents import SUPPORTED, load_file
 from collection.rag.store import publish_document
 
-#: The documents a customer must never be quoted from: discount ceilings, authority limits.
-INTERNAL_DOCUMENTS = frozenset({"limites-de-alcada.md"})
+#: The documents a customer must never be quoted from: the discount ceilings and authority
+#: limits, and the operators' negotiation script.
+INTERNAL_DOCUMENTS = frozenset({"limites-de-alcada.md", "script-de-negociacao.md"})
 
 #: The lifecycle in order, so seeding can climb from wherever a previous run stopped.
 _LADDER = (

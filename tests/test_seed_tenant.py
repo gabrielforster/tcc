@@ -28,10 +28,11 @@ from collection.rag.retriever import PgVectorRetriever
 CUSTOMER_FACING = {
     "faq.md",
     "politica-de-cobranca.md",
-    "script-de-negociacao.md",
     "tabela-de-parcelamento.csv",
 }
-INTERNAL = "limites-de-alcada.md"
+#: The authority limits, and the operators' negotiation script ("nunca prometer desconto
+#: fora da alçada" is guidance for whoever negotiates, not text to quote to a debtor).
+INTERNAL = {"limites-de-alcada.md", "script-de-negociacao.md"}
 #: The dataset the `seeding` fixture shrinks the synthetic source down to.
 CUSTOMERS, INVOICES = 20, 60
 
@@ -104,18 +105,24 @@ def test_seeding_produces_an_active_tenant_that_can_answer(seeding, db):
 
 
 @pytest.mark.db
-def test_the_authority_limits_document_is_seeded_as_internal(seeding, db):
+def test_the_operator_documents_are_seeded_as_internal(seeding, db):
     tenant = seed_development_tenant()
 
     scope = _scope(db, tenant.id)
     audiences = {document.path: document.audience for document in scope.all(KnowledgeDocument)}
 
-    assert audiences[INTERNAL] is Audience.INTERNAL
-    assert set(audiences) == CUSTOMER_FACING | {INTERNAL}
+    assert all(audiences[path] is Audience.INTERNAL for path in INTERNAL)
+    assert set(audiences) == CUSTOMER_FACING | INTERNAL
     assert all(audiences[path] is Audience.CUSTOMER for path in CUSTOMER_FACING)
-    # The point of the audience: the discount ceilings are not reachable by a customer.
-    retrieved = PgVectorRetriever(scope).search("qual o desconto maximo que posso conceder?", 10)
-    assert INTERNAL not in {hit.chunk.document_id for hit in retrieved}
+    # The point of the audience: neither the discount ceilings nor the script that tells an
+    # operator how to negotiate is reachable by a customer, even asked in their own words.
+    retriever = PgVectorRetriever(scope)
+    for question in (
+        "qual o desconto maximo que posso conceder?",
+        "como comecar a conversa de cobranca por telefone?",
+    ):
+        retrieved = {hit.chunk.document_id for hit in retriever.search(question, 10)}
+        assert not retrieved & INTERNAL, question
 
 
 @pytest.mark.db
