@@ -348,7 +348,7 @@ named person's debt. It is a reduced proof of concept: no barge-in, no SIP, no o
 dialling. The turn takes a median of 2.2 s end to end over WebRTC on a CPU. The call
 states a reply budget of 43 words (a 20 s turn at Piper's slowest measured rate) and the
 responder picks the passage section that fits, sentences intact, so a spoken reply lasts a
-median of 11.7 s where the first measurement read whole passages for 102 s. The chat's
+median of 12.1 s where the first measurement read whole passages for 102 s. The chat's
 replies are unchanged. Retrieval can still pick the wrong passage, and then a short reply
 is short and wrong.
 

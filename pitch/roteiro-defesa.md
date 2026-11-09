@@ -19,7 +19,7 @@ mudam.)
 
 | Chave | Valor atual | Fonte |
 |---|---|---|
-| `VOZ_FALA` — duração mediana de uma resposta falada na chamada | **11,7 s** (07/11/2026) | `docs/voice-call.md` |
+| `VOZ_FALA` — duração mediana de uma resposta falada na chamada | **12,1 s** (08/11/2026) | `docs/voice-call.md` |
 
 ---
 
@@ -136,8 +136,8 @@ falada durava em mediana **102 segundos**. A correção não foi no canal — o 
 de decidir que parte de uma política o cliente ouve. A chamada **declara** quanto cabe: **43
 palavras**, de uma meta de 20 segundos vezes a velocidade mais lenta medida do sintetizador, 2,15
 palavras por segundo. O respondedor escolhe a seção do documento que melhor responde e a lê
-literalmente, sem parafrasear. Medido de novo: mediana de **11,7 s** <!-- VOZ_FALA -->, máximo de
-16,2, as 18 falas dentro da meta — e o chat continua idêntico. Limitação: a recuperação ainda pode
+literalmente, sem parafrasear. Medido de novo: mediana de **12,1 s** <!-- VOZ_FALA -->, máximo de
+19,2, as 18 falas dentro da meta — e o chat continua idêntico. Limitação: a recuperação ainda pode
 escolher o trecho errado. O que **não** foi verificado: uma pessoa falando pelo microfone do
 navegador."
 
@@ -257,11 +257,11 @@ Porque com alvo desbalanceado prever sempre a classe majoritária tem acurácia 
 nada: na tarefa 2, a classe majoritária tem 0,836 de acurácia e o modelo útil tem 0,762.
 
 **"A chamada de voz é utilizável?"**
-Como prova de conceito, sim, com ressalvas. O turno leva 2,2 s (2.193 ms medidos por WebRTC). A
+Como prova de conceito, sim, com ressalvas. O turno leva 2,2 s (2.174 ms medidos por WebRTC). A
 primeira medição mostrou que a resposta do *template*, falada, durava 102 s; a chamada passou a
 declarar um orçamento de 43 palavras (20 s × 2,15 palavras/s, a velocidade mais lenta medida do
 Piper), o respondedor escolhe a seção que cabe sem parafrasear, e a resposta falada caiu para uma
-mediana de **11,7 s** <!-- VOZ_FALA --> (máximo 16,2 s; 18 de 18 dentro da meta de 20 s). As
+mediana de **12,1 s** <!-- VOZ_FALA --> (máximo 19,2 s; 18 de 18 dentro da meta de 20 s). As
 ressalvas: a resposta curta é tão boa quanto o trecho que a recuperação escolhe, e pode escolher o
 errado; não há *barge-in*; e o caminho com uma pessoa falando no microfone do navegador não foi
 verificado por máquina.

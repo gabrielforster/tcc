@@ -365,7 +365,7 @@ def _report_retrieval(
     between two different metric definitions: the question set, the ks and the sweep are
     the same code whether passages came from a fitted matrix or from the database.
     """
-    from collection.db.seed import INTERNAL_DOCUMENTS
+    from collection.rag.documents import INTERNAL_DOCUMENTS
     from collection.rag.evaluate import customer_visible, load_questions, sweep
 
     if query and not evaluate_only:
@@ -433,9 +433,9 @@ def rag(
 
     documents = load_directory(settings.dir_knowledge)
     if customer_only:
-        from collection.db.seed import INTERNAL_DOCUMENTS
+        from collection.rag.documents import load_customer_facing
 
-        documents = [d for d in documents if d.root_id not in INTERNAL_DOCUMENTS]
+        documents = load_customer_facing(settings.dir_knowledge)
     index = VectorIndex(embedder=get_embedder(embedder))
     index.add_documents(documents).build()
 
@@ -1040,13 +1040,14 @@ def call_bench(
     from collection.agents.responsive import get_responder
     from collection.channels import call_bench as bench
     from collection.channels.voice_call import VoiceCallChannel
-    from collection.rag.documents import load_directory
+    from collection.rag.documents import load_customer_facing
     from collection.rag.index import VectorIndex
     from collection.voice.evaluate import load_messages
     from collection.voice.speak import AGENT_VOICE, CUSTOMER_VOICE, PiperSynthesizer
     from collection.voice.transcribe import WhisperTranscriber
 
-    index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
+    # What the call server retrieves from (api/call.py), so the bench measures that.
+    index = VectorIndex().add_documents(load_customer_facing(settings.dir_knowledge)).build()
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="call-bench-audio-") as audio_dir:

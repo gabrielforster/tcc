@@ -34,6 +34,18 @@ class Document:
         return self.parent_id or self.document_id
 
 
+#: The documents a customer must never be quoted from: the discount ceilings and authority
+#: limits, and the operators' negotiation script. Seeding publishes them `INTERNAL`, which
+#: the pgvector retriever filters on; an in-memory index has no audience, so a serving path
+#: that builds one loads `load_customer_facing` instead of `load_directory`.
+INTERNAL_DOCUMENTS = frozenset({"limites-de-alcada.md", "script-de-negociacao.md"})
+
+
+def load_customer_facing(directory: Path | str) -> list[Document]:
+    """What a customer may be shown: every document but the internal ones."""
+    return [d for d in load_directory(directory) if d.root_id not in INTERNAL_DOCUMENTS]
+
+
 def load_directory(directory: Path | str) -> list[Document]:
     """Every supported file under a directory, sorted for reproducible ordering."""
     directory = Path(directory)
