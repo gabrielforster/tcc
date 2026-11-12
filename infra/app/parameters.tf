@@ -45,6 +45,8 @@ resource "aws_ssm_parameter" "secret" {
 
   name  = "${local.param_prefix}/${each.key}"
   type  = "SecureString" # encrypted with the AWS-managed aws/ssm key
+  # deploy.sh knows this exact value: it drops the optional LLM keys still holding it and
+  # refuses to deploy while any other secret does.
   value = "placeholder-set-me-with-aws-ssm-put-parameter"
 
   # The real value is set by hand after the first apply; without this, the next apply would

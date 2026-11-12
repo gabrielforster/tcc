@@ -41,6 +41,11 @@ render_env() {
 import json, re, sys
 
 prefix = sys.argv[1]
+# Terraform creates every secret with this value (infra/app/parameters.tf). An unset optional
+# one -- the key of the LLM provider not in use -- is left out, so the app sees it unset; an
+# unset required one stops the deploy before a stack starts with a guessable password.
+PLACEHOLDER = "placeholder-set-me-with-aws-ssm-put-parameter"
+OPTIONAL = {"ANTHROPIC_API_KEY", "LLM_API_KEY"}
 lines = []
 for item in sorted(json.load(sys.stdin), key=lambda p: p["Name"]):
     full, value = item["Name"], item["Value"]
@@ -49,6 +54,11 @@ for item in sorted(json.load(sys.stdin), key=lambda p: p["Name"]):
     # not a variable: refuse it rather than write a line compose would misread.
     if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", name):
         sys.exit(f"refusing parameter {full!r}: not an env var name")
+    if value == PLACEHOLDER:
+        if name not in OPTIONAL:
+            sys.exit(f"{full} still holds the Terraform placeholder: set it first")
+        print(f"skipping {name}: not set", file=sys.stderr)
+        continue
     # Single quotes make compose read the value literally ($ and # included). It has no
     # escape for a quote inside them, so such a value is refused rather than mangled.
     if "\x27" in value or "\n" in value:
