@@ -43,12 +43,8 @@ from collection.db.models import Audience, Tenant, TenantState, advance
 from collection.db.models.tenant import InvalidTransition
 from collection.db.repository import TenantScope
 from collection.db.session import unit_of_work
-from collection.rag.documents import SUPPORTED, load_file
+from collection.rag.documents import INTERNAL_DOCUMENTS, SUPPORTED, load_file
 from collection.rag.store import publish_document
-
-#: The documents a customer must never be quoted from: the discount ceilings and authority
-#: limits, and the operators' negotiation script.
-INTERNAL_DOCUMENTS = frozenset({"limites-de-alcada.md", "script-de-negociacao.md"})
 
 #: The lifecycle in order, so seeding can climb from wherever a previous run stopped.
 _LADDER = (

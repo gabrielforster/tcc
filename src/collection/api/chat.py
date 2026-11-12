@@ -69,7 +69,7 @@ from collection.channels.web import ChatChannel
 from collection.config import settings
 from collection.db.repository import TenantScope
 from collection.db.session import session_factory
-from collection.rag.documents import load_directory
+from collection.rag.documents import load_customer_facing
 from collection.rag.index import VectorIndex
 from collection.rag.retriever import PgVectorRetriever
 from collection.voice.audio import AudioError
@@ -202,8 +202,9 @@ class ChatService:
         downstream.
         """
         if not tenant_key.strip():
+            # Customer-facing only, as the pgvector path is: this index has no audience.
             index = VectorIndex()
-            index.add_documents(load_directory(settings.dir_knowledge)).build()
+            index.add_documents(load_customer_facing(settings.dir_knowledge)).build()
             return ChatChannel(retriever=index, responder=default_responder())
 
         tenant = resolve_tenant(tenant_key.strip())

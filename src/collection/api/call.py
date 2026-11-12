@@ -22,7 +22,7 @@ from collection.agents.responsive import get_responder
 from collection.channels.livekit_call import CallAgent, new_room_name, room_token
 from collection.channels.voice_call import VoiceCallChannel
 from collection.config import settings
-from collection.rag.documents import load_directory
+from collection.rag.documents import load_customer_facing
 from collection.rag.index import VectorIndex
 from collection.voice.speak import PiperSynthesizer, Synthesizer
 from collection.voice.transcribe import WhisperTranscriber
@@ -43,8 +43,10 @@ class StartResponse(BaseModel):
 
 def build_channel(whisper_model: str = "small") -> VoiceCallChannel:
     """The channel the call server runs: the same index and responder as the chat demo."""
+    # Customer-facing only: an in-memory index has no audience filter, so it is never
+    # given the internal documents to begin with.
     index = VectorIndex()
-    index.add_documents(load_directory(settings.dir_knowledge)).build()
+    index.add_documents(load_customer_facing(settings.dir_knowledge)).build()
     transcriber = WhisperTranscriber(model=whisper_model)
     # Loaded now rather than on the first turn, so the first caller does not wait for it.
     transcriber._load()

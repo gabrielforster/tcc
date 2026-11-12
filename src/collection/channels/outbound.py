@@ -30,7 +30,7 @@ from collection.agents.orchestrator import Orchestrator
 from collection.agents.proactive import ProactiveAgent
 from collection.channels.web import ChatChannel
 from collection.config import settings
-from collection.rag.documents import load_directory
+from collection.rag.documents import load_customer_facing
 from collection.rag.index import VectorIndex
 
 #: Inside business hours and on a weekday, so the rules engine's time window is not what
@@ -113,7 +113,7 @@ def run(channel: ChatChannel | None = None, events: list[Event] | None = None) -
     what the path does, and `collection serve --seed-demo` is the demo of it.
     """
     if channel is None:
-        index = VectorIndex().add_documents(load_directory(settings.dir_knowledge)).build()
+        index = VectorIndex().add_documents(load_customer_facing(settings.dir_knowledge)).build()
         channel = ChatChannel(retriever=index)
 
     # The fixture names a customer who has opted out, and the whole point of including

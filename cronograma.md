@@ -182,7 +182,7 @@ do LiveKit, e não o LiveKit Agents, porque o *framework* reconheceria a fala po
 própria e contornaria a escalação por baixa confiança e a confirmação de valores falados.
 
 **O que falta nos resultados.** A tabela de tempo de turno existe (`docs/voice-call.md`):
-mediana de **2.193 ms** medida sobre WebRTC, do fim da fala ao primeiro áudio da resposta,
+mediana de **2.174 ms** medida sobre WebRTC, do fim da fala ao primeiro áudio da resposta,
 em CPU, com Whisper `small` e o respondedor por *templates*. Ficam de fora a interrupção
 pelo cliente, o SIP e a telefonia comutada, a discagem ativa e uma medição da divergência
 entre canais, que é zero por construção mas não foi medida. Uma pessoa falando ao
@@ -193,7 +193,7 @@ no respondedor, não no canal — o canal não pode decidir que parte de uma pol
 ouve. A chamada declara quanto consegue carregar (43 palavras, derivadas de um turno-alvo
 de 20 s × 2,15 palavras/s, a velocidade mais lenta medida do Piper) e o respondedor escolhe
 a seção dos trechos recuperados que cabe, com as frases intactas. A resposta falada passou
-a durar uma mediana de **11,7 s** (máximo 16,2 s; as 18 falas dentro dos 20 s), e o chat
+a durar uma mediana de **12,1 s** (máximo 19,2 s; as 18 falas dentro dos 20 s), e o chat
 ficou idêntico. O que resta: a recuperação às vezes escolhe o trecho errado, e uma resposta
 curta pode ser curta e errada.
 
@@ -259,7 +259,7 @@ e defesa.
 |---|---|---|
 | Volume ou qualidade insuficiente dos dados históricos | Bloqueia as entregas 6–8 | Antecipar a extração (13/08) e, se necessário, usar base pública de *credit scoring* para validar o pipeline, mantendo a base real apenas para o modelo final |
 | Aprovação de *templates* na Meta / conta de telefonia | Atrasava 29/10 e 05/11 | **Risco materializado.** Resolvido pelas substituições de §2: canal de chat simulado e chamada por voz em tempo real, ambas atrás do mesmo contrato de canal; a chamada foi entregue como prova de conceito reduzida (§2.4) |
-| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida. **Medida:** mediana de 2.193 ms por turno; o gargalo que apareceu foi outro — a duração da resposta falada, 102 s → 11,7 s depois de moldada no respondedor (§2.4) |
+| Latência das chamadas com STT em tempo real | Compromete a entrega 15 | Whisper roda localmente por decisão de LGPD, então a latência é medida e publicada (tabela de tempo de turno) em vez de escondida. **Medida:** mediana de 2.174 ms por turno; o gargalo que apareceu foi outro — a duração da resposta falada, 102 s → 12,1 s depois de moldada no respondedor (§2.4) |
 | Experimento operacional com amostra pequena | Enfraquece a entrega 17 | Relatar tamanho de efeito e intervalo de confiança; complementar com métricas técnicas e comparação de custo por contato. **Materializado de forma mais forte:** sem dados operacionais (decisão D1), o experimento é uma simulação com 30 replicações pareadas e intervalos de 95%, e o artigo diz isso |
 | Custo de APIs de LLM, STT/TTS e telefonia | Afeta 08/10 em diante | **Resolvido localmente:** Whisper, Piper e o modelo de linguagem rodam na máquina, sem custo por chamada; o preço é a qualidade e a latência de um modelo pequeno (§2.5) |
 

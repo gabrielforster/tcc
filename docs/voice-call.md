@@ -118,17 +118,18 @@ template responder (no API key). Full tables, per line and including what Whispe
 are in [`voice-call-report.md`](./voice-call-report.md) (in-process) and
 [`voice-call-report-live.md`](./voice-call-report-live.md) (through LiveKit).
 
-Measured on 2026-11-07 on an AMD Ryzen 7 5700X3D (8 cores / 16 threads), CPU only,
-faster-whisper `small` int8, with the spoken replies described below:
+Measured on 2026-11-08 on an AMD Ryzen 7 5700X3D (8 cores / 16 threads), CPU only,
+faster-whisper `small` int8, with the spoken replies described below, and retrieving only
+from the customer-facing documents, as the call server does:
 
 | Stage | In-process median | p90 | Through LiveKit median | p90 |
 |---|---:|---:|---:|---:|
 | End-of-turn wait (hangover) | 700 | 700 | 700 | 700 |
-| Local Whisper `small` | 1,315 | 1,356 | 1,213 | 1,262 |
-| Agent: intent, retrieval, responder | 58 | 59 | 56 | 58 |
-| Piper, first audio | 77 | 108 | 103 | 116 |
-| **Sum of stages** | **2,157** | 2,203 | **2,085** | 2,125 |
-| **End of speech → first audible reply, over WebRTC** | — | — | **2,193** | 2,253 |
+| Local Whisper `small` | 1,189 | 1,230 | 1,213 | 1,242 |
+| Agent: intent, retrieval, responder | 56 | 60 | 55 | 55 |
+| Piper, first audio | 83 | 110 | 98 | 118 |
+| **Sum of stages** | **2,044** | 2,074 | **2,057** | 2,111 |
+| **End of speech → first audible reply, over WebRTC** | — | — | **2,174** | 2,240 |
 
 The first measurement, on 2026-11-06 with whole-passage replies, gave 2,184 ms over WebRTC.
 Shortening the reply did not move this number, and was not expected to: the table times the
@@ -167,7 +168,7 @@ seconds** (max 133 s). It quoted two retrieved passages whole, headings and list
 included. That is already long in a chat bubble and unusable on a call, where the customer
 can neither skim nor scroll: they sat through a minute and a half to get one answer.
 
-**Now the median is 11.7 seconds** (max 16.2 s; all 18 lines inside the 20 s target;
+**Now the median is 12.1 seconds** (max 19.2 s; all 18 lines inside the 20 s target;
 `voice-call-report.md`, column *Reply s*). Lines that end in a handover, an opt-out or small
 talk are 4–5 s, because those are fixed sentences.
 
@@ -221,15 +222,22 @@ share.
 **What this does not fix.** The section chosen is only as good as retrieval. *"quero
 parcelar em seis vezes"* still gets the policy's sentence on contested debts, because that
 is the passage the lexical index ranks first for it -- a retrieval miss the chat has too,
-only hidden there under a second passage. And the in-memory index the benchmark uses holds
-the internal negotiation script, so a reply can be an instruction to the operator (*"Nunca
-prometer desconto fora da alçada."*). The serving path filters internal documents in SQL
-(`docs/rag.md`); the benchmark's index does not.
+only hidden there under a second passage.
+
+Until 2026-11-08 the call server's in-memory index held the internal documents too, so a
+reply could be an instruction to the operator (*"Nunca prometer desconto fora da
+alçada."*), or the discount ceilings. The pgvector path filters them in SQL; the in-memory
+index has no audience, so the call server, the chat with no tenant and the benchmark now
+build it from `load_customer_facing`, which leaves them out
+(`tests/test_internal_documents.py`). Answering only from customer-facing text made the
+replies a little longer: the median went from 11.7 s to 12.1 s.
 
 ### Recognition, briefly
 
-Whisper `small` got the labelled intent on **15 of 18** lines in the first run and **14 of
-18** in both runs on 2026-11-07 (median WER 0.11 in-process, 0.15 through LiveKit).
+Whisper `small` got the labelled intent on **15 of 18** lines in the first run, **14 of
+18** in both runs on 2026-11-07, and **15 of 18** in both on 2026-11-08 (median WER 0.11
+in-process, 0.10 through LiveKit). Piper's synthesis is not bit-identical between runs, so
+one line moves in and out.
 Punctuation is folded before scoring; digits are not, because "6" against "seis" is a real
 difference downstream. The misses are informative:
 
