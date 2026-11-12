@@ -1,0 +1,90 @@
+# The `otelcol` service: the host's and the containers' vital signs, and a black-box probe
+# of each server's /health, pushed to `lgtm` over OTLP like the application's own metrics.
+#
+# Chosen over node-exporter + cAdvisor: one container of ~50 MB instead of two (cAdvisor
+# alone tends to take a few hundred MB and a steady slice of CPU), the same collector build
+# `lgtm` already bundles, and nothing to scrape, so `lgtm`'s own collector configuration is
+# not touched. It reads the host through a read-only mount at /hostfs and the containers
+# through the Docker socket, which is why it is a separate container: Grafana, which faces
+# the internet, never sees that socket.
+#
+# The endpoints come from the environment so the same file serves production (compose
+# network names) and development (host networking, loopback).
+
+receivers:
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      load: {}
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+        # Real disks only: the root volume and the EBS data volume. Docker's overlays and
+        # the kernel's pseudo-filesystems would be dozens of series that never fill up.
+        include_fs_types:
+          fs_types: [ext4, xfs, btrfs]
+          match_type: strict
+        exclude_mount_points:
+          mount_points: ["/hostfs/var/lib/docker/.*", "/hostfs/snap/.*", "/hostfs/boot.*"]
+          match_type: regexp
+      network:
+        include:
+          interfaces: ["en.*", "eth.*", "wl.*"]
+          match_type: regexp
+      disk: {}
+
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    # Docker 29 refuses clients older than API 1.40; the receiver's default is older.
+    api_version: "1.44"
+
+  # Black-box: what a visitor would get, asked from inside the stack every 30 s. This is
+  # what the "API down" alert reads -- an application that has crashed cannot report its
+  # own absence, and one that hangs keeps exporting.
+  httpcheck:
+    collection_interval: 30s
+    targets:
+      - endpoint: ${env:API_HEALTH_URL}
+        method: GET
+      - endpoint: ${env:CALL_HEALTH_URL}
+        method: GET
+
+processors:
+  # One job name for everything this collector reports, so the dashboards can say
+  # `job="host"` rather than guess at what the receivers call themselves.
+  resource:
+    attributes:
+      - key: service.name
+        value: host
+        action: upsert
+      - key: deployment.environment
+        value: ${env:DEPLOYMENT_ENVIRONMENT}
+        action: upsert
+  batch: {}
+
+exporters:
+  otlp_http:
+    endpoint: ${env:OTLP_ENDPOINT}
+    tls:
+      insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, docker_stats, httpcheck]
+      processors: [resource, batch]
+      exporters: [otlp_http]
