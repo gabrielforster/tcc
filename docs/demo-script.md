@@ -30,10 +30,10 @@ Open three terminals and start both servers before the talk:
 
 ```sh
 # terminal 1 — the chat, with the proactive agent's contacts seeded at startup
-make serve ARGS="--seed-demo"   # http://127.0.0.1:8000/chat/demo
+make serve ARGS="--seed-demo"   # http://127.0.0.1:8000/app/chat
 
 # terminal 2 — the voice call
-make call                       # starts LiveKit, then http://127.0.0.1:8100/call/demo
+make call                       # starts LiveKit, then http://127.0.0.1:8100/app/call
 ```
 
 Terminal 1 must print, among the startup lines:
@@ -47,8 +47,12 @@ Postgres is not running: they only mean `POST /score` answers 503, which the dem
 use. (To show `/score` as well, run `make up && make migrate && make seed`, then
 `COLLECTION_TENANT=desenvolvimento make pipeline`, before starting the server.)
 
-Open in browser tabs, in this order: the deck, `http://127.0.0.1:8000/chat/demo`,
-`http://127.0.0.1:8100/call/demo`, and the fallback recording.
+Open `http://127.0.0.1:8000/` once and press *Li e entendi*: every `/app/...` page sends a
+browser that has not acknowledged the disclaimer back to it, and the acknowledgement is a
+cookie both servers read. Then open in browser tabs, in this order: the deck,
+`http://127.0.0.1:8000/app/chat`, `http://127.0.0.1:8100/app/call`, and the fallback
+recording. The call page tests the network before enabling *Ligar*; it should say
+*Rede pronta*.
 
 ## On stage
 
@@ -56,7 +60,7 @@ Open in browser tabs, in this order: the deck, `http://127.0.0.1:8000/chat/demo`
 
 | Step | Do | Say / point at |
 |---|---|---|
-| 1 | Open `/chat/demo`. | The thread opens saying it is **automated**, before anyone types (CDC art. 42). The first message was **written by the proactive agent**, passed the compliance checker, and waited in the mailbox until the widget opened — opt-out is checked again at this moment. |
+| 1 | Open `/app/chat`. | The thread opens saying it is **automated**, before anyone types (CDC art. 42). The first message was **written by the proactive agent**, passed the compliance checker, and waited in the mailbox until the widget opened — opt-out is checked again at this moment. |
 | 2 | Type `quais são os juros e a multa por atraso?` | The answer **cites its source document**. It is the template responder: faithful, but long in a chat bubble. The chat states no length budget, so its replies are unchanged; only the call asks for a short one. |
 | 3 | Type `consigo parcelar em 6 vezes?` | A negotiation answer from the instalment table, within the authority limits. |
 | 4 | Type `eu nunca contratei esse servico` | A **dispute always goes to a person** (`knowledge/limites-de-alcada.md`): the thread escalates and says so. |
@@ -69,7 +73,7 @@ recorded and propagated, and every later outbound contact for that customer is s
 
 | Step | Do | Say / point at |
 |---|---|---|
-| 1 | Open `/call/demo`, press **Ligar**. | The **recording notice plays first and cannot be skipped**: speech during it is discarded. |
+| 1 | Open `/app/call`, press **Ligar**. | The **recording notice plays first and cannot be skipped**: speech during it is discarded. |
 | 2 | Say: "quanto eu tô devendo?" | Whisper and Piper run **locally**; the turn takes about 2 s. |
 | 3 | Let the answer play to the end (about 12 s), then hang up. | Slide 12's fix, live: the call declares a 43-word budget and the responder reads the one section that answers, verbatim. Before the fix this same answer ran for over a minute and a half. |
 

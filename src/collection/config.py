@@ -100,6 +100,16 @@ class Settings(BaseSettings):
     livekit_url: str = "ws://127.0.0.1:7880"
     livekit_api_key: str = "devkey"
     livekit_api_secret: str = "secret"  # noqa: S105  LiveKit --dev mode pair
+    # The TURN/TLS host the call page falls back to when a network blocks UDP; LiveKit
+    # advertises it, so the page only needs to know whether there is one to try. Empty in
+    # local dev, where there is no TURN server and the check says so instead of failing.
+    turn_domain: str = ""
+    # Where each server sends a visitor who asked it for the other server's page. In
+    # production Caddy routes `/app/call*` to the call server and everything else to the
+    # API on one host, so neither redirect is ever reached; locally the two run on two
+    # ports and these are what make the landing page's links work there too.
+    api_public_url: str = "http://127.0.0.1:8000"
+    call_public_url: str = "http://127.0.0.1:8100"
     dir_calls: Path = ROOT / "data" / "calls"
     dir_voices: Path = ROOT / "data" / "voices"
 

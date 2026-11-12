@@ -3,68 +3,50 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chat de cobrança — página de exemplo</title>
+    <title>Chat de cobrança — demonstração</title>
     <style>
-      body {
-        margin: 0;
-        padding: 48px 20px;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        line-height: 1.6;
-        color: #1a1d21;
-        background: #fff;
-      }
-      main { max-width: 720px; margin: 0 auto; }
-      h1 { font-size: 26px; margin-bottom: 4px; }
-      p.lead { color: #596270; margin-top: 0; }
+{{site_css}}
+
       pre {
-        background: #f6f7f9;
-        border: 1px solid #e3e6ea;
-        border-radius: 8px;
+        background: var(--paper-raised);
+        border: 1px solid var(--rule);
+        border-radius: 10px;
         padding: 14px;
         overflow-x: auto;
         font-size: 13px;
       }
-      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      ul { color: #39414d; }
+      code { font-family: var(--mono); font-size: 0.92em; }
+      .try { padding-left: 1.1em; }
+      .try li { margin: 0.35em 0; }
+      .start { margin: 18px 0 8px; }
       /* A deliberately aggressive global rule: the widget renders in a shadow root, so
          this cannot reach it. If the launcher turns pink, the isolation is broken. */
       button { background: hotpink !important; border: 4px dashed red !important; }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Página de exemplo</h1>
+    <a class="skip" href="#conteudo">Pular para o conteúdo</a>
+    {{banner}}
+    {{masthead}}
+    <main id="conteudo" class="page narrow">
+      <span class="eyebrow">Demonstração 01 · Chat</span>
+      <h1>Converse com o agente</h1>
       <p class="lead">
-        Esta página existe para ver o widget funcionando como um site externo o veria.
-        O botão no canto inferior direito abre a conversa.
+        Esta página faz o papel do site de uma empresa que embutiu o widget de atendimento.
+        O botão verde no canto inferior direito abre a conversa.
+      </p>
+      <p class="notice start">
+        Se a conversa já abrir com uma mensagem, foi o agente proativo: ele escreveu o
+        contato, o verificador de conformidade aprovou, e a mensagem esperou aqui até você
+        abrir o chat.
       </p>
 
-      <h2>Como embedar</h2>
-      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
-        data-api="https://SEU-HOST"
-        data-title="Atendimento"
-        defer&gt;&lt;/script&gt;</code></pre>
-
-      <h2>Identificando o cliente</h2>
-      <p>
-        Sem token a conversa é anônima e responde qualquer coisa da base de conhecimento
-        (política, FAQ, tabela de parcelamento). Para identificar o cliente, o
-        <strong>backend</strong> da aplicação gera o token e o entrega à página:
-      </p>
-      <pre><code>from collection.channels.session import issue_token
-
-token = issue_token(customer_id)  # nunca no navegador</code></pre>
-      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
-        data-api="https://SEU-HOST"
-        data-token="{{ token }}"
-        defer&gt;&lt;/script&gt;</code></pre>
-
-      <h2>O que testar aqui</h2>
-      <ul>
+      <h2>O que testar</h2>
+      <ul class="try">
         <li><code>quais sao os juros e a multa por atraso?</code> — resposta ancorada no FAQ</li>
         <li><code>posso parcelar em 6 vezes?</code> — tabela de parcelamento</li>
         <li><code>esse valor ta errado, nao e isso que eu devo</code> — contestação, escala para humano</li>
-        <li><code>parem de me mandar mensagem</code> — opt-out registrado</li>
+        <li><code>parem de me mandar mensagem</code> — pedido para não ser mais contatado, registrado</li>
         <li>
           segure o botão do microfone e fale um valor — o widget grava, envia e, quando o
           valor falado precisa de confirmação, mostra a leitura de volta em destaque
@@ -81,12 +63,36 @@ token = issue_token(customer_id)  # nunca no navegador</code></pre>
         fique visível durante a demonstração.
       </p>
 
+      <h2>Como embutir</h2>
+      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
+        data-api="https://SEU-HOST"
+        data-title="Atendimento"
+        defer&gt;&lt;/script&gt;</code></pre>
+
+      <h3>Identificando o cliente</h3>
       <p>
-        O botão acima está estilizado com uma regra global agressiva
+        Sem token a conversa é anônima e responde qualquer coisa da base de conhecimento
+        (política, FAQ, tabela de parcelamento). Para identificar o cliente, o
+        <strong>backend</strong> da aplicação gera o token e o entrega à página:
+      </p>
+      <pre><code>from collection.channels.session import issue_token
+
+token = issue_token(customer_id)  # nunca no navegador</code></pre>
+      <pre><code>&lt;script src="https://SEU-HOST/chat/widget.js"
+        data-api="https://SEU-HOST"
+        data-token="{{ token }}"
+        defer&gt;&lt;/script&gt;</code></pre>
+
+      <h3>Isolamento</h3>
+      <p>
+        O botão abaixo está estilizado com uma regra global agressiva
         (<code>button { background: hotpink }</code>). Se o botão do widget continuar verde,
         o isolamento por shadow DOM está funcionando.
       </p>
       <button type="button">Botão da página hospedeira</button>
+
+      <hr class="rule">
+      <p><a href="/">← Voltar às demonstrações</a> · <a href="/app/call">Chamada de voz</a> · <a href="/app/fila">Fila de contato</a></p>
     </main>
 
     <script src="/chat/widget.js" data-api="" data-title="Atendimento" defer></script>
