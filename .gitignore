@@ -43,3 +43,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Reports written by `make analyze` (scripts/analyze.sh)
+analysis/

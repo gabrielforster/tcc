@@ -1,6 +1,8 @@
 # Testing
 
 What the suite proves, how much of the critical code it reaches, and how to run it.
+Static code and security analysis (ruff's Bandit rules, Semgrep, gitleaks, pip-audit, Trivy,
+zizmor; `make analyze`) has its own page: [static-analysis.md](static-analysis.md).
 
 ## Running it
 

@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-logs dev-stop up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma article
+.PHONY: setup dev dev-logs dev-stop up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt analyze cronograma article
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -119,6 +119,9 @@ lint:             ## ruff over src and tests
 
 fmt:              ## format, then apply ruff's safe fixes
 	uv run ruff format src tests && uv run ruff check --fix src tests
+
+analyze:          ## static + security analysis, as CI runs it; CHECKS="semgrep trivy" for a subset (needs uv, Docker)
+	scripts/analyze.sh $(CHECKS)
 
 cronograma:       ## rebuild cronograma.pdf from cronograma.md (pandoc in Docker; no local TeX needed)
 	docker run --rm --entrypoint sh -v "$(CURDIR)":/data pandoc/extra:latest -c '\
