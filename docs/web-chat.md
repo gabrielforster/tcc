@@ -226,8 +226,8 @@ make serve          # http://127.0.0.1:8000/chat/demo
 ```
 
 To serve a real tenant instead of the in-memory demo, run `make up && make migrate &&
-make seed` once and put the `tenant_key` it prints in `DEFAULT_TENANT_KEY`. The chat then
-answers from that tenant's published knowledge and keeps its conversations as rows.
+make seed` once and set `DEFAULT_TENANT_SLUG=desenvolvimento` (or the `tenant_key` it
+prints in `DEFAULT_TENANT_KEY`); `make dev` does this for you. The chat then answers from that tenant's published knowledge and keeps its conversations as rows.
 
 With `ANTHROPIC_API_KEY` set the chat answers with the LLM responder; without it, the
 template. That fallback is why the demo works on a fresh clone — and why the default
@@ -249,7 +249,7 @@ typed it.
 `DatabaseSessionStore` is the same contract on rows: the thread is a `conversations` row,
 every turn is a `turns` row, and the session id *is* the conversation id — so a restarted
 process can be handed one and find the thread again, with the transcript the audit trail
-needs. Set `DEFAULT_TENANT_KEY` to a tenant's key (`make seed` prints one) and the chat
+needs. Set `DEFAULT_TENANT_SLUG` (or `DEFAULT_TENANT_KEY`) to name a tenant and the chat
 serves that tenant from the database; leave it empty, as a fresh clone does, and the
 in-memory `SessionStore` still backs the demo so the widget runs with nothing started.
 
