@@ -61,7 +61,7 @@ def spoken_words(text: str) -> int:
     digits separately, and `%` as the two words "por cento", puts the table and the prose
     on the same rate (about 2.2-2.5 words a second against 2.15-3.7), so one budget fits both.
     """
-    return sum(2 if token == "%" else 1 for token in _SPOKEN_TOKEN.findall(text))
+    return sum(2 if word == "%" else 1 for word in _SPOKEN_TOKEN.findall(text))
 
 
 def speaking_rates(synthesizer: "Synthesizer", sentences: list[str]) -> list[float]:
