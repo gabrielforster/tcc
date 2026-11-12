@@ -12,7 +12,8 @@ about what was built, what it measures, and what it leaves out.
 
 ```sh
 make voices          # once: the two Piper pt-BR voices, ~120 MB, into data/voices
-make call            # starts LiveKit, then the page on http://127.0.0.1:8100/call/demo
+make serve           # the landing page on http://127.0.0.1:8000/, whose disclaimer gates the call page
+make call            # starts LiveKit, then the page on http://127.0.0.1:8100/app/call
 make call-bench      # the turn-time table, in-process  -> docs/voice-call-report.md
 make call-bench ARGS="--live"   # the same, through a LiveKit room -> docs/voice-call-report-live.md
 ```
@@ -72,6 +73,42 @@ compares frame energy with a fixed −45 dBFS threshold. A turn ends after 700 m
 (the hangover), with 200 ms of pre-roll, a 200 ms minimum so a click is not a turn, and a
 30 s cap on a monologue. It is pure (bytes in, utterances out), so every decision it makes
 is a unit test.
+
+### The page, and the network check before *Ligar*
+
+The page is `/app/call` on the call server (`/call/demo` redirects there), gated by the
+landing page's disclaimer like every `/app/...` page. A call that rings into silence
+because the visitor's network drops UDP is the worst failure a public demo can show, so
+the page tests the network first and only then enables *Ligar*.
+
+Browsers cannot open a raw UDP socket, so the test is WebRTC itself, using the connection
+checks `livekit-client` ships (the ones behind LiveKit's connection-test page). `POST
+/call/check` mints a token for a throwaway `check-…` room and starts no agent; the page
+then runs, each bounded to 20 s:
+
+| Step | Check | Outcome |
+|---|---|---|
+| 1 | Signalling WebSocket (`checkWebsocket`) | fails → `signal_failed`: "Não conseguimos falar com o servidor de voz", retry, chat |
+| 2 | Direct media path (`checkWebRTC`): UDP, or LiveKit's ICE/TCP port | passes → `direct_ok`: "Rede pronta" |
+| 3 | TURN relay only (`checkTURN`), when `TURN_DOMAIN` is set | passes → `turn_tls_ok`: proceed, with a note on latency |
+| — | none passed | `blocked`: "Sua rede bloqueia a chamada de voz. Troque de rede (ex.: 4G) e tente novamente", retry, chat, and "tentar ligar mesmo assim" |
+
+Each check is a real `room.connect`, which waits for the peer connection to form, so a pass
+means media can flow. `direct_ok` does not distinguish UDP from ICE/TCP: LiveKit's check
+does not report which, and both carry the call without a relay. Without `TURN_DOMAIN`
+(local dev) step 3 is skipped and the warning says only the direct path was tried. If the
+SDK fails to load, or `/call/check` errors, the page says so and the outcome is
+`unavailable`.
+
+The page posts the outcome to `POST /call/check/result`, which logs one line,
+`call_network_check outcome=<outcome>`, on the `collection.call` logger: a closed set of
+values for the observability stack to count, and no address or candidate list (an IP is
+personal data and the count does not need it).
+
+What was verified, against a throwaway LiveKit and headless Chromium: the normal path ends
+in `direct_ok`, and a browser forced to relay-only ICE with no TURN server ends in the
+`blocked` warning. The TURN/TLS fallback was **not** exercised: there is no TURN server
+locally, so it waits for production's `turn.` host.
 
 ### Why not the LiveKit agents framework
 
@@ -263,7 +300,7 @@ model. Spoken figures still trigger the read-back on a call, exactly as on a voi
 | The page starts a call: the token is minted, the browser and the agent join the same room | Done in an automated browser. The browser joined; that browser then refused microphone access, so the spoken leg of the browser call was **not** exercised there |
 
 **Not verified by a machine: a person speaking into the page.** Run `make call`, open
-`/call/demo` in a browser with a microphone, press *Ligar*, and listen. The live benchmark
+`/app/call` in a browser with a microphone, press *Ligar*, and listen. The live benchmark
 exercises everything behind the page, but not the browser's own capture path:
 echo cancellation, noise suppression, and the browser's choice of microphone.
 
