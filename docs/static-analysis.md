@@ -13,6 +13,7 @@ on a laptop.
 | Secrets | **gitleaks** | Credentials committed anywhere in history (cloud keys, tokens, private keys, high-entropy assignments), including ones deleted in a later commit | Any leak |
 | Dependencies | **pip-audit** | Known vulnerabilities (PyPI advisory database / OSV) in every version `uv.lock` resolves, all extras included | Any advisory |
 | Dependencies, IaC, containers | **Trivy** `fs` (`vuln`, `misconfig`) | A severity-rated second opinion on `uv.lock`, and misconfiguration in every Dockerfile, Terraform root, Kubernetes manifest and Helm chart in the tree (root user, `latest` tags, open security groups, unencrypted storage...) | `HIGH`/`CRITICAL` |
+| Container image | **Trivy** `image` (`vuln`), master only | OS and Python packages as installed in the built image, before it is pushed | `HIGH`/`CRITICAL` with a fix available |
 | CI itself | **zizmor** | GitHub Actions attack surface: actions not pinned to a commit, template injection from event payloads, the token left in the checkout, over-broad `permissions:` | `high` |
 
 **Why both pip-audit and Trivy on the dependencies.** pip-audit reads PyPI's own advisory
@@ -23,14 +24,19 @@ database rates severity, so its results land in code scanning sorted by risk.
 **Containers and infrastructure.** Trivy's `misconfig` scanner walks the whole tree, so the
 application's Dockerfile and `infra/` (Terraform) are checked as soon as they are merged, with
 no change to the configuration. It does not read `docker-compose.yml`, which is not one of
-its formats. The built image (OS packages and Python packages *as installed*) is scanned in
-the deploy pipeline, where the image exists; the step is:
+its formats. The built image (OS packages and Python packages *as installed*) is scanned
+where it exists: in the `image` job of the deploy pipeline, between `docker build` and
+`docker push` (see [deployment.md](./deployment.md)). It is the same script, scanner pin and
+gate, as one more subcommand:
 
 ```bash
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  ghcr.io/aquasecurity/trivy:0.76.2 image --exit-code 1 --severity HIGH,CRITICAL \
-  --ignore-unfixed ghcr.io/gabrielforster/tcc:<sha>
+TRIVY_IMAGE_REF=ghcr.io/gabrielforster/tcc:<sha> scripts/analyze.sh trivy-image
 ```
+
+with one difference: `--ignore-unfixed`. A vulnerability the base image's distribution has
+not patched yet has no fix to apply, and would otherwise block every deploy until it does;
+it is still listed in code scanning. A HIGH/CRITICAL that *has* a fix fails the job, and the
+image is never pushed, so it can be neither deployed nor rolled back to.
 
 ## The gate: one rule for every scanner
 
@@ -45,6 +51,8 @@ no severity (gitleaks, pip-audit, ruff) fail on any finding, for the reasons in 
 
 - **Pull request checks:** six `analysis (<tool>)` jobs, parallel to `check`, so they never
   add to its time. A red one names the tool; its log lists each blocking finding.
+- **The `image` job on master:** the image scan, uploaded under the category
+  `trivy-image`.
 - **Security → Code scanning** on GitHub: every SARIF report (all tools but pip-audit,
   which has no SARIF output), one category per tool, with severity, file and line, and
   history across commits. Findings below the gate are only visible here. On a pull request
