@@ -256,6 +256,11 @@ stack, waits for every health check and fails unless `/health` reports the tag i
 given. The host needs inbound 80/tcp, 443/tcp+udp, 7881/tcp (WebRTC over TCP), 7882/udp
 (WebRTC media) and 3478/udp (TURN).
 
+Nobody runs that by hand: a merge to `master` runs the checks, applies `infra/app`, builds,
+scans and pushes the image, deploys it through SSM Run Command (no SSH) and smoke-tests
+`/health`, all in one workflow. Stages, gates, the GitHub setup it needs and how to roll
+back are in [`docs/deployment.md`](./docs/deployment.md).
+
 ### Data source
 
 The pipeline talks to an interface (`DataSource`), not to a specific database. A source
