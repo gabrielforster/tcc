@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-logs dev-stop up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt analyze cronograma article
+.PHONY: setup dev dev-logs dev-stop up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt analyze cronograma article poster
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
@@ -143,3 +143,6 @@ article:          ## build article/main.pdf (XeLaTeX + BibTeX in Docker; no loca
 	  run xelatex -interaction=nonstopmode -halt-on-error main.tex && \
 	  rm -f main.aux main.bbl main.blg main.out main.log'
 	@echo "article/main.pdf"
+
+poster:           ## build poster/poster.pdf (A0) + a PNG preview in headless Chromium; QR targets in poster/qr-targets.conf
+	poster/export-pdf.sh
