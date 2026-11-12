@@ -11,7 +11,7 @@ applies from `master` in the `production` environment); `infra/bootstrap` must b
 | Instance | `t3.large` on-demand, Ubuntu 24.04 (Canonical AMI), IMDSv2 required (hop limit 2 so containers can use the instance role), encrypted 30 GB gp3 root. No SSH key, no port 22: access is SSM Session Manager / Run Command. |
 | Data volume | gp3 20 GB, encrypted, `prevent_destroy`, mounted at `/srv/tcc/data` by user data (formatted only when blank, fstab by UUID). Replacing the instance reattaches it, so Postgres, Grafana and Caddy data survive. |
 | Elastic IP | Stable target for DNS across instance replacements. |
-| Security group | 80/tcp, 443/tcp, 443/udp (HTTP/3), 7881/tcp (LiveKit TCP), 50000–60000/udp (LiveKit media), 3478/udp (TURN). TURN/TLS shares 443 via SNI in Caddy. |
+| Security group | 80/tcp, 443/tcp, 443/udp (HTTP/3), 7881/tcp (LiveKit ICE/TCP), 7882/udp (LiveKit single-port UDP mux), 3478/udp (TURN). No 22, no UDP port range. TURN/TLS shares 443/tcp via SNI in Caddy. |
 | App bucket `tcc-app-<account id>` | Private, SSE-S3, versioned (old versions expire after 30 days), TLS-only. Objects tagged `kind=call-audio` expire after `call_audio_retention_days` (180). |
 | Instance role `tcc-app-instance` | App bucket objects, `ssm:GetParametersByPath` on `/tcc/prod`, `kms:Decrypt` via SSM, `AmazonSSMManagedInstanceCore`. Capped by the bootstrap permissions boundary. |
 | SSM parameters `/tcc/prod/*` | Plain `String`s owned by Terraform; `SecureString` secrets created with a placeholder and `ignore_changes = [value]`. `deploy.sh` renders all of them into `/opt/tcc/.env`. |

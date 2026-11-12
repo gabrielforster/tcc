@@ -33,16 +33,16 @@ locals {
       to_port     = 443
     }
     livekit_tcp = {
-      description = "LiveKit WebRTC over TCP, for networks that block UDP"
+      description = "LiveKit WebRTC over TCP (ICE/TCP), for networks that block UDP"
       protocol    = "tcp"
       from_port   = 7881
       to_port     = 7881
     }
     livekit_udp = {
-      description = "LiveKit WebRTC media (UDP port range)"
+      description = "LiveKit WebRTC media (single-port UDP mux)"
       protocol    = "udp"
-      from_port   = 50000
-      to_port     = 60000
+      from_port   = 7882
+      to_port     = 7882
     }
     turn_udp = {
       description = "TURN over UDP (LiveKit embedded TURN)"
