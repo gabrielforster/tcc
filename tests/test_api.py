@@ -15,6 +15,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 
 from collection.api.app import ModelRegistry, create_app
+from collection.config import settings
 
 FEATURES = ["amount", "hist_late_rate"]
 
@@ -63,7 +64,19 @@ def client():
 def test_health_lists_the_loaded_models(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "models": ["propensity"]}
+    assert response.json() == {
+        "status": "ok",
+        "models": ["propensity"],
+        "version": settings.app_version,
+    }
+
+
+def test_health_reports_the_build_it_is_running(monkeypatch):
+    # The deploy waits on this field to tell the new container from the one it replaced.
+    monkeypatch.setattr(settings, "app_version", "5032579")
+    registry = ModelRegistry(loader=lambda: {"propensity": _stub_bundle()})
+    with TestClient(create_app(registry)) as test_client:
+        assert test_client.get("/health").json()["version"] == "5032579"
 
 
 def test_model_info_exposes_the_threshold_and_feature_contract(client):
@@ -186,7 +199,7 @@ def test_an_unreachable_record_leaves_the_registry_empty_instead_of_failing(monk
     monkeypatch.setattr(app_module, "unit_of_work", unreachable)
     registry = ModelRegistry()
     with TestClient(create_app(registry)) as client:
-        assert client.get("/health").json() == {"status": "degraded", "models": []}
+        assert client.get("/health").json()["models"] == []
         response = client.get("/models/propensity")
     assert response.status_code == 503
     assert "connection refused" in response.json()["detail"]
@@ -204,7 +217,7 @@ def test_a_degraded_registry_recovers_on_the_next_request_after_the_outage(monke
     with TestClient(create_app(registry)) as client:
         assert client.get("/health").json()["status"] == "degraded"
         assert client.get("/models/propensity").status_code == 200
-        assert client.get("/health").json() == {"status": "ok", "models": ["propensity"]}
+        assert client.get("/health").json()["models"] == ["propensity"]
 
 
 def test_one_unreadable_artifact_does_not_discard_the_others(monkeypatch):

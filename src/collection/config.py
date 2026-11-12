@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     # through by a fixture; empty means "use database_url".
     test_database_url: str = ""
 
+    # The commit this process was built from, baked into the image at build time and
+    # reported by `/health`, so "which version is serving" is a request rather than a guess.
+    # A process run from a checkout has no build, and says so.
+    app_version: str = "dev"
+
     # S3-compatible object storage. The defaults are the MinIO in docker-compose.yml, so a
     # fresh clone and the test suite need no configuration. Production sets the endpoint and
     # both keys to the empty string, which means "AWS itself": no endpoint is the regional

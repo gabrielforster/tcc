@@ -29,6 +29,7 @@ from collection.channels.voice_call import (
     VoiceCallChannel,
 )
 from collection.channels.web import GREETING, HANDOVER_NOTICE
+from collection.config import settings
 from collection.voice.audio import ffmpeg_available
 from collection.voice.speak import ToneSynthesizer, first_audio, resample, write_wav
 from collection.voice.transcribe import ScriptedTranscriber
@@ -392,4 +393,5 @@ def test_the_call_page_starts_a_call_in_a_fresh_room(channel, monkeypatch):
         assert first["room"] != second["room"]
         assert first["token"] and first["url"].startswith("ws")
         assert client.get("/call/records/nope").status_code == 404
+        assert client.get("/health").json() == {"status": "ok", "version": settings.app_version}
     assert started == [first["room"], second["room"]]
