@@ -35,6 +35,9 @@ from collection.channels.web import ChatChannel
 from collection.config import settings
 from collection.db.models import Tenant, TenantState
 from collection.db.repository import TenantScope
+from collection.domain.intent import Intent
+from collection.llm.client import Completion, ScriptedClient
+from collection.llm.responder import LLMResponder
 from collection.rag.documents import Document, load_customer_facing
 from collection.rag.embeddings import Embedder
 from collection.rag.index import VectorIndex
@@ -285,3 +288,36 @@ def test_an_escalation_is_counted_by_reason(reader):
     reply = channel.send(session.session_id, "nao reconheco essa divida, quero contestar")
     assert reply.escalation_reason == "dispute"
     assert disputes() == before + 1
+
+
+def test_an_llm_answer_is_a_span_with_token_counts_and_a_failure_counts_a_fallback(spans, reader):
+    class Counted(ScriptedClient):
+        def complete(self, system, user):
+            done = super().complete(system, user)
+            return Completion(done.text, done.model, 0.0, input_tokens=120, output_tokens=30)
+
+    index = VectorIndex(embedder=BagOfWords())
+    index.add_documents([Document(document_id="faq.md", text=BODY, source="faq.md")]).build()
+    passages = index.search(QUESTION)
+    responder = LLMResponder(client=Counted(replies=["Pode sim. Fonte: (faq.md)"]))
+
+    def fallbacks() -> float:
+        return sum(
+            p.value
+            for p in _points(reader, "collection.responder.fallbacks")
+            if p.attributes.get("reason") == "fallback"
+        )
+
+    responder.respond(QUESTION, Intent.NEGOTIATION, passages)
+    call = next(s for s in spans.get_finished_spans() if s.name == "llm.complete")
+    assert call.attributes["gen_ai.provider.name"] == "scripted"
+    assert call.attributes["gen_ai.usage.input_tokens"] == 120
+    tokens = {
+        p.attributes["gen_ai.token.type"]: p.value for p in _points(reader, "collection.llm.tokens")
+    }
+    assert tokens["input"] >= 120 and tokens["output"] >= 30
+
+    before = fallbacks()
+    answer = responder.respond(QUESTION, Intent.NEGOTIATION, passages)  # out of replies
+    assert answer.responder == "llm:fallback"
+    assert fallbacks() == before + 1

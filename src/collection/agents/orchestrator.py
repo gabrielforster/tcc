@@ -14,6 +14,7 @@ The orchestrator stays this small so that the interesting behaviour is testable 
 isolation and the coordination itself cannot hide a bug.
 """
 
+import logging
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -22,6 +23,8 @@ from collection.agents.base import Agent
 from collection.agents.events import Event, EventType
 from collection.agents.queue import EventQueue
 from collection.telemetry import ESCALATIONS, span
+
+logger = logging.getLogger(__name__)
 
 #: Guards against an agent loop: A emits an event handled by B, which emits one for A.
 MAX_CASCADE_DEPTH = 10
@@ -112,9 +115,11 @@ class Orchestrator:
                 if produced.type == EventType.ESCALATED_TO_HUMAN:
                     # Counted here, where every agent's handovers pass, rather than in each
                     # agent: one place, and an agent added later is counted without asking.
-                    ESCALATIONS.add(
-                        1, {"agent": agent.name, "reason": str(produced.payload.get("reason"))}
-                    )
+                    reason = str(produced.payload.get("reason"))
+                    ESCALATIONS.add(1, {"agent": agent.name, "reason": reason})
+                    # The reason and the agent, never the customer or what they said: the
+                    # line is for the operator, and it carries the trace id to the rest.
+                    logger.info("escalated agent=%s reason=%s", agent.name, reason)
                 if self._depth(produced) > MAX_CASCADE_DEPTH:
                     continue
                 if produced.type == EventType.OPT_OUT_REQUESTED:

@@ -225,17 +225,33 @@ def _install_logs(resource, url: str) -> None:
         BatchLogRecordProcessor(OTLPLogExporter(endpoint=f"{url}/v1/logs"))
     )
     set_logger_provider(provider)
-    LoggingInstrumentor().instrument(inject_trace_context=True, log_handler_level=logging.INFO)
+    # No `inject_trace_context`: the exported record carries its trace id natively, and
+    # injecting it as well would store it a second time as a log attribute.
+    LoggingInstrumentor().instrument(log_handler_level=logging.INFO)
 
     stderr = logging.StreamHandler(sys.stderr)
     stderr.setLevel(logging.WARNING)
-    stderr.setFormatter(
-        logging.Formatter("%(levelname)s %(name)s [trace_id=%(otelTraceID)s] %(message)s")
-    )
+    stderr.setFormatter(_TraceFormatter())
     logging.getLogger().addHandler(stderr)
     app_logger = logging.getLogger("collection")
     if app_logger.level == logging.NOTSET or app_logger.level > logging.INFO:
         app_logger.setLevel(logging.INFO)
+
+
+class _TraceFormatter(logging.Formatter):
+    """`LEVEL logger [trace_id=...] message`, the id read from the span the record is in.
+
+    Read at format time, which is still the thread that logged, rather than written onto
+    the record, which every other handler would then see and export.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("%(levelname)s %(name)s [trace_id=%(trace_id)s] %(message)s")
+
+    def formatMessage(self, record: logging.LogRecord) -> str:
+        context = trace.get_current_span().get_span_context()
+        trace_id = format(context.trace_id, "032x") if context.is_valid else "-"
+        return self._style._fmt % {**record.__dict__, "trace_id": trace_id}
 
 
 def instrument_app(app, service_name: str) -> None:
