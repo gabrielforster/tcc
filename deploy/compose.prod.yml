@@ -1,0 +1,184 @@
+# Production: one EC2 host, everything in this file. Run by deploy.sh from /opt/tcc, with
+# the .env it renders from SSM Parameter Store (/tcc/prod/<NAME> -> NAME). That file is both
+# the interpolation source for the ${...} below and the env_file of the app containers.
+#
+#   IMAGE_TAG=<sha> docker compose --env-file .env -f compose.prod.yml up -d
+#
+# No MinIO and no Ollama: object storage is S3 through the instance role, and the LLM is a
+# hosted provider. The observability stack is the `lgtm` service, added by its own change;
+# Caddy already routes GRAFANA_DOMAIN to it and its data path is reserved below.
+#
+# Persistent state lives under DATA_DIR, the mount point of the separate EBS volume, so the
+# instance can be replaced without losing the database or the certificates:
+#   ${DATA_DIR}/postgres   Postgres
+#   ${DATA_DIR}/caddy      certificates and ACME account
+#   ${DATA_DIR}/lgtm       reserved for the observability stack
+# DATA_DIR defaults to the host path; setting it is how this file runs on a laptop.
+
+# Not `tcc`: that is the development project (docker-compose.yml), and running this file on
+# a laptop to try it must not adopt the development containers and volumes.
+name: tcc-prod
+
+x-logging: &logging
+  # Docker's default json-file driver never rotates, and a full root disk takes the whole
+  # box down. 3 x 10 MB per container is days of logs at this traffic; Loki keeps the rest.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  image: ghcr.io/gabrielforster/tcc:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  logging: *logging
+  env_file: .env
+  environment: &app-env
+    DATABASE_URL: postgresql+psycopg://collection:${POSTGRES_PASSWORD:?}@postgres:5432/collection
+    # Empty on purpose, overriding the MinIO defaults in config.py: no endpoint is AWS S3,
+    # no keys is the default credential chain, i.e. the instance role. See config.py.
+    S3_ENDPOINT_URL: ""
+    S3_ACCESS_KEY: ""
+    S3_SECRET_KEY: ""
+    # One URL for the browser and for the call agent alike, because the server hands its
+    # own setting to the browser in /call/start. The agent therefore reaches LiveKit the
+    # way a caller does, through Caddy; the extra hop is on the signalling path only.
+    LIVEKIT_URL: wss://${RTC_DOMAIN:?}
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  caddy:
+    build: ./caddy
+    image: tcc-caddy:local
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3. TURN never uses UDP 443 (it has its own 3478 below), so there is no clash.
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?}
+      RTC_DOMAIN: ${RTC_DOMAIN:?}
+      TURN_DOMAIN: ${TURN_DOMAIN:?}
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DATA_DIR:-/srv/tcc/data}/caddy:/data
+    healthcheck:
+      # The admin endpoint is loopback-only inside the container, and answers once the
+      # config has loaded.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  api:
+    <<: *app
+    command: ["collection", "serve"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Loading the embedder and building the chat's index happens before the first answer.
+      start_period: 120s
+    mem_limit: 2g
+
+  call:
+    <<: *app
+    command: ["collection", "call", "serve"]
+    volumes:
+      # Recordings are personal data with a retention window, not cache: they outlive a
+      # container replacement, and `conversations purge` is what erases them.
+      - ${DATA_DIR:-/srv/tcc/data}/calls:/app/data/calls
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=4)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Whisper and the voice load before uvicorn accepts the first request.
+      start_period: 180s
+    mem_limit: 2560m
+
+  # One-shot, run by deploy.sh before `up`: migrations, then the idempotent seed (the
+  # synthetic tenant, the knowledge base, activation). In a profile so `up` never starts
+  # it; `docker compose run --rm migrate` does, and waits for it to finish.
+  migrate:
+    <<: *app
+    restart: "no"
+    profiles: ["migrate"]
+    command: ["sh", "-c", "collection db upgrade && collection tenant seed"]
+
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      # The API key pair is the only secret, and LiveKit reads it from this variable as
+      # "key: secret". The rest of the configuration is not secret and is inline, as
+      # LIVEKIT_CONFIG (the body of a config file): a mounted livekit.yaml could not take
+      # TURN_DOMAIN from the environment, and this way compose interpolates it.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?}: ${LIVEKIT_API_SECRET:?}"
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          # One TCP and one UDP port for all media, instead of LiveKit's default range of
+          # ten thousand UDP ports: a range would have to be published one by one through
+          # Docker's proxy, and two ports are two security group rules.
+          tcp_port: 7881
+          udp_port: 7882
+          # Discover the instance's public IP over STUN and advertise it: inside a bridge
+          # network LiveKit only sees its private address, which no browser can reach.
+          use_external_ip: true
+        turn:
+          enabled: true
+          domain: ${TURN_DOMAIN:?}
+          # TLS is terminated by Caddy on :443 (see the Caddyfile) and arrives here as plain
+          # TURN over TCP. With external_tls LiveKit advertises turns:<domain>:443 to clients
+          # and listens on tls_port without a certificate of its own.
+          tls_port: 5349
+          external_tls: true
+          udp_port: 3478
+        logging:
+          level: info
+    ports:
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "3478:3478/udp"
+    healthcheck:
+      # The signalling port answers "OK" on / once the server is up.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: collection
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: collection
+    volumes:
+      - ${DATA_DIR:-/srv/tcc/data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      # -h 127.0.0.1: initdb's temporary server listens on the socket only, and a
+      # socket-only check reports healthy while TCP is still refused (see ci.yml).
+      test: ["CMD-SHELL", "pg_isready -U collection -d collection -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 1g
