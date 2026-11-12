@@ -13,12 +13,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from collection.config import ROOT
+from collection.config import ROOT, settings
 from collection.db import session as session_module
 from collection.db.models import StoredObject, Tenant
 from collection.db.repository import TenantScope
 from collection.db.session import CrossTenantWrite, UnscopedQuery, bind_tenant
-from collection.storage.objects import ObjectStore, ObjectStoreError
+from collection.storage.objects import ObjectStore, ObjectStoreError, s3_client
 
 
 def _tenant_scope(db: Session, slug: str) -> TenantScope:
@@ -215,6 +215,42 @@ def test_a_missing_key_raises_object_store_error_not_a_boto_exception(db, bucket
 
     assert caught.type is ObjectStoreError
     assert store.exists(f"tenants/{scope.tenant_id}/raw/nothing-here") is False
+
+
+def test_empty_endpoint_and_keys_mean_aws_s3_through_the_default_credential_chain(
+    monkeypatch,
+):
+    # Production's configuration: nothing set but the bucket and the region. The client
+    # must go to AWS itself and take whatever credentials the chain yields (here the
+    # environment; on the EC2 box the instance role), never an empty literal key.
+    monkeypatch.setattr(settings, "s3_endpoint_url", "")
+    monkeypatch.setattr(settings, "s3_access_key", "")
+    monkeypatch.setattr(settings, "s3_secret_key", "")
+    monkeypatch.setattr(settings, "aws_region", "us-east-1")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "from-the-chain")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "chain-secret")
+
+    client = s3_client()
+
+    assert client.meta.endpoint_url.endswith(".amazonaws.com")
+    assert client.meta.region_name == "us-east-1"
+    assert client.meta.config.s3["addressing_style"] == "auto"
+    credentials = client._request_signer._credentials.get_frozen_credentials()
+    assert credentials.access_key == "from-the-chain"
+
+
+def test_a_configured_endpoint_is_minio_with_its_own_keys_and_path_style(monkeypatch):
+    monkeypatch.setattr(settings, "s3_endpoint_url", "http://localhost:9000")
+    monkeypatch.setattr(settings, "s3_access_key", "collection")
+    monkeypatch.setattr(settings, "s3_secret_key", "collection-secret")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "must-not-be-used")
+
+    client = s3_client()
+
+    assert client.meta.endpoint_url == "http://localhost:9000"
+    assert client.meta.config.s3["addressing_style"] == "path"
+    credentials = client._request_signer._credentials.get_frozen_credentials()
+    assert credentials.access_key == "collection"
 
 
 def test_an_unreachable_backend_raises_object_store_error():
