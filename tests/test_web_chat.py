@@ -23,6 +23,7 @@ from collection.agents.events import Event, EventType
 from collection.agents.responsive import TemplateResponder
 from collection.api.app import ModelRegistry, create_app
 from collection.api.chat import ChatService, _http_error
+from collection.api.pages import ACK_COOKIE
 from collection.channels import session as session_module
 from collection.channels.delivery import DeliveryStatus
 from collection.channels.session import (
@@ -312,7 +313,8 @@ def test_the_widget_renders_replies_as_text_not_html():
 
 
 def test_the_demo_page_embeds_the_widget(client):
-    page = client.get("/chat/demo")
+    client.cookies.set(ACK_COOKIE, "1")
+    page = client.get("/app/chat")
     assert page.status_code == 200
     assert "/chat/widget.js" in page.text
 
@@ -714,11 +716,13 @@ def test_the_demo_page_identifies_itself_only_while_seeding(channel, monkeypatch
     with TestClient(app) as http:
         # The page documents `data-token` in a code sample, so the live script tag is
         # what the assertion has to look at.
-        assert 'data-api="" data-token=' not in http.get("/chat/demo").text
+        http.cookies.set(ACK_COOKIE, "1")
+        assert 'data-api="" data-token=' not in http.get("/app/chat").text
     monkeypatch.setattr(settings, "chat_seed_demo", True)
     app = create_app(registry=ModelRegistry(), chat=ChatService(channel=channel))
     with TestClient(app) as http:
-        assert 'data-api="" data-token=' in http.get("/chat/demo").text
+        http.cookies.set(ACK_COOKIE, "1")
+        assert 'data-api="" data-token=' in http.get("/app/chat").text
 
 
 def test_nothing_is_seeded_by_default(channel):

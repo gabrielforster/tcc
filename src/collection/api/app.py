@@ -31,6 +31,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
 from collection.api.chat import ChatService, create_router
+from collection.api.landing import create_landing_router
+from collection.api.queue import create_queue_router
 from collection.api.ranking import InvalidBatch, rank
 from collection.api.schemas import (
     HealthResponse,
@@ -173,7 +175,8 @@ def create_app(
 
     app = FastAPI(
         title="Collection API",
-        description="Priority ranking for the active module, and the web chat channel.",
+        description="Priority ranking for the active module, the web chat channel, and the "
+        "public demo pages.",
         version="0.1.0",
         lifespan=lifespan,
     )
@@ -188,6 +191,8 @@ def create_app(
             allow_headers=["Content-Type"],
         )
         app.include_router(create_router(chat))
+    app.include_router(create_landing_router(chat_enabled=settings.chat_enabled))
+    app.include_router(create_queue_router(registry))
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:

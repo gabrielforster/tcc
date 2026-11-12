@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Sistema multiagente de cobrança com IA: chat, chamada de voz e fila de contato priorizada por aprendizado de máquina. Projeto acadêmico com dados sintéticos.">
+<title>Cobrança assistida — TCC</title>
+<style>
+{{site_css}}
+
+.hero { padding: 8px 0 4px; }
+.hero h1 { max-width: 18em; }
+.hero h1 .accent { color: var(--teal); font-style: italic; }
+
+.disclaimer h2 { margin-top: 0; }
+.disclaimer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.disclaimer li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.disclaimer .tick {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--info-bg);
+  color: var(--teal);
+  font-weight: 700;
+  font-family: var(--serif);
+}
+.disclaimer li p { margin: 0; }
+.disclaimer li strong { display: block; }
+.ack { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.ack small { color: var(--ink-soft); flex-basis: 100%; }
+
+.done { display: flex; gap: 10px; align-items: center; margin: 4px 0 18px; }
+
+.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 20px 20px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.card::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--saffron);
+  transform: scaleX(0.18);
+  transform-origin: left;
+  transition: transform 0.2s;
+}
+.card:hover, .card:focus-visible { border-color: var(--teal); transform: translateY(-2px); color: var(--ink); }
+.card:hover::after, .card:focus-visible::after { transform: scaleX(1); }
+.card svg { width: 36px; height: 36px; color: var(--teal); }
+.card p { margin: 0; color: var(--ink-soft); flex: 1; }
+.card .go { font-weight: 700; color: var(--teal); }
+.card .num { position: absolute; top: 16px; right: 18px; font-family: var(--serif); color: var(--rule); font-size: 1.6rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+{{banner}}
+{{masthead}}
+<main id="conteudo" class="page">
+  <section class="hero">
+    <span class="eyebrow">Trabalho de Conclusão de Curso · Engenharia de Software</span>
+    <h1>Agentes que conduzem a cobrança — e sabem a hora de <span class="accent">chamar uma pessoa</span>.</h1>
+    <p class="lead">
+      Um sistema multiagente de recuperação de crédito: atendimento por chat e por voz com
+      IA ancorada na base de conhecimento (RAG), contato proativo dentro das regras, e uma
+      fila de contato priorizada por modelos de aprendizado de máquina.
+    </p>
+  </section>
+
+  <!-- picker -->
+  <section id="demos" aria-labelledby="demos-titulo">
+    <h2 id="demos-titulo">Escolha uma demonstração</h2>
+    <p class="done notice ok" role="status"><span aria-hidden="true">✓</span> Aviso lido. Pode explorar à vontade.</p>
+    <div class="cards">
+      <a class="card" href="/app/chat">
+        <span class="num" aria-hidden="true">01</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>
+        <h3>Chat</h3>
+        <p>Converse com o agente de atendimento: dúvidas sobre a dívida, parcelamento, contestação, pedido para não ser mais contatado. Aceita mensagem de voz.</p>
+        <span class="go">Abrir o chat →</span>
+      </a>
+      <a class="card" href="/app/call">
+        <span class="num" aria-hidden="true">02</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>
+        <h3>Chamada de voz</h3>
+        <p>Ligue pelo navegador e fale com o agente em tempo real. Precisa de microfone; antes de ligar, a página testa se a sua rede permite a chamada.</p>
+        <span class="go">Abrir a chamada →</span>
+      </a>
+      <a class="card" href="/app/fila">
+        <span class="num" aria-hidden="true">03</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h11M4 18h6"/><path d="M18 15v6M15 18h6"/></svg>
+        <h3>Fila de contato</h3>
+        <p>Faturas em aberto, sintéticas, ordenadas pelo modelo de propensão a pagamento: probabilidade, decisão no limiar e posição na fila.</p>
+        <span class="go">Ver a fila →</span>
+      </a>
+    </div>
+    <hr class="rule">
+  </section>
+  <!-- /picker -->
+
+  <section class="disclaimer panel" aria-labelledby="aviso-titulo">
+    <h2 id="aviso-titulo">Antes de começar, leia</h2>
+    <ul>
+      <li>
+        <span class="tick" aria-hidden="true">1</span>
+        <p><strong>É um projeto acadêmico.</strong>
+          Trabalho de Conclusão de Curso (Portfólio) de Engenharia de Software no Centro
+          Universitário Católica de Santa Catarina. Não é um serviço de cobrança: ninguém
+          está sendo cobrado aqui.</p>
+      </li>
+      <li>
+        <span class="tick" aria-hidden="true">2</span>
+        <p><strong>Todos os dados são sintéticos.</strong>
+          Clientes, faturas e valores são gerados por programa. Nenhum dado de valores, ou
+          pessoas, reais. Não digite nem fale dados pessoais seus.</p>
+      </li>
+      <li>
+        <span class="tick" aria-hidden="true">3</span>
+        <p><strong>A chamada de voz é gravada e transcrita.</strong>
+          O aviso também é falado no início da ligação. A transcrição é guardada por até
+          {{retention_days}} dias depois que a conversa termina e então apagada. O áudio fica
+          separado da transcrição e é apagado a qualquer momento, a pedido.</p>
+      </li>
+      <li>
+        <span class="tick" aria-hidden="true">4</span>
+        <p><strong>As respostas são automáticas.</strong>
+          Podem errar, e nada aqui é orientação financeira ou jurídica.</p>
+      </li>
+    </ul>
+    <!-- gate -->
+    <form class="ack" method="post" action="/aviso">
+      <input type="hidden" name="next" value="{{next}}">
+      <button class="button primary" type="submit">Li e entendi — ver as demonstrações</button>
+      <small>Guardamos apenas um cookie dizendo que você leu este aviso, por 30 dias. Nenhum rastreamento.</small>
+    </form>
+    <!-- /gate -->
+  </section>
+</main>
+<footer class="footer">
+  Gabriel Forster Rocha · Engenharia de Software · Católica SC
+</footer>
+</body>
+</html>
