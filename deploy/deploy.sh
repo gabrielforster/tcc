@@ -8,7 +8,8 @@
 # 2. pull the app image, build Caddy (a no-op after the first time);
 # 3. run the one-shot `migrate` service: migrations, then the idempotent seed;
 # 4. `up -d` everything and wait until every health check passes;
-# 5. ask the API which version it is serving, and fail unless it is the one asked for.
+# 5. ask the API which version it is serving, and fail unless it is the one asked for;
+# 6. set Grafana's admin and Viewer passwords from the rendered .env.
 #
 # Rollback is this same script with the previous tag. Migrations only ever add (see
 # `collection db downgrade`), so an older image runs against a newer schema.
@@ -87,6 +88,8 @@ render_env
 install -d -m 0750 -o 10001 -g 10001 "$data_dir/calls"
 install -d -m 0700 -o 10002 -g 10002 "$data_dir/caddy"
 install -d -m 0700 "$data_dir/postgres"
+# Root's, like the `lgtm` container that writes it (Grafana, Prometheus, Tempo, Loki).
+install -d -m 0700 "$data_dir/lgtm"
 
 log "pulling ghcr.io/gabrielforster/tcc:${tag}"
 compose pull --ignore-buildable --quiet
@@ -107,6 +110,13 @@ if [ "$tag" != "latest" ] && [ "$serving" != "$tag" ]; then
   exit 1
 fi
 log "serving ${serving}"
+
+# Grafana's admin and Viewer passwords, from the .env just rendered: Grafana reads its admin
+# password only when it first creates its database, and has no file provisioning for users.
+log "grafana accounts"
+# Sent on stdin rather than mounted: a single-file bind mount keeps the old file after the
+# bundle is unpacked over it, and the script must be the one this deploy brought.
+compose exec -T lgtm bash -s <lgtm/grafana-accounts.sh
 
 # The previous image, now untagged, would otherwise accumulate at ~3 GB a deploy.
 docker image prune -f >/dev/null

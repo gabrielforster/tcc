@@ -14,6 +14,7 @@ The orchestrator stays this small so that the interesting behaviour is testable 
 isolation and the coordination itself cannot hide a bug.
 """
 
+import logging
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -21,6 +22,9 @@ from dataclasses import dataclass, field
 from collection.agents.base import Agent
 from collection.agents.events import Event, EventType
 from collection.agents.queue import EventQueue
+from collection.telemetry import ESCALATIONS, span
+
+logger = logging.getLogger(__name__)
 
 #: Guards against an agent loop: A emits an event handled by B, which emits one for A.
 MAX_CASCADE_DEPTH = 10
@@ -80,6 +84,12 @@ class Orchestrator:
         Events produced by an agent are queued, so a reply that triggers an escalation is
         handled in the same run -- but always behind anything more urgent already waiting.
         """
+        with span("orchestrator.run") as current:
+            self._run(max_events)
+            current.set_attributes(self.trace.counts())
+        return self.trace
+
+    def _run(self, max_events: int | None) -> None:
         processed = 0
         while (event := self.queue.pop()) is not None:
             if max_events is not None and processed >= max_events:
@@ -98,15 +108,23 @@ class Orchestrator:
             self.trace.handled_by[event.event_id] = agent.name
             processed += 1
 
-            for produced in agent.handle(event):
+            with span(f"agent.{agent.name}", agent=agent.name, event_type=event.type.value):
+                outcome = agent.handle(event)
+            for produced in outcome:
                 self.trace.produced.append(produced)
+                if produced.type == EventType.ESCALATED_TO_HUMAN:
+                    # Counted here, where every agent's handovers pass, rather than in each
+                    # agent: one place, and an agent added later is counted without asking.
+                    reason = str(produced.payload.get("reason"))
+                    ESCALATIONS.add(1, {"agent": agent.name, "reason": reason})
+                    # The reason and the agent, never the customer or what they said: the
+                    # line is for the operator, and it carries the trace id to the rest.
+                    logger.info("escalated agent=%s reason=%s", agent.name, reason)
                 if self._depth(produced) > MAX_CASCADE_DEPTH:
                     continue
                 if produced.type == EventType.OPT_OUT_REQUESTED:
                     self.opted_out.add(produced.customer_id)
                 self.queue.push(produced)
-
-        return self.trace
 
     # ------------------------------------------------------------------- guards
     def _suppressed(self, event: Event) -> bool:

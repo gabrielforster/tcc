@@ -45,8 +45,8 @@
 	reverse_proxy livekit:7880
 }
 
-# Grafana, from the observability stack (`lgtm`). Until that service exists this answers
-# 502, which is the honest answer; the route is here so adding it is one compose service.
+# Grafana, from the observability stack (`lgtm`). Grafana asks for a login itself: anonymous
+# access and sign-up are off (see compose.prod.yml), so nothing here needs to guard it.
 {$GRAFANA_DOMAIN} {
 	reverse_proxy lgtm:3000
 }

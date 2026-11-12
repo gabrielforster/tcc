@@ -39,6 +39,7 @@ WORKDIR /app
 # collective (216 MB), loaded only when training on several GPUs; shap and the numba JIT
 # under it (about 250 MB) serve `collection explain`, a pipeline step run from a checkout.
 ARG UV_SYNC_ARGS="--extra api --extra call --extra voice --extra llm --extra rag --extra ml \
+    --extra otel \
     --no-install-package nvidia-nccl-cu13 \
     --no-install-package shap --no-install-package numba --no-install-package llvmlite"
 

@@ -5,14 +5,14 @@
 #   IMAGE_TAG=<sha> docker compose --env-file .env -f compose.prod.yml up -d
 #
 # No MinIO and no Ollama: object storage is S3 through the instance role, and the LLM is a
-# hosted provider. The observability stack is the `lgtm` service, added by its own change;
-# Caddy already routes GRAFANA_DOMAIN to it and its data path is reserved below.
+# hosted provider. Observability is `lgtm` (Grafana, Prometheus, Tempo, Loki behind one
+# OpenTelemetry collector), fed by the two servers and by `otelcol`; docs/observability.md.
 #
 # Persistent state lives under DATA_DIR, the mount point of the separate EBS volume, so the
 # instance can be replaced without losing the database or the certificates:
 #   ${DATA_DIR}/postgres   Postgres
 #   ${DATA_DIR}/caddy      certificates and ACME account
-#   ${DATA_DIR}/lgtm       reserved for the observability stack
+#   ${DATA_DIR}/lgtm       metrics, traces, logs and Grafana's own database
 # DATA_DIR defaults to the host path; setting it is how this file runs on a laptop.
 
 # Not `tcc`: that is the development project (docker-compose.yml), and running this file on
@@ -43,6 +43,10 @@ x-app: &app
     # own setting to the browser in /call/start. The agent therefore reaches LiveKit the
     # way a caller does, through Caddy; the extra hop is on the signalling path only.
     LIVEKIT_URL: wss://${RTC_DOMAIN:?}
+    # Telemetry to `lgtm` (collection/telemetry.py). Set here and not in SSM: the address
+    # is this file's network, and each server names itself below.
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+    DEPLOYMENT_ENVIRONMENT: prod
   depends_on:
     postgres:
       condition: service_healthy
@@ -78,6 +82,9 @@ services:
   api:
     <<: *app
     command: ["collection", "serve"]
+    environment:
+      <<: *app-env
+      OTEL_SERVICE_NAME: collection-api
     healthcheck:
       test:
         - CMD
@@ -94,6 +101,9 @@ services:
   call:
     <<: *app
     command: ["collection", "call", "serve"]
+    environment:
+      <<: *app-env
+      OTEL_SERVICE_NAME: collection-call
     volumes:
       # Recordings are personal data with a retention window, not cache: they outlive a
       # container replacement, and `conversations purge` is what erases them.
@@ -182,3 +192,86 @@ services:
       timeout: 3s
       retries: 10
     mem_limit: 1g
+
+  # Grafana, Prometheus, Tempo and Loki behind one OpenTelemetry collector, in Grafana's
+  # single-container distribution: one service to run, ~1 GB, instead of five. Pinned by
+  # digest, because `latest` here would be a monitoring stack that changes under a deploy.
+  # No `env_file`: its run scripts read OTEL_EXPORTER_OTLP_ENDPOINT as "forward everything
+  # there too", and the apps' own variable must never reach it. Not published on any port:
+  # Caddy reaches Grafana on the compose network, and the apps reach the collector there.
+  lgtm:
+    image: grafana/otel-lgtm:0.40.0@sha256:72e05804790e6e0d8c0b70a6d5ff1f721ef7b203463374631e99aa3429bd0cf6
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      GF_SERVER_DOMAIN: ${GRAFANA_DOMAIN:?}
+      GF_SERVER_ROOT_URL: https://${GRAFANA_DOMAIN:?}/
+      # Login required. The image defaults to anonymous Admin, which is right on a laptop
+      # and wrong on the internet. No sign-up and no new orgs: the two accounts are the
+      # admin and the examiners' Viewer, both from SSM (deploy/lgtm/grafana-accounts.sh).
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      # Explore for the Viewer: following a log line to its trace, or a trace to its logs,
+      # happens there, and that correlation is what the examiners are shown. A Viewer still
+      # cannot save a dashboard, add a data source or touch an alert rule.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
+      GRAFANA_VIEWER_PASSWORD: ${GRAFANA_VIEWER_PASSWORD:?}
+      GRAFANA_VIEWER_LOGIN: ${GRAFANA_VIEWER_LOGIN:-banca}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/tcc/service-overview.json
+      # Alert email (deploy/lgtm/grafana/alerting.yaml). All optional: unset, alerts still
+      # fire in Grafana and no mail is sent. `:+true` enables SMTP only once a host is set.
+      GRAFANA_ALERT_EMAIL: ${GRAFANA_ALERT_EMAIL:-alerts@localhost}
+      GF_SMTP_ENABLED: ${GRAFANA_SMTP_HOST:+true}
+      GF_SMTP_HOST: ${GRAFANA_SMTP_HOST:-}
+      GF_SMTP_USER: ${GRAFANA_SMTP_USER:-}
+      GF_SMTP_PASSWORD: ${GRAFANA_SMTP_PASSWORD:-}
+      GF_SMTP_FROM_ADDRESS: ${GRAFANA_SMTP_FROM:-grafana@localhost}
+      # Retention, sized to the 20 GB data volume: logs 7 days, metrics 30 (with a size cap
+      # as a second line), traces 7 days (tempo.yaml).
+      PROMETHEUS_EXTRA_ARGS: --storage.tsdb.retention.time=30d --storage.tsdb.retention.size=4GB
+      LOKI_EXTRA_ARGS: -store.retention=7d -compactor.retention-enabled=true -compactor.delete-request-store=filesystem
+    volumes:
+      - ${DATA_DIR:-/srv/tcc/data}/lgtm:/data
+      - ./lgtm/tempo.yaml:/otel-lgtm/tempo-config.yaml:ro
+      - ./lgtm/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc.yaml:ro
+      - ./lgtm/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc:ro
+      - ./lgtm/grafana/alerting.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/tcc.yaml:ro
+    # The image's own healthcheck (every component's readiness endpoint) is kept; only the
+    # start period is added, because the first start creates every database.
+    healthcheck:
+      test: ["CMD", "/otel-lgtm/docker/healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    mem_limit: 1536m
+
+  # Host and container metrics, and the black-box /health probe; deploy/lgtm/otelcol.yaml
+  # says why this rather than node-exporter + cAdvisor. Root, because the Docker socket is
+  # root's; read-only everywhere, and on no published port.
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
+    restart: unless-stopped
+    logging: *logging
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      OTLP_ENDPOINT: http://lgtm:4318
+      API_HEALTH_URL: http://api:8000/health
+      CALL_HEALTH_URL: http://call:8100/health
+      DEPLOYMENT_ENVIRONMENT: prod
+    volumes:
+      - ./lgtm/otelcol.yaml:/etc/otelcol/config.yaml:ro
+      - /:/hostfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    mem_limit: 192m
