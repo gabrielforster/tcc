@@ -369,7 +369,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -419,11 +429,17 @@
           "custom": {
             "fillOpacity": 60,
             "lineWidth": 1,
-            "showPoints": "never",
+            "showPoints": "auto",
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },

@@ -269,7 +269,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "min by (http_url) (last_over_time(httpcheck_status{http_status_class=\"2xx\"}[2m]))",
+          "expr": "max by (http_url) (last_over_time(httpcheck_status{http_status_class=\"2xx\"}[2m]))",
           "legendFormat": "{{http_url}}",
           "refId": "A"
         }
@@ -341,7 +341,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -391,11 +401,17 @@
           "custom": {
             "fillOpacity": 60,
             "lineWidth": 1,
-            "showPoints": "never",
+            "showPoints": "auto",
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -445,7 +461,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -495,7 +521,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -545,7 +581,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
@@ -584,7 +630,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"$service\", span_kind!=\"SPAN_KIND_CLIENT\"}[$__rate_interval]))",
+          "expr": "sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"$service\", span_kind!=\"SPAN_KIND_CLIENT\", span_name!~\".* http (send|receive)\"}[$__rate_interval]))",
           "legendFormat": "{{service}} {{span_name}}",
           "refId": "A"
         }
@@ -595,7 +641,17 @@
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1,
-            "showPoints": "never"
+            "showPoints": "auto",
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "gradientMode": "none",
+            "pointSize": 4
           },
           "min": 0
         },
