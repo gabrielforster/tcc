@@ -1,20 +1,94 @@
-name: CI
+# One workflow from pull request to production, so the order of the stages is the order of
+# the jobs below and nothing deploys that did not pass the same run's checks:
+#
+#   pull request:  changes, analysis, check, terraform (fmt, validate, tflint, plan)
+#   master:        changes, analysis + check -> terraform apply -> image (build, Trivy, push)
+#                  -> deploy (SSM Run Command) -> smoke
+#   dispatch:      the master path again, optionally without apply and/or deploying an
+#                  existing image tag (rollback)
+#
+# Diagram, environments, repository variables and rollback: docs/deployment.md.
+name: CI/CD
 
 on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >-
+          Deploy this existing image instead of building one: the full 40-character commit
+          SHA of an earlier master build (rollback). Empty builds and deploys the branch tip.
+        type: string
+        default: ""
+      skip_apply:
+        description: Skip terraform apply (deploy the application only).
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A dispatch gets its own group so that a rollback is neither queued behind nor replaced by
+  # a push run; the deploy job's own group below still keeps the two from overlapping.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && 'dispatch' || github.ref }}
+  # A new commit on a pull request makes the old run's result worthless, so it is cancelled.
+  # On master it is not: cancelling there could stop an apply or a deploy halfway. Master runs
+  # queue instead, so they also deploy in commit order (only the newest waiting run is kept).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Read-only by default. Nothing in this workflow writes to the repository; the one job that
-# needs more -- uploading reports to code scanning -- asks for it on its own.
+# Read-only by default. Each job that needs more -- uploading reports to code scanning,
+# commenting a plan, pushing the image, assuming an AWS role -- asks for exactly that.
 permissions:
   contents: read
 
 jobs:
+  changes:
+    # Which stages this run needs. A path filter on the trigger would skip the whole
+    # workflow; this has to decide per job, inside one run.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      infra: ${{ steps.diff.outputs.infra }}
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          # Whole history, but commits and trees only: enough for `git diff --name-only`
+          # between any two commits, without downloading every file ever committed. (Hence
+          # `--no-renames` below: rename detection compares contents, and would fetch them.)
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Diff
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          case "$EVENT" in
+            pull_request) files="$(git diff --name-only --no-renames "$PR_BASE" HEAD)" ;;
+            push)
+              # A new branch or a force push has no usable "before": treat everything as
+              # changed rather than guess, which at worst runs an apply with nothing to do.
+              if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                files="$(git diff --name-only --no-renames "$BEFORE" HEAD)"
+              else
+                files="infra/app/"
+              fi
+              ;;
+            # A dispatch applies unless told not to (skip_apply), whatever changed.
+            *) files="infra/app/" ;;
+          esac
+          # `infra`: anything Terraform reads, or this workflow, which runs it -- linted.
+          # `app`: the root CI plans and applies.
+          infra=false; app=false
+          if grep -qE '^(infra/|\.github/workflows/ci\.yml$)' <<<"$files"; then infra=true; fi
+          if grep -q '^infra/app/' <<<"$files"; then app=true; infra=true; fi
+          echo "infra=$infra app=$app"
+          { echo "infra=$infra"; echo "app=$app"; } >>"$GITHUB_OUTPUT"
+
   analysis:
     # Static code and security analysis, one check per matrix entry, so they run in
     # parallel with each other and with `check` below and never add to its time. Each entry
@@ -24,6 +98,10 @@ jobs:
     # anything lower is only reported there. What each tool covers and how each gate is
     # defined: docs/static-analysis.md.
     name: analysis (${{ matrix.check }})
+    # Skipped only by a rollback (a dispatch with image_tag): that image already passed
+    # every check when it was built, and re-running them would only delay putting it back.
+    # `inputs` is empty on push and pull_request, so there this is always true.
+    if: inputs.image_tag == ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -76,6 +154,8 @@ jobs:
           category: ${{ matrix.check }}
 
   check:
+    # Same condition as `analysis`, for the same reason.
+    if: inputs.image_tag == ''
     runs-on: ubuntu-latest
     # The suite trains real models and now also exercises Postgres and object storage,
     # and the first run on a cold cache downloads the embedding model.
@@ -306,3 +386,415 @@ jobs:
         # the property the design rests on: adding context must never lose a passage the
         # customer's own words would have found.
         run: uv run collection answer --conversations --responder template
+
+  terraform:
+    # Pull requests that touch Terraform (or this workflow, which runs it): formatting,
+    # `validate` and tflint on both roots. No cloud access -- `init -backend=false` reads no
+    # state -- so it needs nothing beyond the read-only default. infra/bootstrap is only ever
+    # linted here, never planned or applied by CI: it holds the CI roles themselves and is
+    # applied by hand (infra/bootstrap/README.md).
+    name: terraform (fmt, validate, tflint)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          # The version the lock files and the roots were last applied with.
+          terraform_version: 1.17.1
+          # The wrapper rewrites stdout and exit codes for its own outputs; the plan job
+          # below reads `-detailed-exitcode` itself.
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.65.0
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff infra
+
+      - name: Validate and lint
+        # The shared tflint config uses only the bundled Terraform ruleset, so there is no
+        # plugin to download and nothing to authenticate.
+        run: |
+          for root in infra/bootstrap infra/app; do
+            echo "::group::$root"
+            terraform -chdir="$root" init -backend=false -input=false -no-color
+            terraform -chdir="$root" validate -no-color
+            tflint --chdir "$root" --config "$PWD/infra/.tflint.hcl"
+            echo "::endgroup::"
+          done
+
+  plan:
+    # `terraform plan` of infra/app against the real account and state, posted on the pull
+    # request as one comment that every push updates. Through tcc-ci-plan, which trusts the
+    # `pull_request` OIDC subject and is read-only apart from the state lock.
+    #
+    # Deliberately no `environment:`. Naming one would change the token's subject to
+    # `environment:production`, which the plan role does not trust -- and which the apply and
+    # deploy roles do. Fork pull requests get no OIDC token at all, so they are skipped
+    # rather than left to fail.
+    name: terraform plan
+    needs: [changes, terraform]
+    if: >-
+      github.event_name == 'pull_request'
+      && needs.changes.outputs.app == 'true'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # The OIDC token traded for tcc-ci-plan credentials.
+      id-token: write
+      # Only for the plan comment.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          role-session-name: tcc-plan-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Plan
+        id: plan
+        working-directory: infra/app
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+        run: |
+          : "${TF_STATE_BUCKET:?repository variable TF_STATE_BUCKET is not set}"
+          # Only when set: to Terraform an empty string is not "no address" but an address,
+          # and the budget would get an empty subscriber.
+          if [ -n "$BUDGET_EMAIL" ]; then export TF_VAR_budget_email="$BUDGET_EMAIL"; fi
+          terraform init -input=false -no-color -backend-config="bucket=$TF_STATE_BUCKET"
+          # 0 no changes, 2 changes, 1 error. Captured rather than failing here, so the
+          # comment below reports an error too; the last step fails the job.
+          set +e
+          terraform plan -input=false -no-color -lock-timeout=5m -detailed-exitcode \
+            -out=tfplan >plan.log 2>&1
+          code=$?
+          set -e
+          cat plan.log
+          # On success the comment shows the plan itself, without the refresh lines.
+          if [ "$code" -ne 1 ]; then terraform show -no-color tfplan >plan.log; fi
+          echo "exitcode=$code" >>"$GITHUB_OUTPUT"
+
+      - name: Comment the plan
+        if: always() && steps.plan.outputs.exitcode != ''
+        working-directory: infra/app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          CODE: ${{ steps.plan.outputs.exitcode }}
+        run: |
+          # The marker is how the next run finds this comment to edit, rather than adding
+          # one comment per push.
+          marker='<!-- terraform-plan:infra/app -->'
+          case "$CODE" in
+            0) result='No changes.' ;;
+            2) result='Changes below; they are applied when this is merged.' ;;
+            *) result='**The plan failed.**' ;;
+          esac
+          {
+            echo "$marker"
+            echo "### Terraform plan: \`infra/app\`"
+            echo
+            echo "$result Commit ${SHA:0:12}."
+            echo
+            echo '<details><summary>Plan output</summary>'
+            echo
+            echo '```text'
+            # A comment holds 65,536 characters; the full plan is in the job log.
+            head -c 60000 plan.log
+            echo
+            echo '```'
+            echo '</details>'
+          } >comment.md
+          id="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" |
+            head -n 1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@comment.md >/dev/null
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md >/dev/null
+          fi
+
+      - name: Fail on a failed plan
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1
+
+  apply:
+    # From here on, master and dispatch only. Every job below states the same three things
+    # in its `if`: nothing before it failed or was cancelled (`failure()` covers every
+    # ancestor, and a job skipped on purpose -- the checks on a rollback, this one when
+    # infra/app did not change -- counts as neither), the ref is master, and it is not a pull
+    # request. The `production` environment's branch rule refuses anything but master too;
+    # checking here keeps a dispatch from another branch from even asking.
+    #
+    # Applies the plan made in this same job, so what is applied is exactly what was printed
+    # to the job summary. Through tcc-ci-apply, which trusts only jobs in `production`.
+    name: terraform apply
+    needs: [changes, analysis, check]
+    if: >-
+      !cancelled() && !failure()
+      && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+      && needs.changes.outputs.app == 'true' && !inputs.skip_apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    # Two applies against one state would only fight over its lock: queue them, and never
+    # cancel one halfway through.
+    concurrency:
+      group: terraform-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      # The OIDC token traded for tcc-ci-apply credentials.
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          role-session-name: tcc-apply-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Plan
+        working-directory: infra/app
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+        run: |
+          : "${TF_STATE_BUCKET:?repository variable TF_STATE_BUCKET is not set}"
+          if [ -n "$BUDGET_EMAIL" ]; then export TF_VAR_budget_email="$BUDGET_EMAIL"; fi
+          terraform init -input=false -no-color -backend-config="bucket=$TF_STATE_BUCKET"
+          terraform plan -input=false -no-color -lock-timeout=5m -out=tfplan
+          {
+            echo "### Terraform plan: \`infra/app\`"
+            echo '```text'
+            terraform show -no-color tfplan | head -c 60000
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        working-directory: infra/app
+        run: terraform apply -input=false -no-color -lock-timeout=5m tfplan
+
+  image:
+    # Build this commit's application image, scan it, and only then push it: an image with a
+    # fixable HIGH/CRITICAL vulnerability never reaches GHCR, so it can never be deployed or
+    # rolled back to. Tagged with the full commit SHA -- also baked in as APP_VERSION, the
+    # value /health reports and deploy.sh compares -- and `latest`. Skipped on a rollback,
+    # which deploys an image that already exists.
+    name: image (build, scan, push)
+    needs: [analysis, check, apply]
+    if: >-
+      !cancelled() && !failure()
+      && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+      && inputs.image_tag == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # The push to ghcr.io, with this run's own token: no stored registry credential.
+      packages: write
+      # The scan's report, to code scanning like every other analysis.
+      security-events: write
+    env:
+      IMAGE: ghcr.io/gabrielforster/tcc
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Free disk space
+        # The image is several GB (CPU torch and the baked-in models) and exists more than
+        # once during this job: BuildKit's cache, the copy loaded into Docker for the scan,
+        # the layers exported to the build cache. The runner's preinstalled SDKs for other
+        # languages are the cheapest room to make.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          # The production host is x86_64 (t3.large).
+          platforms: linux/amd64
+          build-args: APP_VERSION=${{ github.sha }}
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          # The source label links the GHCR package to this repository, which is what lets
+          # this run's token push to it.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          # Into the local Docker daemon, not the registry: the scan comes first. No
+          # provenance attestation, so what is pushed is the one single-platform image that
+          # was scanned.
+          load: true
+          push: false
+          provenance: false
+          # Every stage cached -- the dependency and model-download stages above all -- so a
+          # commit that changes only source rebuilds in minutes instead of downloading a few
+          # GB again.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan the image
+        # The same script and scanner pin as `analysis (trivy)`, so the same gate:
+        # HIGH/CRITICAL with a fix available fails the job, and nothing is pushed.
+        env:
+          TRIVY_IMAGE_REF: ${{ env.IMAGE }}:${{ github.sha }}
+        run: scripts/analyze.sh trivy-image
+
+      - name: Upload to code scanning
+        if: always() && hashFiles('analysis/trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: analysis/trivy-image.sarif
+          category: trivy-image
+
+      - name: Push
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker tag "$IMAGE:$SHA" "$IMAGE:latest"
+          docker push --quiet "$IMAGE:$SHA"
+          docker push --quiet "$IMAGE:latest"
+
+  deploy:
+    # deploy.sh on the instance through SSM Run Command: no SSH, no key, port 22 closed.
+    # scripts/ssm_deploy.sh finds the instance by its tags, sends the command, waits for it
+    # and prints its output; deploy.sh on the host renders .env from SSM, pulls, migrates,
+    # starts the stack and fails unless the API reports the tag it was given.
+    name: deploy
+    needs: [apply, image]
+    if: >-
+      !cancelled() && !failure()
+      && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    environment:
+      name: production
+      url: https://${{ vars.APP_DOMAIN || 'tcc.gabrielfr.com' }}
+    # Never two deploys at once, whichever run they come from, and never cancel one: a
+    # deploy stopped between `migrate` and `up` leaves the host halfway. A deploy that
+    # arrives while one is running waits; if a third arrives, the waiting one is dropped in
+    # its favour, since only the newest matters.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      # The OIDC token traded for tcc-ci-deploy credentials.
+      id-token: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+          SHA: ${{ github.sha }}
+        run: |
+          tag="${INPUT_TAG:-$SHA}"
+          # A full SHA, because the tag is also the commit whose deploy/ bundle the host
+          # downloads and the version /health must report. `latest` or a short SHA would make
+          # all three ambiguous.
+          if ! [[ "$tag" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::image_tag must be a full 40-character commit SHA, got '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+
+      - name: Check the image is publicly pullable
+        # The host pulls anonymously, so this asks the same way: no login. Fails here, with a
+        # clear message, if the tag does not exist (a mistyped rollback) or the package is
+        # still private (GHCR's default for a new package).
+        env:
+          REF: ghcr.io/gabrielforster/tcc:${{ steps.tag.outputs.tag }}
+        run: |
+          if ! docker manifest inspect "$REF" >/dev/null; then
+            echo "::error::$REF is not pullable anonymously: no such tag, or the GHCR package is not public"
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: tcc-deploy-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Deploy over SSM
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: scripts/ssm_deploy.sh "$TAG"
+
+  smoke:
+    # From the outside, the way a visitor arrives: DNS, TLS, Caddy, then the API. deploy.sh
+    # already checked the version from inside the box; this catches what it cannot see -- a
+    # DNS record pointing elsewhere, a certificate Caddy could not obtain, a route that does
+    # not reach the API. Retries, because a first deploy may still be getting its
+    # certificate.
+    name: smoke
+    needs: deploy
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Nothing from the repository, no token: one curl.
+    permissions: {}
+    steps:
+      - name: GET /health
+        env:
+          URL: https://${{ vars.APP_DOMAIN || 'tcc.gabrielfr.com' }}/health
+          TAG: ${{ needs.deploy.outputs.tag }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if body="$(curl -fsS --max-time 10 "$URL")"; then
+              version="$(jq -r '.version' <<<"$body")"
+              if [ "$version" = "$TAG" ]; then
+                echo "$URL reports $version"
+                exit 0
+              fi
+              echo "attempt $attempt: $URL reports $version, expected $TAG"
+            else
+              echo "attempt $attempt: no answer from $URL"
+            fi
+            sleep 10
+          done
+          echo "::error::$URL never reported version $TAG"
+          exit 1
