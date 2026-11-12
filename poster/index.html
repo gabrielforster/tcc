@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pôster A0 — Sistema Multiagente de Cobrança</title>
+<link rel="stylesheet" href="poster.css">
+</head>
+<body>
+<!--
+  A0 poster (841 x 1189 mm, portrait). Build with `make poster` (poster/export-pdf.sh).
+
+  Every number below carries a comment naming the document it comes from. The rule is the
+  article's: a number on the poster is a number in docs/, character for character after
+  rounding, or it does not go on the poster. See poster/README.md for the full table.
+-->
+
+<!-- shared arrow heads for every diagram -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+    <marker id="ah-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C00000"/>
+    </marker>
+    <marker id="ah-navy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000099"/>
+    </marker>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <!-- ===================== HEADER (template) ===================== -->
+  <header class="hdr">
+    <!-- Logo taken from the official template (ppt/media/image1.jpeg), upscaled for print; see README -->
+    <img class="logo" src="assets/logo-catolica-sc.png" alt="Católica de Santa Catarina — Centro Universitário">
+    <div class="who">
+      <h1>Sistema Multiagente Inteligente de Cobrança com LLM, RAG e Machine Learning</h1>
+      <div class="name">Gabriel Forster Rocha</div>
+      <div class="mail">gabriel04.rocha@catolicasc.edu.br</div>
+      <div class="course">Graduando do curso de Bacharelado em Engenharia de Software da Católica de SC</div>
+      <div class="advisor">Orientador: Andrei Carniel</div>
+    </div>
+  </header>
+  <div class="bar"></div>
+
+  <main>
+
+    <!-- ===================== ROW 1: contexto | solução ===================== -->
+    <div class="row">
+      <section>
+        <h2>Contexto e problema</h2>
+        <!-- Market numbers: Serasa Experian, Indicador de Inadimplência das Empresas, dez/2025
+             (same source and figures as pitch/index.html, slide 2). Not a docs/ number. -->
+        <div class="stats">
+          <div class="stat"><span class="num">R$ 213 <small>bi</small></span><span class="cap">em dívidas de empresas no fim de 2025</span></div>
+          <div class="stat"><span class="num">8,9 <small>mi</small></span><span class="cap">de empresas inadimplentes (CNPJ)</span></div>
+        </div>
+        <p class="src">Fonte: Serasa Experian, Indicador de Inadimplência das Empresas, dez/2025.</p>
+
+        <ul class="icons">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#C00000"/><circle cx="12" cy="9" r="3.4" fill="#fff"/><path d="M5.5 19c1-3.6 3.6-5.2 6.5-5.2s5.5 1.6 6.5 5.2" fill="#fff"/></svg>
+            <p><strong>Capacidade finita.</strong> Cada operador faz poucos contatos por dia; sem priorizar, o esforço vai para quem menos vai pagar.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#C00000"/><path d="M12 5v13M7 18h10M6 8h12M6 8l-2.6 5.2h5.2zM18 8l-2.6 5.2h5.2z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <p><strong>Cobrança é regulada.</strong> Horário, frequência e <em>opt-out</em> (CDC art. 42, LGPD, Lei 14.181/2021).</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#C00000"/><rect x="5.5" y="5.5" width="5.5" height="5.5" fill="#fff"/><rect x="13" y="5.5" width="5.5" height="5.5" fill="none" stroke="#fff" stroke-width="1.4"/><rect x="5.5" y="13" width="5.5" height="5.5" fill="none" stroke="#fff" stroke-width="1.4"/><rect x="13" y="13" width="5.5" height="5.5" fill="#fff"/></svg>
+            <p><strong>Soluções em pedaços.</strong> Risco, voz ou atendimento, cada um isolado, sem integração.</p>
+          </li>
+        </ul>
+
+        <div class="question">
+          <p><span class="lbl">Pergunta de pesquisa</span>Um sistema multiagente com LLM, RAG e ML automatiza a cobrança, responsiva e proativa, e recupera mais crédito que abordagens convencionais?</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Solução proposta</h2>
+        <!-- Structure: docs/architecture.md (layers, priority rule, what the orchestrator enforces) -->
+        <svg class="dia" viewBox="0 0 383 193" role="img" aria-label="Diagrama do sistema multiagente">
+          <!-- channels -->
+          <rect x="0" y="0" width="185" height="38" rx="4" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+          <text class="t c navy" x="92.5" y="15">Chat web</text>
+          <text class="s c" x="92.5" y="30">texto e nota de voz</text>
+          <rect x="198" y="0" width="185" height="38" rx="4" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+          <text class="t c navy" x="290.5" y="15">Chamada de voz</text>
+          <text class="s c" x="290.5" y="30">tempo real, WebRTC</text>
+
+          <line x1="92.5" y1="39" x2="92.5" y2="55" stroke="#000" stroke-width="1" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <line x1="290.5" y1="39" x2="290.5" y2="55" stroke="#000" stroke-width="1" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <text class="s" x="98" y="50">eventos</text>
+
+          <!-- orchestrator -->
+          <rect x="0" y="56" width="383" height="56" rx="4" fill="#FCEDED" stroke="#C00000" stroke-width="1.6"/>
+          <text class="t c red" x="191.5" y="71">ORQUESTRADOR</text>
+          <text class="s c" x="191.5" y="87">rotear · priorizar · opt-out antes de tudo · auditar</text>
+          <text class="s c" x="191.5" y="103">responsivo › escalação › proativo</text>
+
+          <line x1="60.5" y1="113" x2="60.5" y2="129" stroke="#000" stroke-width="1" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <line x1="191.5" y1="113" x2="191.5" y2="129" stroke="#000" stroke-width="1" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <line x1="322.5" y1="113" x2="322.5" y2="129" stroke="#000" stroke-width="1" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+          <!-- agents -->
+          <g>
+            <rect x="0" y="130" width="121" height="62" rx="4" fill="#fff" stroke="#000099" stroke-width="1.2"/>
+            <text class="t c navy" x="60.5" y="146">Responsivo</text>
+            <text class="s c" x="60.5" y="162">intenção · RAG</text>
+            <text class="s c" x="60.5" y="176">LLM ou escala</text>
+            <text class="s c" x="60.5" y="188">a humano</text>
+          </g>
+          <g>
+            <rect x="131" y="130" width="121" height="62" rx="4" fill="#fff" stroke="#000099" stroke-width="1.2"/>
+            <text class="t c navy" x="191.5" y="146">Proativo</text>
+            <text class="s c" x="191.5" y="162">regras legais</text>
+            <text class="s c" x="191.5" y="176">texto checado</text>
+            <text class="s c" x="191.5" y="188">inicia contato</text>
+          </g>
+          <g>
+            <rect x="262" y="130" width="121" height="62" rx="4" fill="#fff" stroke="#000099" stroke-width="1.2"/>
+            <text class="t c navy" x="322.5" y="146">Preditivo</text>
+            <text class="s c" x="322.5" y="162">ranking por ML</text>
+            <text class="s c" x="322.5" y="176">quem contatar</text>
+            <text class="s c" x="322.5" y="188">primeiro</text>
+          </g>
+
+</svg>
+      </section>
+    </div>
+
+    <!-- ===================== ROW 2: arquitetura ===================== -->
+    <section>
+      <h2>Arquitetura em produção</h2>
+      <!-- Deployment as settled for production: one EC2 with Docker Compose, Caddy, LiveKit,
+           Postgres+pgvector on EBS, S3, Grafana LGTM, GitHub Actions with OIDC -> SSM, images on GHCR.
+           Services/hostnames per the cross-task contracts; voice stack per docs/voice-call.md. -->
+      <svg class="dia" viewBox="0 0 791 192" role="img" aria-label="Diagrama de implantação na AWS">
+        <!-- left: visitor and DNS -->
+        <rect x="0" y="14" width="118" height="62" rx="4" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+        <text class="t c navy" x="59" y="32">Visitante</text>
+        <text class="s c" x="59" y="49">navegador ou</text>
+        <text class="s c" x="59" y="63">celular (QR)</text>
+
+        <rect x="0" y="96" width="118" height="62" rx="4" fill="#fff" stroke="#000" stroke-width="0.9"/>
+        <text class="t c" x="59" y="114">DNS</text>
+        <text class="s c" x="59" y="131">Cloudflare</text>
+        <text class="s c" x="59" y="146">tcc.gabrielfr.com</text>
+        <line x1="59" y1="77" x2="59" y2="95" stroke="#000" stroke-width="0.9" stroke-dasharray="2 1.5"/>
+
+        <!-- AWS -->
+        <rect x="136" y="0" width="488" height="192" rx="5" fill="none" stroke="#000099" stroke-width="1.2" stroke-dasharray="4 2"/>
+        <text class="k navy" x="144" y="11">AWS · us-east-1 · VPC dedicada · Terraform</text>
+
+        <rect x="144" y="17" width="472" height="128" rx="4" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k" x="152" y="29">EC2 t3.large · Ubuntu 24.04 · Docker Compose</text>
+
+        <!-- visitor -> caddy -->
+        <line x1="119" y1="45" x2="153" y2="62" stroke="#C00000" stroke-width="1.4" marker-end="url(#ah-red)"/>
+
+        <rect x="154" y="38" width="80" height="98" rx="4" fill="#FCEDED" stroke="#C00000" stroke-width="1.2"/>
+        <text class="t c red" x="194" y="78">Caddy</text>
+        <text class="s c" x="194" y="94">HTTPS</text>
+        <text class="s c" x="194" y="108">TLS</text>
+
+        <line x1="235" y1="53" x2="251" y2="53" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+        <line x1="235" y1="87" x2="251" y2="87" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+        <line x1="235" y1="121" x2="251" y2="121" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+
+        <rect x="252" y="38" width="170" height="30" rx="3" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+        <text class="k" x="258" y="50">api · FastAPI</text>
+        <text class="s" x="258" y="63">landing · chat · /score</text>
+        <rect x="252" y="72" width="170" height="30" rx="3" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+        <text class="k" x="258" y="84">call · voz</text>
+        <text class="s" x="258" y="97">Whisper + Piper locais</text>
+        <rect x="252" y="106" width="170" height="30" rx="3" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+        <text class="k" x="258" y="118">LiveKit</text>
+        <text class="s" x="258" y="131">WebRTC + TURN</text>
+
+        <line x1="423" y1="53" x2="437" y2="53" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+        <line x1="423" y1="87" x2="437" y2="70" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+        <line x1="423" y1="121" x2="437" y2="114" stroke="#555" stroke-width="1" stroke-dasharray="2 1.5" marker-end="url(#ah)"/>
+
+        <rect x="438" y="38" width="170" height="44" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k" x="444" y="50">Postgres + pgvector</text>
+        <text class="s" x="444" y="63">volume EBS separado</text>
+        <text class="s" x="444" y="76">só dados sintéticos</text>
+        <rect x="438" y="92" width="170" height="44" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k" x="444" y="104">Grafana (LGTM)</text>
+        <text class="s" x="444" y="117">métricas · traces · logs</text>
+        <text class="s" x="444" y="130">via OpenTelemetry</text>
+
+        <rect x="144" y="153" width="230" height="30" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k" x="152" y="165">S3</text>
+        <text class="s" x="152" y="177">modelos e artefatos</text>
+        <rect x="386" y="153" width="230" height="30" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k" x="392" y="165">SSM</text>
+        <text class="s" x="392" y="177">segredos e deploy, sem SSH</text>
+
+        <!-- right: GitHub and LLM provider -->
+        <rect x="644" y="0" width="147" height="26" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k c" x="717.5" y="17">GitHub · PR</text>
+        <line x1="717.5" y1="27" x2="717.5" y2="35" stroke="#000" stroke-width="1" marker-end="url(#ah)"/>
+        <rect x="644" y="36" width="147" height="58" rx="3" fill="#ECEEFA" stroke="#000099" stroke-width="1"/>
+        <text class="k c navy" x="717.5" y="50">GitHub Actions</text>
+        <text class="s c" x="717.5" y="65">análise · testes</text>
+        <text class="s c" x="717.5" y="78">Terraform · build</text>
+        <text class="s c" x="717.5" y="90">imagem no GHCR</text>
+        <path d="M 644 80 L 630 80 L 630 170 L 618 170" fill="none" stroke="#000099" stroke-width="1.2" marker-end="url(#ah-navy)"/>
+        <text class="s navy" x="644" y="108">OIDC, sem</text>
+        <text class="s navy" x="644" y="120">chave fixa</text>
+
+        <rect x="644" y="132" width="147" height="51" rx="3" fill="#fff" stroke="#000" stroke-width="1"/>
+        <text class="k c" x="717.5" y="146">Provedor LLM</text>
+        <text class="s c" x="717.5" y="161">API externa</text>
+        <text class="s c" x="717.5" y="175">sem LLM: template</text>
+        <line x1="643" y1="150" x2="610" y2="140" stroke="#000" stroke-width="1" stroke-dasharray="2 1.5" marker-end="url(#ah)"/>
+      </svg>
+    </section>
+
+    <!-- ===================== ROW 3: pipeline de IA ===================== -->
+    <section>
+      <h2>Pipeline de IA</h2>
+      <!-- Preditivo: README "Predictive module", docs/model-synthetic-*.md (TimeSeriesSplit k=5,
+             six candidates, champion by average precision, 70/15/15 chronological split per article §3.1).
+           Proativo: docs/collection-rules.md (max_attempts = 4, cooldown_hours = 48), docs/outreach.md.
+           Responsivo: docs/rag.md (paraphrase-multilingual-MiniLM-L12-v2, 384 dims, pgvector,
+             tenant + audience filter), docs/llm-responder.md (faithfulness check).
+           Voz: docs/voice-call.md (700 ms hangover, Whisper small local, Piper local, 43-word budget),
+             docs/voice.md (spoken figure is read back). -->
+      <svg class="dia" viewBox="0 0 791 138" role="img" aria-label="Pipelines de IA por agente">
+        <g id="lanes">
+          <!-- lane labels -->
+          <rect x="0" y="0"   width="116" height="30" rx="3" fill="#000099"/>
+          <text class="k c white" x="58" y="18.5">Preditivo</text>
+          <rect x="0" y="36"  width="116" height="30" rx="3" fill="#000099"/>
+          <text class="k c white" x="58" y="54.5">Proativo</text>
+          <rect x="0" y="72"  width="116" height="30" rx="3" fill="#000099"/>
+          <text class="k c white" x="58" y="90.5">Responsivo</text>
+          <rect x="0" y="108" width="116" height="30" rx="3" fill="#000099"/>
+          <text class="k c white" x="58" y="126.5">Voz (local)</text>
+        </g>
+
+        <!-- boxes: x = 128, 293, 458, 623; w = 150; arrows in the 15 mm gaps -->
+        <g fill="#fff" stroke="#000099" stroke-width="1">
+          <rect x="128" y="0" width="150" height="30" rx="3"/><rect x="293" y="0" width="150" height="30" rx="3"/><rect x="458" y="0" width="150" height="30" rx="3"/><rect x="623" y="0" width="168" height="30" rx="3" fill="#FCEDED" stroke="#C00000"/>
+          <rect x="128" y="36" width="150" height="30" rx="3"/><rect x="293" y="36" width="150" height="30" rx="3"/><rect x="458" y="36" width="150" height="30" rx="3"/><rect x="623" y="36" width="168" height="30" rx="3" fill="#FCEDED" stroke="#C00000"/>
+          <rect x="128" y="72" width="150" height="30" rx="3"/><rect x="293" y="72" width="150" height="30" rx="3"/><rect x="458" y="72" width="150" height="30" rx="3"/><rect x="623" y="72" width="168" height="30" rx="3" fill="#FCEDED" stroke="#C00000"/>
+          <rect x="128" y="108" width="150" height="30" rx="3"/><rect x="293" y="108" width="150" height="30" rx="3"/><rect x="458" y="108" width="150" height="30" rx="3"/><rect x="623" y="108" width="168" height="30" rx="3" fill="#FCEDED" stroke="#C00000"/>
+        </g>
+        <g stroke="#000" stroke-width="1" marker-end="url(#ah)">
+          <line x1="117" y1="15" x2="127" y2="15"/><line x1="279" y1="15" x2="292" y2="15"/><line x1="444" y1="15" x2="457" y2="15"/><line x1="609" y1="15" x2="622" y2="15"/>
+          <line x1="117" y1="51" x2="127" y2="51"/><line x1="279" y1="51" x2="292" y2="51"/><line x1="444" y1="51" x2="457" y2="51"/><line x1="609" y1="51" x2="622" y2="51"/>
+          <line x1="117" y1="87" x2="127" y2="87"/><line x1="279" y1="87" x2="292" y2="87"/><line x1="444" y1="87" x2="457" y2="87"/><line x1="609" y1="87" x2="622" y2="87"/>
+          <line x1="117" y1="123" x2="127" y2="123"/><line x1="279" y1="123" x2="292" y2="123"/><line x1="444" y1="123" x2="457" y2="123"/><line x1="609" y1="123" x2="622" y2="123"/>
+        </g>
+
+        <!-- Preditivo -->
+        <text class="k" x="134" y="12.5">Dados sintéticos</text><text class="s" x="134" y="24">pseudônimos HMAC</text>
+        <text class="k" x="299" y="12.5">Atributos sem</text><text class="s" x="299" y="24">vazamento · split 70/15/15</text>
+        <text class="k" x="464" y="12.5">6 candidatos</text><text class="s" x="464" y="24">LR · RF · XGBoost, CV k=5</text>
+        <text class="k" x="629" y="12.5">POST /score</text><text class="s" x="629" y="24">fila por precisão média</text>
+        <!-- Proativo -->
+        <text class="k" x="134" y="48.5">Vencido ou risco</text><text class="s" x="134" y="60">evento imutável</text>
+        <text class="k" x="299" y="48.5">Motor de regras</text><text class="s" x="299" y="60">horário · ≤ 4 tentativas</text>
+        <text class="k" x="464" y="48.5">Template ou LLM</text><text class="s" x="464" y="60">termos da tabela oficial</text>
+        <text class="k" x="629" y="48.5">Conformidade</text><text class="s" x="629" y="60">reprovou: humano</text>
+        <!-- Responsivo -->
+        <text class="k" x="134" y="84.5">Base de conhecimento</text><text class="s" x="134" y="96">versionada</text>
+        <text class="k" x="299" y="84.5">Embeddings</text><text class="s" x="299" y="96">MiniLM multilíngue</text>
+        <text class="k" x="464" y="84.5">pgvector</text><text class="s" x="464" y="96">filtro inquilino e público</text>
+        <text class="k" x="629" y="84.5">Template ou LLM</text><text class="s" x="629" y="96">checagem de fidelidade</text>
+        <!-- Voz -->
+        <text class="k" x="134" y="120.5">Áudio do cliente</text><text class="s" x="134" y="132">nota ou chamada</text>
+        <text class="k" x="299" y="120.5">Whisper small</text><text class="s" x="299" y="132">fim de turno 700 ms</text>
+        <text class="k" x="464" y="120.5">Agente responsivo</text><text class="s" x="464" y="132">valor falado é confirmado</text>
+        <text class="k" x="629" y="120.5">Piper TTS</text><text class="s" x="629" y="132">resposta ≤ 43 palavras</text>
+      </svg>
+    </section>
+
+    <!-- ===================== ROW 4: resultados ===================== -->
+    <section>
+      <h2>Resultados</h2>
+      <div class="row results">
+        <div>
+          <div class="chart-title">Valor em risco recuperado em até 30 dias</div>
+          <div class="legend">
+            <span class="sys"><i></i><b>Sistema (com predição)</b></span>
+            <span class="semi"><i></i><b>Semiautomático</b></span>
+            <span class="man"><i style="background:repeating-linear-gradient(90deg,#555 0 3mm,transparent 3mm 5mm)"></i><b>Manual</b></span>
+          </div>
+          <!-- docs/experiment-results.md, "Arms by daily capacity (main scenario)", column
+               "recovered ≤ 30 days" (means): capacity 2/4/8/16 —
+               system 0.576 0.592 0.610 0.621; semi-automated 0.528 0.545 0.597 0.621;
+               manual 0.525 0.539 0.579 0.621.
+               +4,8 pp: "Paired differences", 2/day, system − semi-automated, +4.8 [+3.9, +5.8].
+               y(v) = 128 - (v - 0.50) * 800 ; x: 2→78, 4→158, 8→238, 16→318 -->
+          <svg class="dia" viewBox="0 22 412 136" role="img" aria-label="Gráfico: recuperação por capacidade diária">
+            <g stroke="#ccc" stroke-width="0.5">
+              <line x1="44" y1="128" x2="340" y2="128" stroke="#000" stroke-width="0.9"/>
+              <line x1="44" y1="88" x2="340" y2="88"/>
+              <line x1="44" y1="48"  x2="340" y2="48"/>
+            </g>
+            <text class="s e" x="38" y="131">50%</text>
+            <text class="s e" x="38" y="91">55%</text>
+            <text class="s e" x="38" y="51">60%</text>
+            <text class="s c" x="78"  y="140">2</text>
+            <text class="s c" x="158" y="140">4</text>
+            <text class="s c" x="238" y="140">8</text>
+            <text class="s c" x="318" y="140">16</text>
+            <text class="s c" x="198" y="154">contatos por dia (capacidade)</text>
+
+            <!-- manual -->
+            <polyline points="78,108.0 158,96.8 238,64.8 318,31.2" fill="none" stroke="#555" stroke-width="1.6" stroke-dasharray="4 2.5"/>
+            <!-- semi-automated -->
+            <polyline points="78,105.6 158,92.0 238,50.4 318,31.2" fill="none" stroke="#000099" stroke-width="2"/>
+            <!-- system -->
+            <polyline points="78,67.2 158,54.4 238,40.0 318,31.2" fill="none" stroke="#C00000" stroke-width="2.6"/>
+            <g fill="#C00000"><circle cx="78" cy="67.2" r="2.3"/><circle cx="158" cy="54.4" r="2.3"/><circle cx="238" cy="40.0" r="2.3"/><circle cx="318" cy="31.2" r="2.3"/></g>
+            <g fill="#000099"><circle cx="78" cy="105.6" r="2"/><circle cx="158" cy="92.0" r="2"/><circle cx="238" cy="50.4" r="2"/></g>
+
+            <!-- the gap at 2/day -->
+            <line x1="86" y1="69" x2="86" y2="102" stroke="#C00000" stroke-width="1" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+            <text class="t red" x="91" y="89">+4,8 pp</text>
+
+            <!-- convergence note -->
+            <text class="s" x="326" y="47">todos</text>
+            <text class="s" x="326" y="58">iguais:</text>
+            <text class="s" x="326" y="69">62,1%</text>
+          </svg>
+          <p class="small">Simulação: 30 replicações pareadas, IC 95%. Mostra o mecanismo, não o valor de uma operação real.</p>
+          <div class="takeaway"><p><strong>A predição vale o que a escassez de contato a faz valer:</strong> com 2 a 4 contatos/dia ganha +4,7 a +4,8 pp; quando dá para contatar todos, o ganho some.</p></div>
+          <!-- "+4,7 a +4,8 pp": docs/experiment-results.md Finding 1 and Paired differences
+               (4/day +4.7 [+4.0, +5.4]; 2/day +4.8 [+3.9, +5.8]); 16/day −0.1 [−0.2, +0.2]. -->
+        </div>
+
+        <div class="kpis">
+          <!-- docs/experiment-results.md, "Compliance": 0 violations across all 1500 runs -->
+          <div class="kpi hl"><span class="v">0</span><span class="d">violações de regras em 1.500 execuções simuladas (auditoria independente)</span></div>
+          <!-- docs/experiment-results.md, capacity 4: "R$ per R$ 1,000 gained" system 1.94, manual 34.62 -->
+          <div class="kpi hl"><span class="v">R$ 1,94</span><span class="d">por R$ 1.000 recuperado, contra R$ 34,62 da mesa manual (4 contatos/dia)</span></div>
+          <!-- docs/voice-call.md / docs/voice-call-report-live.md: measured over WebRTC median 2,174 ms -->
+          <div class="kpi"><span class="v">2,2 s</span><span class="d">do fim da fala à resposta audível na chamada (mediana, só CPU)</span></div>
+          <!-- docs/voice-call.md: spoken reply median 12.1 s (was 102 s), 18/18 within 20 s -->
+          <div class="kpi"><span class="v">12,1 s</span><span class="d">resposta falada (mediana), antes 102 s: o texto é cortado para o ouvido</span></div>
+          <!-- docs/experiment-results.md, "Concurrency": 400 conversations, 0 errors, p95 1,342 ms -->
+          <div class="kpi"><span class="v">400</span><span class="d">conversas simultâneas sem nenhum erro (p95 de 1,34 s)</span></div>
+          <!-- docs/responder-comparison.md: faithful_rate template 1.0, llm 0.6923 (qwen2.5:3b, local) -->
+          <div class="kpi"><span class="v">100% × 69%</span><span class="d">respostas fiéis à base: <em>template</em> (controle) × LLM local de 3B</span></div>
+          <!-- docs/voice.md / docs/voice-report.md: WER 0.099 → intent 0.856 (86%), figures intact 0.867 (1 in 7 wrong) -->
+          <div class="kpi"><span class="v">86% · 1 em 7</span><span class="d">com 9,9% de erro de palavras, a intenção sobrevive; 1 valor falado em 7 erra, por isso é confirmado</span></div>
+          <!-- docs/rag.md, customer-facing corpus: MRR tfidf 0.8472, pgvector 0.8194 -->
+          <div class="kpi"><span class="v">0,82 × 0,85</span><span class="d">MRR: <em>embedder</em> pré-treinado não superou o TF-IDF (dentro do ruído)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ROW 5: ética | acesse ===================== -->
+    <div class="row">
+      <section>
+        <h2>Ética e LGPD</h2>
+        <ul class="checks">
+          <!-- docs/data-acquisition-plan.md (D1), docs/eda-bank-marketing.md, article §3.1 -->
+          <li><span><strong>Só dados sintéticos</strong> no sistema e em produção: nenhum valor ou pessoa real.</span></li>
+          <li><span><strong>Bases públicas só como referência:</strong> Bank Marketing (UCI) calibra a resposta ao contato (de 13,0% na 1ª tentativa para 5,5% na 6ª); Home Credit é <em>benchmark</em>.</span></li>
+          <!-- docs/voice.md, docs/voice-call.md: local Whisper and Piper -->
+          <li><span><strong>Voz processada localmente</strong> (Whisper, Piper): o áudio não vai a terceiros.</span></li>
+          <!-- docs/architecture.md: per-tenant HMAC key, 6-month transcript retention, purged_at -->
+          <li><span><strong>Pseudônimos HMAC por inquilino</strong>; transcrições expiram em 6 meses.</span></li>
+          <!-- docs/architecture.md: opt-out before any agent (CDC art. 42) -->
+          <li><span><strong><em>Opt-out</em> antes de qualquer agente</strong>; a mensagem se identifica como automática.</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Acesse</h2>
+        <!-- QR targets: poster/qr-targets.conf (regenerated by `make poster`) -->
+        <div class="qrs">
+          <figure class="qr main" data-qr="prod">
+            <div class="code"><img alt="QR code da aplicação em produção"></div>
+            <figcaption><div class="lbl">Aplicação ao vivo</div><div class="url"></div></figcaption>
+          </figure>
+          <figure class="qr" data-qr="repo">
+            <div class="code"><img alt="QR code do repositório"></div>
+            <figcaption><div class="lbl">Repositório</div><div class="url"></div></figcaption>
+          </figure>
+          <figure class="qr" data-qr="docs">
+            <div class="code"><img alt="QR code da documentação"></div>
+            <figcaption><div class="lbl">Documentação</div><div class="url"></div></figcaption>
+          </figure>
+          <!-- Demo video: set VIDEO_URL in qr-targets.conf. Empty -> this slot is removed. -->
+          <figure class="qr" data-qr="video">
+            <div class="code"><img alt="QR code do vídeo de demonstração"></div>
+            <figcaption><div class="lbl">Vídeo demo</div><div class="url"></div></figcaption>
+          </figure>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== ROW 6: referências ===================== -->
+    <section>
+      <h2>Referências</h2>
+      <!-- Entries from article/refs.bib, plus the Serasa 2025 indicator used by the pitch. -->
+      <div class="refs">
+        <p>BRASIL. <strong>Lei nº 13.709, de 14 de agosto de 2018</strong>. Lei Geral de Proteção de Dados Pessoais (LGPD). 2018.</p>
+        <p>BRASIL. <strong>Lei nº 8.078, de 11 de setembro de 1990</strong>. Código de Defesa do Consumidor. 1990.</p>
+        <p>CHEN, T.; GUESTRIN, C. XGBoost: a scalable tree boosting system. In: <strong>Proc. 22nd ACM SIGKDD</strong>, p. 785–794, 2016.</p>
+        <p>LEWIS, P. et al. Retrieval-augmented generation for knowledge-intensive NLP tasks. <strong>arXiv:2005.11401</strong>, 2020.</p>
+        <p>MORO, S.; CORTEZ, P.; RITA, P. A data-driven approach to predict the success of bank telemarketing. <strong>Decision Support Systems</strong>, v. 62, p. 22–31, 2014.</p>
+        <p>RADFORD, A. et al. Robust speech recognition via large-scale weak supervision. <strong>arXiv:2212.04356</strong>, 2023.</p>
+        <p>REIMERS, N.; GUREVYCH, I. Sentence-BERT: sentence embeddings using Siamese BERT-networks. In: <strong>EMNLP-IJCNLP</strong>, p. 3982–3992, 2019.</p>
+        <p>SERASA EXPERIAN. <strong>Indicador de Inadimplência das Empresas</strong>. Dez. 2025.</p>
+        <p>WANG, L. et al. A survey on large language model based autonomous agents. <strong>Frontiers of Computer Science</strong>, v. 18, n. 6, 2024.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="bar foot"></div>
+</div>
+
+<script src="qr/targets.js"></script>
+<script src="poster.js"></script>
+</body>
+</html>
