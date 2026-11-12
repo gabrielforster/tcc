@@ -1,6 +1,41 @@
-# Local infrastructure: Postgres (with pgvector), S3-compatible object storage and LiveKit.
+# Development: Postgres (with pgvector), S3-compatible object storage and LiveKit, plus the
+# application itself in the `app` profile. `make up` starts the infrastructure only (for
+# `uv run`); `make dev` starts everything. deploy/compose.prod.yml is production.
+#
 # There is no Redis: nothing ever read REDIS_URL. The work queue (agents/queue.py) is
 # in-process by design, and the place a broker would plug in if it ever needed one.
+
+# Fixed rather than taken from the directory name, so a git worktree or a clone under
+# another name drives the same containers (their names are fixed below anyway) and volumes.
+name: tcc
+
+x-app: &app
+  build:
+    context: .
+    # `make dev` passes the checkout's commit, so `/health` says which code is running.
+    args:
+      APP_VERSION: ${APP_VERSION:-dev}
+  image: tcc:dev
+  profiles: ["app"]
+  restart: unless-stopped
+  network_mode: host
+  # Optional: without a .env the settings' defaults are already this file's services.
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    # Loopback, not the image's 0.0.0.0: on the host network that would be every interface
+    # of this machine, the Wi-Fi included.
+    COLLECTION_HOST: 127.0.0.1
+    # The tenant `make dev` seeds, by slug, so its random key never has to be copied into
+    # .env. A DEFAULT_TENANT_KEY in .env still wins.
+    DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-desenvolvimento}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    minio:
+      condition: service_started
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -61,6 +96,48 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+
+  # The application, from the same image production runs (Dockerfile), so what runs here
+  # is what deploys. Host networking, unlike production's bridge, for one reason: LiveKit
+  # in dev mode advertises 127.0.0.1 as its media address, which the browser on this
+  # machine can reach and a container on a bridge network cannot -- inside it, 127.0.0.1
+  # is itself. On the host network the call agent sees what the browser sees, and the
+  # .env that serves `uv run` (localhost:5433, localhost:9000, ws://127.0.0.1:7880) serves
+  # these containers unchanged. Linux only; elsewhere use the `uv run` path.
+
+  # One-shot: migrations, then the idempotent seed. `make dev` runs it before the servers.
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["sh", "-c", "collection db upgrade && collection tenant seed"]
+
+  api:
+    <<: *app
+    command: ["collection", "serve"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  call:
+    <<: *app
+    command: ["collection", "call", "serve"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
 
 volumes:
   pgdata:

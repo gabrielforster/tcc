@@ -121,19 +121,65 @@ make article      # XeLaTeX + BibTeX num container; gera article/main.pdf
 
 ## Running it
 
-Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
+Requirements: Docker with the compose plugin, on Linux. From a fresh clone to the chat and
+the voice call on this machine:
 
 ```sh
-cp .env.example .env      # set your own ANONYMIZATION_SALT
+git clone https://github.com/gabrielforster/tcc && cd tcc
+cp .env.example .env      # optional: the defaults already point at the compose services
+make dev                  # infra + migrations + seed + API and call server, all in Docker
+```
+
+`make dev` starts Postgres, MinIO and LiveKit, builds the application image (the same
+`Dockerfile` production runs; the first build downloads a few GB and takes a while), runs
+the migrations and `tenant seed` once, then starts the API and the call server and waits
+until both answer their health checks:
+
+| What | Where |
+|---|---|
+| Chat demo | http://127.0.0.1:8000/chat/demo |
+| Voice call demo | http://127.0.0.1:8100/call/demo (allow the microphone) |
+| API docs / health | http://127.0.0.1:8000/docs, http://127.0.0.1:8000/health |
+
+The chat serves the seeded *Desenvolvimento* tenant from the database: the containers are
+given `DEFAULT_TENANT_SLUG=desenvolvimento`, so no key has to be copied from the seed's
+output. `make dev-logs` follows both servers, `make dev-stop` stops them and leaves the
+infrastructure up, `make down` stops everything (volumes are kept).
+
+For iterating on the code, the same servers run from a checkout with uv, against the same
+infrastructure (`make up` starts it without the app containers):
+
+```sh
 make setup                # creates .venv (Python 3.12) and installs dependencies
-make up                   # docker compose up -d: Postgres with pgvector, MinIO and LiveKit
-make migrate              # apply the migrations (alembic upgrade head)
-make seed                 # create the development tenant and leave it servable
+make up                   # Postgres with pgvector, MinIO and LiveKit
+make migrate seed         # migrations, then the development tenant
+make serve                # the API on :8000 (reload with ARGS="--reload")
+make voices call          # the Piper voices into data/voices, then the call server on :8100
 export COLLECTION_TENANT=desenvolvimento   # the tenant the pipeline commands work on
 make pipeline             # ingest (extracts) -> dictionary -> eda -> features
 make train                # train, publish a platform model version, write the comparison report
 make test lint            # database tests run only against TEST_DATABASE_URL, never DATABASE_URL
 ```
+
+### Development and production
+
+| | Development (this machine) | Production (one EC2 host) |
+|---|---|---|
+| Compose file | `docker-compose.yml`, project `tcc` | `deploy/compose.prod.yml`, project `tcc-prod` |
+| App image | built locally as `tcc:dev` | `ghcr.io/gabrielforster/tcc:<sha>`, built by CI |
+| Networking | host network, servers on 127.0.0.1 | bridge network behind Caddy, servers on 0.0.0.0 |
+| TLS and ingress | none: plain HTTP on :8000 and :8100 | Caddy with Let's Encrypt; TURN over TLS on :443 |
+| Object storage | MinIO, fixed dev keys | AWS S3, credentials from the instance role |
+| Database | Postgres container, `pgdata` volume | Postgres container, data on a separate EBS volume |
+| LLM | template responder, or local Ollama (`make ollama`) | hosted provider, key in SSM Parameter Store |
+| LiveKit | `--dev` mode, `devkey`/`secret`, media on 127.0.0.1 | real key pair, public IP via STUN, TURN relay |
+| Configuration | `.env` (optional; defaults match compose) | `.env` rendered from SSM `/tcc/prod/*` by `deploy.sh` |
+| Observability | off (no `OTEL_EXPORTER_OTLP_ENDPOINT`) | OpenTelemetry to Grafana (`lgtm`) |
+| Data | synthetic, seeded by `make dev` / `make seed` | synthetic only, seeded on every deploy |
+| Version on `/health` | `dev` (from a checkout) or the build argument | the commit SHA |
+
+Every variable, who reads it and where production keeps it is listed in
+[`.env.example`](./.env.example).
 
 Every target has a help line in the `Makefile`. The ones that reproduce the evaluation:
 
@@ -161,8 +207,8 @@ Run it again whenever a document under `knowledge/` changes: unchanged bytes kee
 version, an edited document mints the next one, and ingestion matches each customer by its
 external id and replaces that tenant's receivables as a set, instead of adding to them.
 The labelled `.json` question sets are evaluation fixtures, not knowledge, and are not
-published. It prints the tenant's `tenant_key`; put that in
-`DEFAULT_TENANT_KEY` in `.env` to have the chat widget serve this tenant.
+published. To have a server run from a checkout serve this tenant's chat, set
+`DEFAULT_TENANT_SLUG=desenvolvimento` in `.env` (`make dev` does it for the containers).
 
 `make pipeline` runs schedule deliverables 3-5 end to end and produces:
 

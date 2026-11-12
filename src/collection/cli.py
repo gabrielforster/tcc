@@ -799,7 +799,7 @@ def tenant_seed(
     console.print(table)
     console.print(
         f"\n[dim]export COLLECTION_TENANT={tenant.slug}  # the pipeline commands read this\n"
-        f"DEFAULT_TENANT_KEY={tenant.tenant_key}  # in .env, so the chat serves this tenant[/]"
+        f"DEFAULT_TENANT_SLUG={tenant.slug}  # in .env, so the chat serves this tenant[/]"
     )
 
 

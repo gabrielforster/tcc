@@ -34,6 +34,7 @@ from collection.channels.session import (
     UnknownTenant,
     issue_token,
     resolve_tenant,
+    tenant_key_for_slug,
 )
 from collection.channels.web import GREETING, ChatChannel
 from collection.config import settings
@@ -190,6 +191,17 @@ def test_an_unknown_tenant_key_is_refused(db):
     # An empty key is not a wildcard that resolves to the first tenant.
     with pytest.raises(UnknownTenant):
         resolve_tenant("", session=db)
+
+
+@pytest.mark.db
+def test_a_slug_names_the_tenant_whose_key_the_chat_serves(db):
+    tenant = _tenant(db, "by-slug")
+
+    assert tenant_key_for_slug("by-slug", session=db) == tenant.tenant_key
+    with pytest.raises(UnknownTenant):
+        tenant_key_for_slug("nao-existe", session=db)
+    with pytest.raises(UnknownTenant):
+        tenant_key_for_slug("", session=db)
 
 
 @pytest.mark.db
