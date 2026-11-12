@@ -82,6 +82,7 @@ Every finding is fixed or ignored with its reason written next to the ignore. As
 | ruff `C90` | 5 functions over 10 (11–22) | Ignored by file in `pyproject.toml`: route factories and event loops, refactor deferred |
 | pip-audit | 70 advisories in 5 packages | **Fixed**: pillow 13.0.0, pypdf 6.21.4, urllib3 2.8.0, certifi, setuptools upgraded in `uv.lock` |
 | Trivy | 1 HIGH, 1 MEDIUM, 1 LOW in `article/Dockerfile` (the LaTeX build image) | HIGH **fixed** (`USER nobody`); MEDIUM (`FROM ...:latest`) and LOW (no `HEALTHCHECK` on a one-shot build image) reported only |
+| Trivy | 1 HIGH in `deploy/caddy/Dockerfile` (the ingress image, root by default), once the container image work landed | **Fixed**: runs as UID 10002 with `cap_net_bind_service` on the binary; `deploy.sh` hands it the certificate directory |
 | Semgrep | 3 WARNING (actions on mutable tags) | **Fixed**: every action pinned by commit SHA |
 | zizmor | 3 high, 2 medium | **Fixed**: actions pinned, `permissions: contents: read` by default, `persist-credentials: false` |
 | gitleaks | 0 | — |
