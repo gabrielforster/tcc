@@ -152,7 +152,7 @@ def degrade(text: str, rate: float, rng: random.Random | None = None) -> str:
     """
     if rate <= 0:
         return text
-    rng = rng or random.Random(0)
+    rng = rng or random.Random(0)  # noqa: S311  seeded on purpose: reproducible, not secret
 
     families = list(WEIGHTS)
     weights = [WEIGHTS[family] for family in families]

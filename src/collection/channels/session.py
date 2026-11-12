@@ -82,7 +82,7 @@ EVIDENCE_FIELDS = frozenset(
     {"passages", "confidence", "responder", "latency_ms", "escalation_reason"}
 )
 
-_TOKEN_SEPARATOR = "."
+_TOKEN_SEPARATOR = "."  # noqa: S105  a delimiter inside the token, not a credential
 
 
 class SessionError(RuntimeError):

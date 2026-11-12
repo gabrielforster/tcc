@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "collection"
     s3_access_key: str = "collection"
-    s3_secret_key: str = "collection-secret"
+    s3_secret_key: str = "collection-secret"  # noqa: S105  local MinIO, docker-compose.yml
     # Read from AWS_REGION, the variable the AWS SDKs themselves read. MinIO ignores it.
     aws_region: str = "us-east-1"
 
@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     # biometric personal data, and a voice model is a 60 MB download, not source.
     livekit_url: str = "ws://127.0.0.1:7880"
     livekit_api_key: str = "devkey"
-    livekit_api_secret: str = "secret"
+    livekit_api_secret: str = "secret"  # noqa: S105  LiveKit --dev mode pair
     dir_calls: Path = ROOT / "data" / "calls"
     dir_voices: Path = ROOT / "data" / "voices"
 
