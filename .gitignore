@@ -25,3 +25,21 @@ HANDOFF.md
 
 # Local provider/setup notes, never shared
 *.local.md
+
+# Terraform: provider caches, state (holds resource details and, for SSM, secret values) and
+# variable files (real emails, overrides) never leave the laptop. The lock file IS committed,
+# so CI and every machine install the exact provider build that was validated.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# The one-time local backend for the first bootstrap apply (see infra/bootstrap/README.md).
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
