@@ -27,6 +27,9 @@ dependencies = [
     # Default, not an extra: the embedding model backs retrieval and memory for every
     # tenant, and the design accepted its install cost explicitly.
     "sentence-transformers>=3.0",
+    # Already pulled in by sentence-transformers; named here only because uv applies a
+    # source (the CPU-only index below) to direct dependencies, never to transitive ones.
+    "torch>=2.4",
 ]
 
 [project.optional-dependencies]
@@ -75,3 +78,15 @@ precision = 1
 testpaths = ["tests"]
 addopts = "-q"
 markers = ["db: needs Postgres"]
+
+# torch comes in through sentence-transformers, and PyPI's Linux wheel bundles CUDA: about
+# 3 GB of nvidia-* libraries for a CPU-only embedder on a t3 box with no GPU. The CPU index
+# carries the same version without them. Pinned to Linux only, because on macOS the PyPI
+# wheel is already CPU-only and the CPU index is not where those builds live.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
