@@ -1029,6 +1029,11 @@ def call_serve(
     """Serve the voice-call page; needs `docker compose up -d livekit` and `make voices`."""
     import uvicorn
 
+    from collection.telemetry import setup as setup_telemetry
+
+    # Before the import: importing `collection.api` builds the API's app, which would
+    # otherwise set telemetry up first and name this process after the API.
+    setup_telemetry("collection-call")
     from collection.api.call import create_call_app
 
     console.print(f"[green]call[/] open http://{host}:{port}/app/call and press Ligar")

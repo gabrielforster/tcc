@@ -51,6 +51,7 @@ from collection.channels.session import (
 )
 from collection.channels.web import GREETING, HANDOVER_NOTICE, ChatChannel, Retriever
 from collection.config import settings
+from collection.telemetry import VOICE_TURN_DURATION, span
 from collection.voice.audio import AudioClip, AudioError
 from collection.voice.speak import SLOWEST_WORDS_PER_SECOND
 from collection.voice.transcribe import Transcriber, Transcription
@@ -188,7 +189,8 @@ class _TimedTranscriber(Transcriber):
     def transcribe_path(self, path: Path | str) -> Transcription:
         started = time.perf_counter()
         try:
-            return self.inner.transcribe_path(path)
+            with span("stt", transcriber=self.name):
+                return self.inner.transcribe_path(path)
         finally:
             self.last_ms = (time.perf_counter() - started) * 1000
 
@@ -311,7 +313,8 @@ class VoiceCallChannel:
             # The clip as the transport wrote it, not the kept copy: the copy is named for
             # the record, and a recogniser keyed on the file (the scripted one) must see
             # the same file the chat's voice-note path would have handed it.
-            reply = self._core.send_audio(call_id, Path(clip))
+            with span("call.turn"):
+                reply = self._core.send_audio(call_id, Path(clip))
         except AudioError as error:
             call.log("utterance_rejected", detail=str(error))
             return None
@@ -326,6 +329,9 @@ class VoiceCallChannel:
             endpointing_ms=endpointing_ms, stt_ms=stt_ms, agent_ms=max(0.0, elapsed_ms - stt_ms)
         )
         call.timings.append(timing)
+        # The stages before speech now; synthesis and the total when the reply plays (`spoke`).
+        for stage in ("endpointing", "stt", "agent"):
+            VOICE_TURN_DURATION.record(getattr(timing, f"{stage}_ms") / 1000, {"stage": stage})
 
         turn = CallTurn(
             say=reply.text,
@@ -360,6 +366,8 @@ class VoiceCallChannel:
         call = self.calls[call_id]
         timing.tts_first_audio_ms = first_audio_ms
         call.log("turn_timed", **timing.as_dict())
+        VOICE_TURN_DURATION.record(first_audio_ms / 1000, {"stage": "tts_first_audio"})
+        VOICE_TURN_DURATION.record(timing.total_ms / 1000, {"stage": "total"})
 
     def silence(self, call_id: str) -> CallTurn | None:
         """The line has been quiet for `SILENCE_TIMEOUT_S`. Ask once, then hang up."""

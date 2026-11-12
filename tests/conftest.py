@@ -7,6 +7,10 @@ _THREADS = os.environ.get("COLLECTION_TEST_THREADS", "2")
 for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_var, _THREADS)
 os.environ.setdefault("N_JOBS", _THREADS)
+# Never export: a developer whose .env names a collector for `uv run` would otherwise ship
+# the suite's spans to it. The environment beats .env. tests/test_telemetry.py turns
+# telemetry on itself, with in-memory exporters.
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
 
 import fcntl  # noqa: E402
 import sys  # noqa: E402
