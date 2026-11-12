@@ -39,6 +39,11 @@ TenantOption = Annotated[
     ),
 ]
 
+# Loopback by default, so a server started from a checkout is not on the network by
+# accident. The image sets COLLECTION_HOST=0.0.0.0: inside a container loopback is the
+# container's own, and nothing outside it -- Caddy, the published port -- could connect.
+HOST_HELP = "Address to bind (or COLLECTION_HOST); 0.0.0.0 inside a container."
+
 
 @contextmanager
 def _tenant_scope(slug: str) -> Iterator[TenantScope]:
@@ -257,7 +262,7 @@ def score(
 
 @app.command()
 def serve(
-    host: str = typer.Option("127.0.0.1"),
+    host: str = typer.Option("127.0.0.1", envvar="COLLECTION_HOST", help=HOST_HELP),
     port: int = typer.Option(8000),
     reload: bool = typer.Option(False, help="reload on code changes"),
     seed_demo: bool = typer.Option(
@@ -1016,7 +1021,7 @@ if __name__ == "__main__":
 
 @call_app.command("serve")
 def call_serve(
-    host: str = typer.Option("127.0.0.1"),
+    host: str = typer.Option("127.0.0.1", envvar="COLLECTION_HOST", help=HOST_HELP),
     port: int = typer.Option(8100),
     whisper_model: str = typer.Option("small", help="faster-whisper checkpoint"),
 ) -> None:
