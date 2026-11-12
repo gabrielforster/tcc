@@ -162,7 +162,16 @@ After `infra/bootstrap` has been applied (see its README):
    public, package. (The image's `org.opencontainers.image.source` label links the package to
    this repository, which is what gives the workflow's token write access to it.)
 
-4. **Actions must be able to run** — the account's billing lock has to be lifted; nothing
+4. **Set the secrets in Parameter Store** — `infra/app` creates each `SecureString` with a
+   placeholder and never overwrites it. Set the real values once, e.g.
+   `aws ssm put-parameter --name /tcc/prod/POSTGRES_PASSWORD --type SecureString --overwrite --value "$(openssl rand -hex 24)"`.
+   `deploy.sh` refuses to deploy while `ANONYMIZATION_SALT`, `LIVEKIT_API_KEY`,
+   `LIVEKIT_API_SECRET`, `POSTGRES_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` or
+   `GRAFANA_VIEWER_PASSWORD` still holds it. `ANTHROPIC_API_KEY` and `LLM_API_KEY` may stay at
+   the placeholder: only the provider in `LLM_PROVIDER` needs its key, and an unset one is left
+   out of `.env`. `POSTGRES_PASSWORD` must be URL-safe (hex).
+
+5. **Actions must be able to run** — the account's billing lock has to be lifted; nothing
    in the workflow works around it.
 
 ## Rollback
