@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from collection.agents.responsive import TemplateResponder
+from collection.api.pages import ACK_COOKIE, BANNER_TEXT
 from collection.channels.base import Channel
 from collection.channels.endpointing import Endpointer, frame_dbfs
 from collection.channels.voice_call import (
@@ -386,7 +387,8 @@ def test_the_call_page_starts_a_call_in_a_fresh_room(channel, monkeypatch):
     monkeypatch.setattr(call_api.CallAgent, "run", fake_run)
     app = call_api.create_call_app(channel=channel, synthesizer=ToneSynthesizer())
     with TestClient(app) as client:
-        page = client.get("/call/demo")
+        client.cookies.set(ACK_COOKIE, "1")
+        page = client.get("/app/call")
         assert page.status_code == 200 and "transcrita e registrada" in page.text
         first = client.post("/call/start", json={}).json()
         second = client.post("/call/start", json={}).json()
@@ -395,3 +397,73 @@ def test_the_call_page_starts_a_call_in_a_fresh_room(channel, monkeypatch):
         assert client.get("/call/records/nope").status_code == 404
         assert client.get("/health").json() == {"status": "ok", "version": settings.app_version}
     assert started == [first["room"], second["room"]]
+
+
+@pytest.fixture
+def call_client(channel, monkeypatch):
+    pytest.importorskip("livekit.api")
+    from fastapi.testclient import TestClient
+
+    from collection.api import call as call_api
+
+    async def fake_run(self):
+        return None
+
+    monkeypatch.setattr(call_api.CallAgent, "run", fake_run)
+    app = call_api.create_call_app(channel=channel, synthesizer=ToneSynthesizer())
+    with TestClient(app) as client:
+        yield client
+
+
+def test_the_call_page_sends_a_visitor_who_skipped_the_disclaimer_to_it(call_client):
+    response = call_client.get("/app/call", follow_redirects=False)
+    assert response.status_code == 303
+    # Relative, so in production Caddy routes it back to the API's landing page.
+    assert response.headers["location"] == "/?next=/app/call"
+
+
+def test_the_call_page_carries_the_banner_and_a_pinned_sdk(call_client):
+    call_client.cookies.set(ACK_COOKIE, "1")
+    page = call_client.get("/app/call").text
+    assert BANNER_TEXT in page
+    # An exact version with its hash: `@2` would let a new release change the page.
+    assert "livekit-client@2.23.0/" in page and 'integrity="sha384-' in page
+    assert "Sua rede bloqueia a chamada de voz. Troque de rede (ex.: 4G) e tente novamente" in page
+
+
+def test_the_old_call_address_redirects_to_the_new_page(call_client):
+    response = call_client.get("/call/demo", follow_redirects=False)
+    assert response.status_code == 301
+    assert response.headers["location"] == "/app/call"
+
+
+def test_the_network_check_gets_a_token_and_starts_no_agent(call_client, monkeypatch):
+    from collection.api import call as call_api
+
+    started = []
+    monkeypatch.setattr(call_api.CallAgent, "__init__", lambda *a, **k: started.append(a))
+    monkeypatch.setattr(settings, "turn_domain", "")
+    body = call_client.post("/call/check").json()
+    assert body["token"] and body["url"].startswith("ws")
+    # No TURN in local dev: the page must know not to try it, not fail trying.
+    assert body["turn"] is False
+    monkeypatch.setattr(settings, "turn_domain", "turn.example.test")
+    assert call_client.post("/call/check").json()["turn"] is True
+    assert started == []
+
+
+def test_the_network_check_outcome_is_logged_under_a_stable_name(call_client, caplog):
+    with caplog.at_level("INFO", logger="collection.call"):
+        response = call_client.post("/call/check/result", json={"outcome": "blocked"})
+    assert response.status_code == 204
+    assert "call_network_check outcome=blocked" in caplog.text
+    # Anything else is refused, so the log line stays a closed set a dashboard can count.
+    assert call_client.post("/call/check/result", json={"outcome": "x"}).status_code == 422
+
+
+def test_the_call_server_sends_other_pages_to_the_api_in_local_runs(call_client, monkeypatch):
+    monkeypatch.setattr(settings, "api_public_url", "http://api.local:8000")
+    response = call_client.get("/?next=/app/call", follow_redirects=False)
+    assert response.headers["location"] == "http://api.local:8000/?next=/app/call"
+    response = call_client.get("/app/chat", follow_redirects=False)
+    assert response.headers["location"] == "http://api.local:8000/app/chat"

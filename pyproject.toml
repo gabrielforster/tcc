@@ -95,6 +95,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "S", "C90"]
 # each LiveKit event in turn; and the transcript degrader, one branch per error family.
 # Splitting them is a refactor with its own risk, not part of switching the check on.
 # Listed by file, so a new function anywhere else is held to the cap.
+"src/collection/api/call.py" = ["C901"]
 "src/collection/api/chat.py" = ["C901"]
 "src/collection/api/landing.py" = ["C901"]
 "src/collection/channels/call_bench.py" = ["C901"]
