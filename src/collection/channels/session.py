@@ -323,6 +323,32 @@ def resolve_tenant(tenant_key: str, session: "SQLSession | None" = None) -> "Ten
         return found(platform)
 
 
+def tenant_key_for_slug(slug: str, session: "SQLSession | None" = None) -> str:
+    """The public key of the tenant with this slug, or `UnknownTenant`.
+
+    For `default_tenant_slug`: the key is minted at random when a tenant is created, so a
+    configuration that has to name the seeded tenant before it exists -- the development
+    compose file, a fresh database -- names it by its slug, which `tenant seed` fixes.
+    """
+    from sqlalchemy import select
+
+    from collection.db.models.tenant import Tenant
+    from collection.db.session import unit_of_work
+
+    def found(where: "SQLSession") -> str:
+        tenant = where.scalars(select(Tenant).where(Tenant.slug == slug)).first()
+        if tenant is None:
+            raise UnknownTenant(f"No tenant has the slug {slug!r}; run `collection tenant seed`.")
+        return tenant.tenant_key
+
+    if not slug:
+        raise UnknownTenant("No tenant slug was given.")
+    if session is not None:
+        return found(session)
+    with unit_of_work(platform=True) as platform:
+        return found(platform)
+
+
 class DatabaseSession(Session):
     """A session whose transcript is rows.
 

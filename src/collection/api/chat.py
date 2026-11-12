@@ -64,6 +64,7 @@ from collection.channels.session import (
     UnknownTenant,
     issue_token,
     resolve_tenant,
+    tenant_key_for_slug,
 )
 from collection.channels.web import ChatChannel
 from collection.config import settings
@@ -167,10 +168,21 @@ class ChatService:
         self._tenants: dict[str, ChatChannel] = {}
         self._sessions: dict[str, ChatChannel] = {}
         self._lock = Lock()
+        self._default_key: str | None = None
+
+    @property
+    def default_key(self) -> str:
+        """The default tenant's key: `default_tenant_key`, else the one `default_tenant_slug`
+        names, else empty (the in-memory channel). Resolved once, on first use."""
+        if self._default_key is None:
+            key = settings.default_tenant_key.strip()
+            slug = settings.default_tenant_slug.strip()
+            self._default_key = key or (tenant_key_for_slug(slug) if slug else "")
+        return self._default_key
 
     def load(self) -> None:
         if self._channel is None:
-            self._channel = self._build(settings.default_tenant_key)
+            self._channel = self._build(self.default_key)
 
     @property
     def channel(self) -> ChatChannel:
@@ -183,8 +195,8 @@ class ChatService:
 
     def channel_for(self, tenant_key: str | None) -> ChatChannel:
         """The channel serving a tenant, built on first use."""
-        key = (tenant_key or settings.default_tenant_key).strip()
-        if not key or key == settings.default_tenant_key.strip():
+        key = (tenant_key or self.default_key).strip()
+        if not key or key == self.default_key:
             return self.channel
         with self._lock:
             if key not in self._tenants:
