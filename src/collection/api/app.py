@@ -31,10 +31,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
 from collection.api.chat import ChatService, create_router
+from collection.api.ranking import InvalidBatch, rank
 from collection.api.schemas import (
     HealthResponse,
     ModelInfo,
-    ScoredReceivable,
     ScoreRequest,
     ScoreResponse,
 )
@@ -46,8 +46,6 @@ from collection.storage.objects import ObjectStoreError
 logger = logging.getLogger(__name__)
 
 TASKS = ("propensity", "default")
-#: Columns carried through to the response but never fed to the model.
-PASSTHROUGH = ("invoice_id", "customer_id")
 
 
 @dataclass(frozen=True)
@@ -214,55 +212,12 @@ def create_app(
     @app.post("/score", response_model=ScoreResponse)
     def score(request: ScoreRequest) -> ScoreResponse:
         bundle = registry.get(request.task)
-        frame = pd.DataFrame(request.receivables)
-
-        expected = list(bundle["features"])
-        missing = [c for c in expected if c not in frame.columns]
-        if missing:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Missing feature columns: {missing[:10]}"
-                + (f" (+{len(missing) - 10} more)" if len(missing) > 10 else ""),
-            )
-        unexpected = [c for c in frame.columns if c not in expected and c not in PASSTHROUGH]
-        if unexpected:
-            raise HTTPException(status_code=422, detail=f"Unknown columns: {unexpected[:10]}")
-
-        probabilities = bundle["pipeline"].predict_proba(frame[expected])[:, 1]
-        threshold = float(bundle["threshold"])
-
-        ordered = sorted(range(len(frame)), key=lambda i: float(probabilities[i]), reverse=True)
-        priority = {index: rank for rank, index in enumerate(ordered, start=1)}
-
-        results = [
-            ScoredReceivable(
-                invoice_id=_optional(frame, "invoice_id", i),
-                customer_id=_optional(frame, "customer_id", i),
-                probability=round(float(probabilities[i]), 6),
-                decision=bool(probabilities[i] >= threshold),
-                priority=priority[i],
-            )
-            for i in range(len(frame))
-        ]
-
-        return ScoreResponse(
-            task=request.task,
-            target=bundle["target"],
-            model=bundle["champion"],
-            source=bundle["source"],
-            threshold=threshold,
-            scored=len(results),
-            results=results,
-        )
+        try:
+            return rank(bundle, pd.DataFrame(request.receivables), request.task)
+        except InvalidBatch as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     return app
-
-
-def _optional(frame: pd.DataFrame, column: str, index: int) -> str | None:
-    if column not in frame.columns:
-        return None
-    value = frame.iloc[index][column]
-    return None if pd.isna(value) else str(value)
 
 
 app = create_app()
