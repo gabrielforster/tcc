@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     # Tests run against this database when set, so a developer's data is never rolled
     # through by a fixture; empty means "use database_url".
     test_database_url: str = ""
-    redis_url: str = "redis://localhost:6380/0"
 
     # S3-compatible object storage (MinIO locally). The defaults match docker-compose.yml.
     s3_endpoint_url: str = "http://localhost:9000"

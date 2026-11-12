@@ -126,7 +126,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
 ```sh
 cp .env.example .env      # set your own ANONYMIZATION_SALT
 make setup                # creates .venv (Python 3.12) and installs dependencies
-make up                   # docker compose up -d: Postgres with pgvector, Redis and MinIO
+make up                   # docker compose up -d: Postgres with pgvector, MinIO and LiveKit
 make migrate              # apply the migrations (alembic upgrade head)
 make seed                 # create the development tenant and leave it servable
 export COLLECTION_TENANT=desenvolvimento   # the tenant the pipeline commands work on
