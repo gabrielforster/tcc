@@ -36,6 +36,7 @@ def _published(monkeypatch, loaded: Loaded) -> None:
 
 def test_serve_runs_its_body_and_starts_the_server(monkeypatch, served):
     _published(monkeypatch, Loaded(bundles={"propensity": {}, "default": {}}))
+    monkeypatch.delenv("COLLECTION_HOST", raising=False)
 
     result = runner.invoke(app, ["serve", "--port", "8099"])
 
@@ -44,6 +45,17 @@ def test_serve_runs_its_body_and_starts_the_server(monkeypatch, served):
     assert served == [
         {"target": "collection.api.app:app", "host": "127.0.0.1", "port": 8099, "reload": False}
     ]
+
+
+def test_serve_binds_where_the_container_says(monkeypatch, served):
+    # The image sets COLLECTION_HOST=0.0.0.0; loopback inside a container is unreachable.
+    _published(monkeypatch, Loaded(bundles={"propensity": {}}))
+    monkeypatch.setenv("COLLECTION_HOST", "0.0.0.0")
+
+    result = runner.invoke(app, ["serve"])
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert served[0]["host"] == "0.0.0.0"
 
 
 def test_serve_reports_an_outage_as_an_outage_not_as_nothing_trained(monkeypatch, served):

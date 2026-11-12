@@ -80,6 +80,12 @@ def create_call_app(
     def demo() -> str:
         return (WEB_DIR / "call.html").read_text(encoding="utf-8")
 
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        # Answered only once the lifespan has loaded Whisper and the voice, because uvicorn
+        # accepts no request before then: a container that answers here can take a call.
+        return {"status": "ok", "version": settings.app_version}
+
     @app.post("/call/start", response_model=StartResponse, status_code=201)
     async def start(request: StartRequest) -> StartResponse:
         room = new_room_name()

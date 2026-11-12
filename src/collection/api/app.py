@@ -194,7 +194,9 @@ def create_app(
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(
-            status="degraded" if registry.degraded else "ok", models=registry.tasks
+            status="degraded" if registry.degraded else "ok",
+            models=registry.tasks,
+            version=settings.app_version,
         )
 
     @app.get("/models/{task}", response_model=ModelInfo)

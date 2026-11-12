@@ -14,13 +14,23 @@ class Settings(BaseSettings):
     # Tests run against this database when set, so a developer's data is never rolled
     # through by a fixture; empty means "use database_url".
     test_database_url: str = ""
-    redis_url: str = "redis://localhost:6380/0"
 
-    # S3-compatible object storage (MinIO locally). The defaults match docker-compose.yml.
+    # The commit this process was built from, baked into the image at build time and
+    # reported by `/health`, so "which version is serving" is a request rather than a guess.
+    # A process run from a checkout has no build, and says so.
+    app_version: str = "dev"
+
+    # S3-compatible object storage. The defaults are the MinIO in docker-compose.yml, so a
+    # fresh clone and the test suite need no configuration. Production sets the endpoint and
+    # both keys to the empty string, which means "AWS itself": no endpoint is the regional
+    # S3 endpoint, and no keys is boto3's default credential chain -- the EC2 instance role
+    # -- so no long-lived access key exists anywhere to leak or rotate.
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "collection"
     s3_access_key: str = "collection"
     s3_secret_key: str = "collection-secret"
+    # Read from AWS_REGION, the variable the AWS SDKs themselves read. MinIO ignores it.
+    aws_region: str = "us-east-1"
 
     # Embeddings. The dimension is part of the schema (pgvector columns are fixed-width),
     # so changing the model to one with another width needs a migration, not just a setting.

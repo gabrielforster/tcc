@@ -3,7 +3,7 @@
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
 
-up:               ## start Postgres (pgvector), Redis, MinIO and LiveKit (the voice call)
+up:               ## start Postgres (pgvector), MinIO and LiveKit (the voice call)
 	docker compose up -d
 
 down:             ## stop the compose services (volumes are kept)
