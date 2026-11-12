@@ -1,7 +1,7 @@
 # The `otelcol` service: the host's and the containers' vital signs, and a black-box probe
 # of each server's /health, pushed to `lgtm` over OTLP like the application's own metrics.
 #
-# Chosen over node-exporter + cAdvisor: one container of ~50 MB instead of two (cAdvisor
+# Chosen over node-exporter + cAdvisor: one container of ~80 MB instead of two (cAdvisor
 # alone tends to take a few hundred MB and a steady slice of CPU), the same collector build
 # `lgtm` already bundles, and nothing to scrape, so `lgtm`'s own collector configuration is
 # not touched. It reads the host through a read-only mount at /hostfs and the containers
@@ -12,7 +12,7 @@
 # network names) and development (host networking, loopback).
 
 receivers:
-  hostmetrics:
+  host_metrics:
     root_path: /hostfs
     collection_interval: 30s
     scrapers:
@@ -52,7 +52,7 @@ receivers:
   # Black-box: what a visitor would get, asked from inside the stack every 30 s. This is
   # what the "API down" alert reads -- an application that has crashed cannot report its
   # own absence, and one that hangs keeps exporting.
-  httpcheck:
+  http_check:
     collection_interval: 30s
     targets:
       - endpoint: ${env:API_HEALTH_URL}
@@ -85,6 +85,6 @@ service:
       level: warn
   pipelines:
     metrics:
-      receivers: [hostmetrics, docker_stats, httpcheck]
+      receivers: [host_metrics, docker_stats, http_check]
       processors: [resource, batch]
       exporters: [otlp_http]

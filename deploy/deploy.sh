@@ -114,7 +114,9 @@ log "serving ${serving}"
 # Grafana's admin and Viewer passwords, from the .env just rendered: Grafana reads its admin
 # password only when it first creates its database, and has no file provisioning for users.
 log "grafana accounts"
-compose exec -T lgtm bash /otel-lgtm/grafana-accounts.sh
+# Sent on stdin rather than mounted: a single-file bind mount keeps the old file after the
+# bundle is unpacked over it, and the script must be the one this deploy brought.
+compose exec -T lgtm bash -s <lgtm/grafana-accounts.sh
 
 # The previous image, now untagged, would otherwise accumulate at ~3 GB a deploy.
 docker image prune -f >/dev/null

@@ -2,7 +2,7 @@
 # Grafana's two accounts, from the environment: run inside the `lgtm` container by
 # deploy.sh after every `up`, so Parameter Store stays the one place the passwords live.
 #
-#   docker compose exec -T lgtm bash /otel-lgtm/grafana-accounts.sh
+#   docker compose exec -T lgtm bash -s <lgtm/grafana-accounts.sh
 #
 # * admin: GF_SECURITY_ADMIN_PASSWORD only takes effect when Grafana creates its database,
 #   so a password changed in SSM afterwards would be silently ignored. It is reset here,
@@ -71,8 +71,15 @@ elif [ "$status" != 200 ]; then
 fi
 id="$(grep -o '"id":[0-9]*' /tmp/grafana-accounts.out | head -n1 | cut -d: -f2)"
 
-status="$(call PUT "/admin/users/${id}/password" "{\"password\":\"${viewer_password}\"}")"
-[ "$status" = 200 ] || { echo "grafana-accounts: setting the viewer password failed ($status)" >&2; exit 1; }
+# Only when the viewer cannot already log in with it: Grafana answers 500 to a "change" to
+# the password the account already has.
+viewer_ok="$(printf 'user = "%s:%s"\nurl = "%s/user"\n' "$viewer_login" "$viewer_password" "$api" |
+  curl -sS -o /dev/null -w '%{http_code}' --config -)"
+if [ "$viewer_ok" != 200 ]; then
+  status="$(call PUT "/admin/users/${id}/password" "{\"password\":\"${viewer_password}\"}")"
+  [ "$status" = 200 ] || { echo "grafana-accounts: setting the viewer password failed ($status)" >&2; exit 1; }
+  echo "viewer '${viewer_login}' password set"
+fi
 status="$(call PATCH "/org/users/${id}" '{"role":"Viewer"}')"
 [ "$status" = 200 ] || { echo "grafana-accounts: pinning the viewer role failed ($status)" >&2; exit 1; }
 echo "grafana accounts in step with the environment (admin, ${viewer_login})"

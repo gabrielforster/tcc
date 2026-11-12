@@ -212,6 +212,10 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_USERS_ALLOW_ORG_CREATE: "false"
+      # Explore for the Viewer: following a log line to its trace, or a trace to its logs,
+      # happens there, and that correlation is what the examiners are shown. A Viewer still
+      # cannot save a dashboard, add a data source or touch an alert rule.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
       GRAFANA_VIEWER_PASSWORD: ${GRAFANA_VIEWER_PASSWORD:?}
@@ -242,7 +246,6 @@ services:
       - ./lgtm/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc.yaml:ro
       - ./lgtm/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc:ro
       - ./lgtm/grafana/alerting.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/tcc.yaml:ro
-      - ./lgtm/grafana-accounts.sh:/otel-lgtm/grafana-accounts.sh:ro
     # The image's own healthcheck (every component's readiness endpoint) is kept; only the
     # start period is added, because the first start creates every database.
     healthcheck:
@@ -271,4 +274,4 @@ services:
       - ./lgtm/otelcol.yaml:/etc/otelcol/config.yaml:ro
       - /:/hostfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    mem_limit: 128m
+    mem_limit: 192m
