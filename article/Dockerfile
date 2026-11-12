@@ -24,3 +24,8 @@ RUN for p in orcidlink tabularray ninecolors footmisc xurl fontawesome fontaweso
 # XeTeX finds fonts by name through fontconfig, which does not look inside the TeX tree.
 RUN printf '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n<dir>/opt/texlive/texdir/texmf-dist/fonts/opentype</dir>\n<dir>/opt/texlive/texdir/texmf-dist/fonts/truetype</dir>\n<dir>/opt/texlive/texdir/texmf-dist/fonts/type1</dir>\n</fontconfig>\n' \
       > /etc/fonts/local.conf && fc-cache -f >/dev/null
+
+# Not root at run time. `make article` already runs the container as the caller's uid (so
+# the PDF it writes into the bind mount is theirs), but the image should not default to
+# root for anyone who runs it another way.
+USER nobody
