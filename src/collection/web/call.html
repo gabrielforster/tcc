@@ -3,46 +3,197 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atendimento por voz</title>
-<!-- The LiveKit browser SDK. Only the page's code comes from the CDN; the call's audio
-     goes browser -> the self-hosted LiveKit server -> the agent, never to a third party. -->
-<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<title>Chamada de voz — demonstração</title>
+<!-- The LiveKit browser SDK, pinned to one exact version and checked against its hash, so
+     a new release or a tampered CDN file cannot change what this page runs. Only the
+     page's code comes from the CDN; the call's audio goes browser -> the self-hosted
+     LiveKit server -> the agent, never to a third party. -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.23.0/dist/livekit-client.umd.js"
+        integrity="sha384-HkA7rQNo8H04l1p4zoXX1Cy+h9YoYp8LvKt4vfMFhv4KFk07UkrNwIUnyBum8Pw6"
+        crossorigin="anonymous"></script>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 26rem; margin: 2rem auto; padding: 0 1rem; color: #1b1b1f; }
-  .notice { background: #fff4d6; border: 1px solid #e8c766; border-radius: .5rem; padding: .75rem; font-size: .9rem; }
-  .orb { width: 6rem; height: 6rem; margin: 1.5rem auto; border-radius: 50%; background: #c9d6ff; transition: transform .2s, background .2s; }
-  .orb.agent { background: #6c8cff; transform: scale(1.08); }
-  .orb.listening { background: #5cc48a; }
-  .controls { display: flex; gap: .5rem; justify-content: center; }
-  button { font-size: 1rem; padding: .6rem 1rem; border-radius: 2rem; border: 0; cursor: pointer; }
-  #call { background: #2e9e5b; color: white; }
-  #hangup { background: #d64545; color: white; }
-  #mute { background: #e4e4ea; }
-  .log { margin-top: 1.5rem; font-size: .9rem; }
-  .turn { margin: .4rem 0; padding: .5rem .7rem; border-radius: .6rem; }
-  .turn.agent { background: #eef1ff; }
-  .turn.customer { background: #e9f7ef; text-align: right; }
-  .timing { font-family: ui-monospace, monospace; font-size: .75rem; color: #555; margin-top: 1rem; }
-  .status { text-align: center; color: #555; font-size: .85rem; }
+{{site_css}}
+
+.stage { text-align: center; padding: 26px 20px; }
+.orb {
+  width: 112px;
+  height: 112px;
+  margin: 8px auto 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff8 0 18%, transparent 19%), var(--rule);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--rule) 35%, transparent);
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.orb.agent { background: radial-gradient(circle at 35% 30%, #fff8 0 18%, transparent 19%), var(--teal); transform: scale(1.06); box-shadow: 0 0 0 12px color-mix(in srgb, var(--teal) 25%, transparent); }
+.orb.listening { background: radial-gradient(circle at 35% 30%, #fff8 0 18%, transparent 19%), var(--saffron); box-shadow: 0 0 0 12px color-mix(in srgb, var(--saffron) 30%, transparent); }
+.status { color: var(--ink-soft); min-height: 1.6em; margin: 0 0 14px; }
+.controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.network { margin: 18px 0; }
+.network .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--teal); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 44px; }
+.log { margin-top: 22px; display: grid; gap: 8px; }
+.turn { max-width: 85%; padding: 10px 14px; border-radius: 14px; }
+.turn.agent { background: var(--info-bg); justify-self: start; border-bottom-left-radius: 4px; }
+.turn.customer { background: var(--ok-bg); justify-self: end; text-align: right; border-bottom-right-radius: 4px; }
+.timing { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-soft); margin-top: 14px; }
 </style>
 </head>
 <body>
-  <h2>Atendimento automático de cobrança</h2>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+{{banner}}
+{{masthead}}
+<main id="conteudo" class="page narrow">
+  <span class="eyebrow">Demonstração 02 · Chamada de voz</span>
+  <h1>Ligue para o agente</h1>
   <p class="notice">Esta ligação está sendo transcrita e registrada. O aviso é falado no início da
     chamada e não pode ser pulado. Você pode pedir para falar com uma pessoa a qualquer momento.</p>
-  <div id="orb" class="orb"></div>
-  <p id="status" class="status">Pronto para ligar.</p>
-  <div class="controls">
-    <button id="call">Ligar</button>
-    <button id="mute" disabled>Silenciar</button>
-    <button id="hangup" disabled>Desligar</button>
-  </div>
-  <div id="timing" class="timing"></div>
-  <div id="log" class="log"></div>
+
+  <div id="rede" class="network" role="status" aria-live="polite"></div>
+
+  <section class="panel stage" aria-label="Chamada">
+    <div id="orb" class="orb" aria-hidden="true"></div>
+    <p id="status" class="status" aria-live="polite">Verificando a rede antes de ligar…</p>
+    <div class="controls">
+      <button id="call" class="button primary" type="button" disabled>Ligar</button>
+      <button id="mute" class="button secondary" type="button" disabled>Silenciar</button>
+      <button id="hangup" class="button danger" type="button" disabled>Desligar</button>
+    </div>
+    <div id="timing" class="timing"></div>
+  </section>
+  <div id="log" class="log" aria-live="polite" aria-label="Transcrição da chamada"></div>
+
+  <hr class="rule">
+  <p><a href="/">← Voltar às demonstrações</a> · <a href="/app/chat">Chat</a> · <a href="/app/fila">Fila de contato</a></p>
+</main>
 <script>
 const $ = (id) => document.getElementById(id);
 let room = null;
 
+// ------------------------------------------------------------------ network check
+// Browsers cannot open a raw UDP socket, so "is UDP blocked?" is asked the only way a page
+// can: by trying WebRTC against our own LiveKit with the SDK's connection checks. First
+// the signalling WebSocket, then the direct media path (UDP, which LiveKit prefers, or its
+// ICE/TCP port), and only if that fails, the TURN relay over TLS on 443 -- the path that
+// survives a network which allows nothing but HTTPS. Each check is bounded, so a silently
+// dropping firewall ends in a verdict rather than a spinner.
+//
+// Each media check is a real `room.connect`, which waits for the peer connection to
+// form, so a pass means media can flow -- not merely that signalling answered.
+const CHECK_TIMEOUT_MS = 20000;
+
+const MESSAGES = {
+  running: ["", '<p><span class="spinner" aria-hidden="true"></span> Verificando se a sua rede permite a chamada de voz…</p>'],
+  direct_ok: ["ok", "<p><strong>Rede pronta.</strong> Pode ligar.</p>"],
+  turn_tls_ok: ["", "<p><strong>Sua rede bloqueia a conexão direta, mas a chamada funciona por um caminho alternativo seguro.</strong> A voz pode chegar com um pouco mais de atraso.</p>"],
+  blocked: ["warn", "<p><strong>Sua rede bloqueia a chamada de voz. Troque de rede (ex.: 4G) e tente novamente.</strong></p>"],
+  signal_failed: ["warn", "<p><strong>Não conseguimos falar com o servidor de voz.</strong> Pode ser a sua rede ou o servidor fora do ar. Tente novamente em instantes.</p>"],
+  unavailable: ["warn", "<p><strong>Não foi possível verificar a sua rede agora.</strong> Você ainda pode tentar ligar.</p>"],
+  no_sdk: ["warn", "<p><strong>A chamada não pôde ser carregada.</strong> Um bloqueador ou a rede impediu o carregamento do componente de voz. Recarregue a página ou use o chat.</p>"],
+};
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+}
+
+function passed(info) {
+  return Boolean(info) && info.status === LivekitClient.CheckStatus.SUCCESS;
+}
+
+function report(outcome) {
+  // Best effort: a lost report must never get in the way of the call.
+  fetch("/call/check/result", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome }), keepalive: true,
+  }).catch(() => {});
+}
+
+function showNetwork(key, extra) {
+  const [kind, html] = MESSAGES[key];
+  const box = document.createElement("div");
+  box.className = "notice " + kind;
+  box.innerHTML = html + (extra || "");
+  $("rede").replaceChildren(box);
+  return box;
+}
+
+function offerRetry(box, { anyway }) {
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const retry = document.createElement("button");
+  retry.className = "button secondary";
+  retry.type = "button";
+  retry.textContent = "Testar de novo";
+  retry.onclick = networkCheck;
+  const chat = document.createElement("a");
+  chat.className = "button primary";
+  chat.href = "/app/chat";
+  chat.textContent = "Usar o chat";
+  actions.append(retry, chat);
+  if (anyway) {
+    const force = document.createElement("button");
+    force.className = "linkish";
+    force.type = "button";
+    force.textContent = "Tentar ligar mesmo assim";
+    force.onclick = () => { $("call").disabled = false; state("Pronto para ligar.", ""); };
+    actions.append(force);
+  }
+  box.appendChild(actions);
+}
+
+function verdict(outcome, { turn } = {}) {
+  report(outcome === "no_sdk" ? "unavailable" : outcome);
+  const ready = outcome === "direct_ok" || outcome === "turn_tls_ok" || outcome === "unavailable";
+  $("call").disabled = !ready;
+  state(ready ? "Pronto para ligar." : "Chamada indisponível nesta rede.", "");
+  if (outcome === "blocked" && !turn) {
+    // Local development has no TURN server; say so, so the warning is not misread as a
+    // verdict on the network when there was only one path to try.
+    const box = showNetwork(outcome, '<p><small>Este servidor não tem retransmissão TURN configurada, então só a conexão direta foi testada.</small></p>');
+    offerRetry(box, { anyway: true });
+  } else if (outcome === "blocked" || outcome === "signal_failed") {
+    offerRetry(showNetwork(outcome), { anyway: true });
+  } else if (outcome === "no_sdk") {
+    offerRetry(showNetwork(outcome), { anyway: false });
+  } else {
+    showNetwork(outcome);
+  }
+}
+
+async function networkCheck() {
+  $("call").disabled = true;
+  showNetwork("running");
+  state("Verificando a rede antes de ligar…", "");
+  if (!window.LivekitClient || !LivekitClient.ConnectionCheck) return verdict("no_sdk");
+
+  let creds;
+  try {
+    const response = await fetch("/call/check", { method: "POST" });
+    if (!response.ok) throw new Error(String(response.status));
+    creds = await response.json();
+  } catch {
+    return verdict("unavailable");
+  }
+
+  const check = new LivekitClient.ConnectionCheck(creds.url, creds.token);
+  try {
+    if (!passed(await withTimeout(check.checkWebsocket(), CHECK_TIMEOUT_MS))) {
+      return verdict("signal_failed", creds);
+    }
+    if (passed(await withTimeout(check.checkWebRTC(), CHECK_TIMEOUT_MS))) {
+      return verdict("direct_ok", creds);
+    }
+    // Relay only, through the TURN server LiveKit advertises; skipped (and so not a pass)
+    // when the server advertises none.
+    if (creds.turn && passed(await withTimeout(check.checkTURN(), CHECK_TIMEOUT_MS))) {
+      return verdict("turn_tls_ok", creds);
+    }
+  } catch {
+    // A check that throws instead of failing is still a path that did not connect.
+  }
+  return verdict("blocked", creds);
+}
+
+// ------------------------------------------------------------------ the call
 function bubble(role, text) {
   const div = document.createElement("div");
   div.className = "turn " + role;
@@ -76,10 +227,15 @@ function onData(payload, participant, kind, topic) {
 async function call() {
   $("call").disabled = true;
   state("Conectando…", "");
-  const response = await fetch("/call/start", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
-  });
-  if (!response.ok) { state("Não foi possível iniciar a chamada.", ""); $("call").disabled = false; return; }
+  let response;
+  try {
+    response = await fetch("/call/start", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+  } catch {
+    response = null;
+  }
+  if (!response || !response.ok) { state("Não foi possível iniciar a chamada. Tente de novo.", ""); $("call").disabled = false; return; }
   const { url, token } = await response.json();
   room = new LivekitClient.Room({ audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true } });
   room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
@@ -87,8 +243,20 @@ async function call() {
   });
   room.on(LivekitClient.RoomEvent.DataReceived, onData);
   room.on(LivekitClient.RoomEvent.Disconnected, finish);
-  await room.connect(url, token);
-  await room.localParticipant.setMicrophoneEnabled(true);
+  try {
+    await room.connect(url, token);
+  } catch {
+    state("A chamada não conectou. Teste a rede de novo ou use o chat.", "");
+    finish();
+    return;
+  }
+  try {
+    await room.localParticipant.setMicrophoneEnabled(true);
+  } catch {
+    state("Sem acesso ao microfone. Permita o microfone no navegador e ligue de novo.", "");
+    finish();
+    return;
+  }
   $("hangup").disabled = false;
   $("mute").disabled = false;
   state("Aguardando o atendente…", "");
@@ -108,6 +276,8 @@ $("mute").onclick = async () => {
   await room.localParticipant.setMicrophoneEnabled(!muted);
   $("mute").textContent = muted ? "Ativar microfone" : "Silenciar";
 };
+
+networkCheck();
 </script>
 </body>
 </html>

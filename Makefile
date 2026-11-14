@@ -3,13 +3,15 @@
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
 
-dev:              ## the whole demo in Docker: chat on :8000/chat/demo, call on :8100/call/demo
+dev:              ## the whole demo in Docker: landing on :8000/, then /app/chat, /app/call, /app/fila
 	docker compose up -d --wait postgres minio livekit
 	APP_VERSION=$$(git rev-parse --short HEAD 2>/dev/null || echo dev) docker compose --profile app build migrate
 	docker compose --profile app run --rm migrate
 	docker compose --profile app up -d --wait api call
-	@echo "chat  http://127.0.0.1:8000/chat/demo"
-	@echo "call  http://127.0.0.1:8100/call/demo"
+	@echo "landing  http://127.0.0.1:8000/  (acknowledge the disclaimer, then pick a demo)"
+	@echo "chat     http://127.0.0.1:8000/app/chat"
+	@echo "call     http://127.0.0.1:8100/app/call"
+	@echo "queue    http://127.0.0.1:8000/app/fila"
 
 dev-logs:         ## follow the API and call server logs of `make dev`
 	docker compose --profile app logs -f api call
@@ -76,7 +78,7 @@ voice:            ## sweep what recognition error costs; ARGS="--audio FILE" tra
 voices:           ## download the two Piper pt-BR voices the call uses into data/voices
 	uv run python -m piper.download_voices --download-dir data/voices pt_BR-faber-medium pt_BR-cadu-medium
 
-call:             ## the voice call demo on http://127.0.0.1:8100/call/demo (needs `make voices`, LiveKit up)
+call:             ## the voice call demo on http://127.0.0.1:8100/app/call (needs `make voices`, LiveKit up)
 	docker compose up -d livekit
 	uv run collection call serve $(ARGS)
 

@@ -1,0 +1,244 @@
+/* Shared by every public page, inlined by `collection.api.pages.render` so that each page
+   is one self-contained response from whichever server serves it.
+
+   The identity borrows from the thing the system works on: a ledger. Ink-teal on warm
+   paper, a saffron rule where a ledger would underline a total, and numbers set in
+   tabular figures. System fonts only -- no font CDN, nothing loaded from a third party. */
+
+:root {
+  --paper: #f7f2e8;
+  --paper-raised: #fffdf8;
+  --ink: #17302e;
+  --ink-soft: #46605d;
+  --teal: #0f5c56;
+  --teal-strong: #0a4540;
+  --saffron: #e9b544;
+  --saffron-ink: #2b1f05;
+  --rule: #d9cfbc;
+  --danger: #a3271d;
+  --danger-bg: #fbe9e6;
+  --info-bg: #e5f0ee;
+  --ok: #1c6b3a;
+  --ok-bg: #e4f2e8;
+  --focus: #1b66d6;
+  --radius: 14px;
+  --shadow: 0 1px 0 rgba(23, 48, 46, 0.06), 0 8px 24px -12px rgba(23, 48, 46, 0.25);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f1a19;
+    --paper-raised: #152423;
+    --ink: #ecf1ee;
+    --ink-soft: #a9bbb7;
+    --teal: #5cc2b5;
+    --teal-strong: #8adbd0;
+    --rule: #2a3d3b;
+    --danger: #ff9f94;
+    --danger-bg: #3a1a17;
+    --info-bg: #17312e;
+    --ok: #8fdcaa;
+    --ok-bg: #163322;
+    --focus: #7fb0ff;
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+a { color: var(--teal); text-underline-offset: 3px; }
+a:hover { color: var(--teal-strong); }
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus { left: 16px; top: 48px; z-index: 10; background: var(--paper-raised); padding: 8px 12px; }
+
+/* The permanent banner: on every page, never dismissible. */
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--saffron);
+  color: var(--saffron-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px 16px;
+  border-bottom: 2px solid rgba(43, 31, 5, 0.2);
+}
+.banner-mark { font-size: 0.7rem; vertical-align: 1px; margin-right: 4px; }
+
+.masthead {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--teal);
+  color: var(--paper-raised);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: inset 0 -3px 0 var(--saffron);
+}
+.brand-name { font-family: var(--serif); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.01em; }
+.brand-name em { font-style: italic; font-weight: 400; color: var(--teal); margin-left: 2px; }
+.brand-tag {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+.page.narrow { max-width: 640px; }
+
+h1, h2, h3 { font-family: var(--serif); line-height: 1.2; letter-spacing: -0.005em; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); margin: 0.4em 0 0.3em; }
+h2 { font-size: 1.45rem; margin: 1.6em 0 0.5em; }
+h3 { font-size: 1.15rem; margin: 0 0 0.3em; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal);
+  font-weight: 700;
+}
+.lead { font-size: 1.12rem; color: var(--ink-soft); max-width: 46em; }
+
+/* A ledger rule: thin line, a short saffron total underneath. */
+.rule {
+  border: 0;
+  height: 6px;
+  margin: 28px 0;
+  background:
+    linear-gradient(var(--saffron), var(--saffron)) left bottom / 72px 3px no-repeat,
+    linear-gradient(var(--rule), var(--rule)) left top / 100% 1px no-repeat;
+}
+
+.panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.1s;
+}
+.button:active { transform: translateY(1px); }
+.button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.button.primary { background: var(--teal); color: #fff; }
+.button.primary:hover:not([disabled]) { background: var(--teal-strong); color: #fff; }
+.button.secondary { background: transparent; color: var(--teal); border-color: var(--teal); }
+.button.danger { background: var(--danger); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  .button.primary, .button.primary:hover:not([disabled]) { color: #06201d; }
+  .button.danger { color: #2a0906; }
+}
+
+.notice {
+  border-radius: 10px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--teal);
+  background: var(--info-bg);
+}
+.notice.warn { border-left-color: var(--danger); background: var(--danger-bg); }
+.notice.ok { border-left-color: var(--ok); background: var(--ok-bg); }
+.notice p { margin: 0.2em 0; }
+
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

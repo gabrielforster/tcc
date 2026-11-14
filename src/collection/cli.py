@@ -305,7 +305,8 @@ def serve(
     elif not loaded.bundles:
         console.print("[yellow]warning[/] no trained models found; /score will return 404.")
     if settings.chat_enabled:
-        console.print(f"[green]chat[/] widget demo at http://{host}:{port}/chat/demo")
+        console.print(f"[green]demo[/] start at http://{host}:{port}/ (disclaimer, then the demos)")
+        console.print(f"[green]chat[/] widget demo at http://{host}:{port}/app/chat")
         console.print(f"[dim]origins[/] {', '.join(settings.chat_origins)}")
         if seed_demo:
             console.print(
@@ -1030,7 +1031,7 @@ def call_serve(
 
     from collection.api.call import create_call_app
 
-    console.print(f"[green]call[/] open http://{host}:{port}/call/demo and press Ligar")
+    console.print(f"[green]call[/] open http://{host}:{port}/app/call and press Ligar")
     console.print(f"[dim]livekit[/] {settings.livekit_url}")
     uvicorn.run(create_call_app(whisper_model=whisper_model), host=host, port=port)
 

@@ -169,7 +169,7 @@ embedded.
 **Shadow DOM.** Everything renders inside a shadow root, so the host page's CSS cannot
 reach in and the widget's cannot leak out. Widgets that skip this look fine in the demo and
 break on the first real site with a global `button { }` rule — which is why
-`/chat/demo` sets exactly that rule, as a visible check that the isolation holds.
+`/app/chat` sets exactly that rule, as a visible check that the isolation holds.
 
 **Replies are inserted as text nodes, never as HTML.** The reply is generated text quoting
 a knowledge base; treating it as markup would hand whoever can influence either one a
@@ -222,12 +222,17 @@ collection, it does not refuse service.
 ## Running it
 
 ```bash
-make serve          # http://127.0.0.1:8000/chat/demo
+make serve          # http://127.0.0.1:8000/ -> acknowledge the disclaimer -> /app/chat
 ```
+
+The page used to live at `/chat/demo`, which now redirects to `/app/chat`. Like every
+`/app/...` page it is gated: a browser that has not acknowledged the landing page's
+disclaimer is sent to `/` first, and returned to the chat once it has.
 
 To serve a real tenant instead of the in-memory demo, run `make up && make migrate &&
 make seed` once and set `DEFAULT_TENANT_SLUG=desenvolvimento` (or the `tenant_key` it
-prints in `DEFAULT_TENANT_KEY`); `make dev` does this for you. The chat then answers from that tenant's published knowledge and keeps its conversations as rows.
+prints in `DEFAULT_TENANT_KEY`); `make dev` does this for you. The chat then answers from
+that tenant's published knowledge and keeps its conversations as rows.
 
 With `ANTHROPIC_API_KEY` set the chat answers with the LLM responder; without it, the
 template. That fallback is why the demo works on a fresh clone — and why the default

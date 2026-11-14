@@ -248,7 +248,7 @@ The design the voice channel was built against was approved and drawn:
 
 <img src="./images/voice-channel-mockup.png" width="300" alt="The voice call screen: a notice that the call is transcribed and recorded, a pulsing orb while the customer speaks, the live transcript, a turn-time strip, and mute, hang-up and transfer-to-a-person controls">
 
-The running page (`make call`, then `/call/demo`) is a plainer version of that screen: the
+The running page (`make call`, then `/app/call`) is a plainer version of that screen: the
 notice, the orb, the live transcript and a turn-time strip filled from the call's own
 measurements. The numbers in the drawing were **placeholders drawn by a designer**; the
 measured ones are in [`docs/voice-call-report.md`](./voice-call-report.md). The transfer

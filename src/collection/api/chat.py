@@ -32,7 +32,7 @@ from pathlib import Path
 from threading import Lock
 
 from fastapi import APIRouter, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from collection.agents.responsive import Responder, get_responder
 from collection.api.schemas import (
@@ -52,7 +52,6 @@ from collection.channels.delivery import (
     DatabaseDeliveryLog,
     DeliveryStatus,
 )
-from collection.channels.outbound import SEED_DEMO_CUSTOMER
 from collection.channels.session import (
     ConversationEnded,
     DatabaseSessionStore,
@@ -62,7 +61,6 @@ from collection.channels.session import (
     TenantNotServable,
     TokenError,
     UnknownTenant,
-    issue_token,
     resolve_tenant,
     tenant_key_for_slug,
 )
@@ -374,21 +372,9 @@ def create_router(service: ChatService) -> APIRouter:
             headers={"Cache-Control": "public, max-age=300"},
         )
 
-    @router.get("/demo", include_in_schema=False, response_class=HTMLResponse)
-    def demo() -> HTMLResponse:
-        """A host page that embeds the widget, for seeing it work end to end."""
-        html = (WEB_DIR / "demo.html").read_text(encoding="utf-8")
-        if settings.chat_seed_demo:
-            # A seeded message is addressed to a customer, and this page is otherwise
-            # anonymous -- an anonymous session gets a random id and so an empty mailbox.
-            # In demo mode the page is therefore served carrying a token for the fixture
-            # customer whose contact was seeded at startup. The rule still holds: the
-            # token is minted on the server, and the browser cannot mint one itself.
-            html = html.replace(
-                'data-api=""',
-                f'data-api="" data-token="{issue_token(SEED_DEMO_CUSTOMER)}"',
-                1,
-            )
-        return HTMLResponse(html)
+    @router.get("/demo", include_in_schema=False)
+    def demo() -> RedirectResponse:
+        """The page moved to `/app/chat`; old links and the poster's draft still point here."""
+        return RedirectResponse("/app/chat", status_code=301)
 
     return router

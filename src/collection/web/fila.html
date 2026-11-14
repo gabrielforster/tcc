@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila de contato — demonstração</title>
+<style>
+{{site_css}}
+
+.facts { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 16px 0 20px; padding: 0; list-style: none; }
+.facts li { display: flex; flex-direction: column; }
+.facts .k { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.facts .v { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-raised); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+caption { text-align: left; padding: 14px 16px 6px; color: var(--ink-soft); font-size: 0.9rem; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 650; }
+td.num, th.num { text-align: right; }
+tbody tr:last-child td { border-bottom: 0; }
+.pos { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; color: var(--teal); }
+.id { font-family: var(--mono); font-size: 0.85rem; color: var(--ink-soft); }
+.bar { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--rule); vertical-align: middle; margin-left: 8px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--teal); }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 650; }
+.tag.yes { background: var(--ok-bg); color: var(--ok); }
+.tag.no { background: var(--danger-bg); color: var(--danger); }
+
+/* On a phone the table becomes a stack of ledger cards; the header row is repeated as
+   labels so nothing depends on horizontal scrolling. */
+@media (max-width: 640px) {
+  .table-wrap { border: 0; background: none; box-shadow: none; overflow: visible; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  caption { display: block; padding: 0 0 8px; }
+  tr { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 12px; margin-bottom: 10px; padding: 6px 4px; box-shadow: var(--shadow); }
+  td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 6px 12px; white-space: normal; }
+  td.num { text-align: right; }
+  td::before { content: attr(data-label); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); align-self: center; }
+}
+.state { margin: 18px 0; }
+.page.wide, .masthead { max-width: 1120px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+{{banner}}
+{{masthead}}
+<main id="conteudo" class="page wide">
+  <span class="eyebrow">Demonstração 03 · Fila de contato</span>
+  <h1>Quem contatar primeiro</h1>
+  <p class="lead">
+    Faturas sintéticas vencidas há até 30 dias e ainda em aberto, ordenadas pelo modelo de
+    propensão a pagamento — o mesmo cálculo da API <code>POST /score</code>. A posição 1 é a
+    primeira da fila; a decisão compara a probabilidade com o limiar ajustado do modelo,
+    não com 50%.
+  </p>
+
+  <div id="estado" class="state" role="status" aria-live="polite">
+    <p class="notice"><span class="spinner" aria-hidden="true"></span> Carregando a fila…</p>
+  </div>
+
+  <div id="resultado" hidden>
+    <ul class="facts" aria-label="Sobre o modelo">
+      <li><span class="k">Modelo</span><span class="v" id="f-modelo"></span></li>
+      <li><span class="k">Limiar de decisão</span><span class="v" id="f-limiar"></span></li>
+      <li><span class="k">Faturas na fila</span><span class="v" id="f-total"></span></li>
+      <li><span class="k">Acima do limiar</span><span class="v" id="f-acima"></span></li>
+      <li><span class="k">Data de referência</span><span class="v" id="f-data"></span></li>
+    </ul>
+    <div class="table-wrap">
+      <table>
+        <caption>Identificadores são pseudônimos, como na base anonimizada.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Posição</th>
+            <th scope="col">Fatura</th>
+            <th scope="col">Cliente</th>
+            <th scope="col" class="num">Valor</th>
+            <th scope="col" class="num">Dias em atraso</th>
+            <th scope="col" class="num">Chance de pagar em 30 dias</th>
+            <th scope="col">Decisão no limiar</th>
+          </tr>
+        </thead>
+        <tbody id="linhas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr class="rule">
+  <p><a href="/">← Voltar às demonstrações</a> · <a href="/app/chat">Chat</a> · <a href="/app/call">Chamada de voz</a></p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+
+function show(kind, html) {
+  // Every string placed here is the page's own; nothing from the server goes in as HTML.
+  $("estado").innerHTML = `<div class="notice ${kind}">${html}</div>`;
+}
+
+// A pseudonym is 20 characters of hash; the first few tell rows apart, the rest is in
+// the tooltip.
+function short(id) {
+  return id && id.length > 12 ? id.slice(0, 12) + "…" : id || "—";
+}
+
+function cell(row, label, text, className) {
+  const td = document.createElement("td");
+  td.dataset.label = label;
+  if (className) td.className = className;
+  if (text instanceof Node) td.appendChild(text); else td.textContent = text;
+  row.appendChild(td);
+  return td;
+}
+
+function render(data) {
+  $("f-modelo").textContent = data.model;
+  $("f-limiar").textContent = pct.format(data.threshold);
+  $("f-total").textContent = data.scored;
+  $("f-acima").textContent = data.entries.filter((e) => e.decision).length;
+  $("f-data").textContent = new Date(data.as_of + "T12:00:00").toLocaleDateString("pt-BR");
+  const body = $("linhas");
+  body.replaceChildren();
+  for (const entry of data.entries) {
+    const tr = document.createElement("tr");
+    const pos = document.createElement("span");
+    pos.className = "pos";
+    pos.textContent = entry.priority + "º";
+    cell(tr, "Posição", pos);
+    cell(tr, "Fatura", short(entry.invoice_id), "id").title = entry.invoice_id;
+    cell(tr, "Cliente", short(entry.customer_id), "id").title = entry.customer_id;
+    cell(tr, "Valor", brl.format(entry.amount), "num");
+    cell(tr, "Dias em atraso", String(entry.days_late), "num");
+    const prob = document.createElement("span");
+    prob.textContent = pct.format(entry.probability);
+    const bar = document.createElement("span");
+    bar.className = "bar";
+    bar.setAttribute("aria-hidden", "true");
+    const fill = document.createElement("i");
+    fill.style.width = Math.round(entry.probability * 100) + "%";
+    bar.appendChild(fill);
+    const wrap = document.createElement("span");
+    wrap.append(prob, bar);
+    cell(tr, "Chance de pagar em 30 dias", wrap, "num");
+    const tag = document.createElement("span");
+    tag.className = "tag " + (entry.decision ? "yes" : "no");
+    tag.textContent = entry.decision ? "Deve pagar" : "Risco";
+    cell(tr, "Decisão no limiar", tag);
+    body.appendChild(tr);
+  }
+  $("estado").replaceChildren();
+  $("resultado").hidden = false;
+}
+
+async function load() {
+  $("resultado").hidden = true;
+  show("", '<span class="spinner" aria-hidden="true"></span> Carregando a fila…');
+  let response;
+  try {
+    response = await fetch("/queue", { headers: { Accept: "application/json" } });
+  } catch {
+    show("warn", '<p><strong>Sem conexão com o servidor.</strong> Verifique a internet e tente de novo.</p><p><button class="button secondary" type="button" id="retry">Tentar de novo</button></p>');
+    $("retry").onclick = load;
+    return;
+  }
+  if (response.ok) { render(await response.json()); return; }
+  if (response.status === 404) {
+    show("", "<p><strong>Nenhum modelo treinado ainda.</strong> A fila aparece aqui assim que um modelo de propensão for publicado (<code>collection train</code>). Enquanto isso, o chat e a chamada funcionam normalmente.</p>");
+    return;
+  }
+  if (response.status === 503) {
+    show("warn", '<p><strong>O modelo está indisponível no momento.</strong> O servidor não conseguiu carregá-lo agora; costuma voltar sozinho em instantes.</p><p><button class="button secondary" type="button" id="retry">Tentar de novo</button></p>');
+    $("retry").onclick = load;
+    return;
+  }
+  show("warn", '<p><strong>Não foi possível montar a fila.</strong> Tente de novo em instantes.</p><p><button class="button secondary" type="button" id="retry">Tentar de novo</button></p>');
+  $("retry").onclick = load;
+}
+
+load();
+</script>
+</body>
+</html>

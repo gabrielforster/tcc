@@ -137,8 +137,10 @@ until both answer their health checks:
 
 | What | Where |
 |---|---|
-| Chat demo | http://127.0.0.1:8000/chat/demo |
-| Voice call demo | http://127.0.0.1:8100/call/demo (allow the microphone) |
+| Landing (disclaimer gate, then the demo picker) | http://127.0.0.1:8000/ |
+| Chat demo | http://127.0.0.1:8000/app/chat |
+| Voice call demo | http://127.0.0.1:8100/app/call (allow the microphone) |
+| Contact queue | http://127.0.0.1:8000/app/fila |
 | API docs / health | http://127.0.0.1:8000/docs, http://127.0.0.1:8000/health |
 
 The chat serves the seeded *Desenvolvimento* tenant from the database: the containers are
@@ -190,7 +192,7 @@ Every target has a help line in the `Makefile`. The ones that reproduce the eval
 | `make experiment` | The simulated experiment against the manual and semi-automated baselines (about 15 minutes) |
 | `make concurrency` | Holds up to 400 chat conversations at once and times every request |
 | `make voices` | Downloads the two Piper pt-BR voices the call uses into `data/voices` |
-| `make call` | The voice call demo on http://127.0.0.1:8100/call/demo (LiveKit is started for it) |
+| `make call` | The voice call demo on http://127.0.0.1:8100/app/call (LiveKit is started for it) |
 | `make call-bench` | The call's turn-time budget on synthesised speech; `ARGS="--live"` goes through LiveKit |
 | `make article` / `make cronograma` | Build the article and the schedule PDFs in Docker |
 
@@ -312,10 +314,33 @@ values — writing `docs/interpretability-<source>-<task>.md`.
 | `POST /chat/sessions/{id}/audio` | Send one voice note; the agent transcribes it |
 | `POST /chat/sessions/{id}/deliveries/{id}` | The widget reporting `entregue` or `lida` |
 | `GET /chat/widget.js` | The embeddable widget |
+| `GET /queue` | The demo's synthetic open book, ranked by the same function as `POST /score` |
 
 The ranking is the operational output, not the probability: the active module works down a
 finite queue each day, which is also why models are selected on average precision. Unknown
 or missing feature columns are rejected with a 422 rather than silently scored.
+
+### Public demo pages
+
+`/` is the entry point (and the poster's QR target): a one-line description of the project,
+then a disclaimer — academic project, synthetic data only, call audio recorded and
+transcribed under the retention policy — that must be acknowledged before the demo picker
+appears. Every page carries the banner *"Dados sintéticos — nenhum dado de valores, ou
+pessoas, reais"*.
+
+| Page | Served by | What |
+|---|---|---|
+| `/` | API | Disclaimer gate, then the picker |
+| `/app/chat` | API | The chat widget demo (`/chat/demo` redirects here) |
+| `/app/call` | call server | The voice call, after a WebRTC network check (`/call/demo` redirects here) |
+| `/app/fila` | API | The contact queue: synthetic open receivables ranked by the propensity model |
+
+The acknowledgement is a cookie (`aviso_lido`, 30 days, `HttpOnly`), not localStorage,
+because only a cookie reaches the server: a direct link to `/app/...` is answered with a
+redirect to `/` before the page exists, on both servers. In production Caddy routes
+`/app/call*` and `/call/*` to the call server and everything else to the API; locally the
+two run on two ports, and `API_PUBLIC_URL` / `CALL_PUBLIC_URL` make each one's links reach
+the other.
 
 ### Multi-agent architecture
 
@@ -450,8 +475,8 @@ conversations, measured in memory with the template responder.
 
 ### Web chat channel
 
-`make serve` exposes an embeddable chat widget at `/chat/demo`, documented in
-[`docs/web-chat.md`](./docs/web-chat.md). One `<script>` tag embeds it on any page:
+`make serve` exposes an embeddable chat widget at `/app/chat` (reached through the landing
+page at `/`), documented in [`docs/web-chat.md`](./docs/web-chat.md). One `<script>` tag embeds it on any page:
 
 ```html
 <script src="https://host/chat/widget.js" data-api="https://host" defer></script>
