@@ -125,20 +125,30 @@ svg.dia .e  { text-anchor: end; }
 svg.dia .red  { fill: var(--red); }
 svg.dia .ls { letter-spacing: 0.08em; }
 
+.col { display: flex; flex-direction: column; gap: var(--rhythm); }
+
+/* ---------- 02 ética: compact check list, three per row -------------------------- */
+.ethics { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; }
+.ethics li { position: relative; padding-left: 9mm; font-size: 22pt; line-height: 1.2; }
+.ethics li::before {
+  content: ""; position: absolute; left: 0; top: 0.6mm; width: 6.5mm; height: 6.5mm;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12.5l5 5 11-12' fill='none' stroke='%23C00000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
 /* ---------- 01 contexto -------------------------------------------------------- */
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; }
-.stat .num { display: block; font-size: 80pt; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
-.stat .num small { font-size: 42pt; }
+.stat .num { display: block; font-size: 70pt; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.stat .num small { font-size: 38pt; }
 .stat .lbl { display: block; font-size: 23pt; line-height: 1.22; margin-top: 2mm; color: var(--ink-2); }
 .ctx .src { margin-top: 3mm; }
 
-.bullets { list-style: none; margin-top: 8mm; display: grid; gap: 4mm; }
+.bullets { list-style: none; margin-top: 6mm; display: grid; gap: 3mm; }
 .bullets li { position: relative; padding-left: 9mm; }
 .bullets li::before {
   content: ""; position: absolute; left: 0; top: 4.2mm;
   width: 3.4mm; height: 3.4mm; background: var(--red); border-radius: 50%;
 }
-.question { margin-top: 9mm; background: var(--fill); padding: 6mm 8mm; }
+.question { margin-top: 6mm; background: var(--fill); padding: 5mm 7mm; }
 .question .lbl {
   display: block; color: var(--red); font-weight: 700; font-size: 21pt;
   text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 1.5mm;
@@ -150,9 +160,10 @@ figure.fig { margin: 0; }
 figure.fig figcaption { font-size: 21pt; line-height: 1.25; color: var(--ink-2); margin-top: 3mm; }
 figure.fig figcaption b { color: var(--ink); font-weight: 700; }
 
-.shots { display: flex; justify-content: space-between; align-items: flex-start; gap: 16mm; }
+.shots { display: flex; justify-content: space-between; align-items: flex-start; gap: 12mm; }
+.shot { width: min-content; }
 .shot img {
-  display: block; height: 142mm; width: auto;
+  display: block; height: 148mm; width: auto;
   border-radius: 3mm;
   box-shadow: 0 0.6mm 3mm rgba(0, 0, 0, 0.16);
 }

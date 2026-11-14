@@ -46,8 +46,9 @@
 
   <main>
 
-    <!-- ===================== 01 contexto | 02 solução ===================== -->
+    <!-- ===================== 01 contexto + 02 ética | 03 solução ===================== -->
     <div class="row">
+      <div class="col">
       <section class="ctx">
         <h2><span class="n">01</span>Contexto e problema</h2>
         <!-- Market numbers: Serasa Experian, Indicador de Inadimplência das Empresas, dez/2025
@@ -71,7 +72,27 @@
       </section>
 
       <section>
-        <h2><span class="n">02</span>Solução proposta</h2>
+        <h2><span class="n">02</span>Ética e LGPD</h2>
+        <!-- docs/data-acquisition-plan.md (D1) and article §3.1: synthetic data only;
+             docs/voice.md, docs/voice-call.md: Whisper and Piper run locally;
+             docs/architecture.md: HMAC pseudonyms per tenant, opt-out before any agent
+             (CDC art. 42), transcript_retention_days = 180 (six months);
+             docs/web-chat.md and docs/outreach.md: the thread and every outbound message say
+             they are automated. -->
+        <ul class="ethics">
+          <li>Só dados sintéticos</li>
+          <li>Voz local: Whisper e Piper</li>
+          <li>Pseudônimos HMAC por inquilino</li>
+          <li><em>Opt-out</em> antes de qualquer agente</li>
+          <li>O agente se diz automático</li>
+          <li>Transcrições expiram em 6 meses</li>
+        </ul>
+      </section>
+      </div>
+
+
+      <section>
+        <h2><span class="n">03</span>Solução proposta</h2>
         <!-- Structure: docs/architecture.md (orchestrator: route, prioritise, opt-out before
              any agent, record). Responsivo: docs/rag.md, docs/llm-responder.md (faithfulness
              check). Proativo: docs/collection-rules.md (max_attempts = 4), docs/outreach.md.
@@ -138,27 +159,27 @@
 
     <!-- ===================== 03 o sistema em uso ===================== -->
     <section>
-      <h2><span class="n">03</span>O sistema em uso</h2>
+      <h2><span class="n">04</span>O sistema em uso</h2>
       <!-- Screenshots of the running app, synthetic data only (captured locally; see README). -->
       <div class="shots">
         <figure class="fig shot">
           <img src="assets/tela-chat.png" alt="Widget de chat respondendo sobre juros e segunda via">
-          <figcaption><b>Figura 2 –</b> Chat: resposta a partir da base de conhecimento, com a fonte.</figcaption>
+          <figcaption><b>Figura 2 –</b> Chat: resposta da base, com a fonte.</figcaption>
         </figure>
         <figure class="fig shot">
           <img src="assets/tela-chamada.png" alt="Página da chamada de voz com a transcrição ao vivo">
-          <figcaption><b>Figura 3 –</b> Chamada de voz: transcrição ao vivo e o tempo de cada etapa.</figcaption>
+          <figcaption><b>Figura 3 –</b> Chamada de voz: tempos e transcrição.</figcaption>
         </figure>
         <figure class="fig shot">
           <img src="assets/tela-fila.png" alt="Fila de contato ordenada pelo modelo de propensão">
-          <figcaption><b>Figura 4 –</b> Fila de contato: faturas ordenadas pelo modelo preditivo.</figcaption>
+          <figcaption><b>Figura 4 –</b> Fila de contato: faturas ordenadas pelo modelo.</figcaption>
         </figure>
       </div>
     </section>
 
     <!-- ===================== 04 arquitetura ===================== -->
     <section>
-      <h2><span class="n">04</span>Arquitetura em produção</h2>
+      <h2><span class="n">05</span>Arquitetura em produção</h2>
       <!-- Deployment as settled for production: one EC2 with Docker Compose, Caddy, LiveKit,
            Postgres+pgvector on EBS, S3, Grafana LGTM (docs/observability.md), GitHub Actions
            with OIDC (infra/bootstrap) and deploy over SSM. Voice stack per docs/voice-call.md. -->
@@ -236,7 +257,7 @@
 
     <!-- ===================== 05 resultados ===================== -->
     <section>
-      <h2><span class="n">05</span>Resultados</h2>
+      <h2><span class="n">06</span>Resultados</h2>
       <div class="row">
         <div class="heroes">
           <!-- docs/experiment-results.md, "Paired differences", 2/day, system − semi-automated, +4.8 [+3.9, +5.8] -->
@@ -260,33 +281,33 @@
                "recovered ≤ 30 days" (means): capacity 2/4/8/16 —
                system 0.576 0.592 0.610 0.621; semi-automated 0.528 0.545 0.597 0.621;
                manual 0.525 0.539 0.579 0.621.
-               y(v) = 100 - (v - 0.50) * 640 ; x: 2→70, 4→145, 8→220, 16→295 -->
-          <svg class="dia" viewBox="0 14 375 116" role="img" aria-label="Gráfico: recuperação por capacidade diária">
+               y(v) = 92 - (v - 0.50) * 540 ; x: 2→70, 4→145, 8→220, 16→295 -->
+          <svg class="dia" viewBox="0 16 375 106" role="img" aria-label="Gráfico: recuperação por capacidade diária">
             <g stroke="#E3E3E3" stroke-width="0.5">
-              <line x1="40" y1="68" x2="300" y2="68"/>
-              <line x1="40" y1="36" x2="300" y2="36"/>
+              <line x1="40" y1="65.0" x2="300" y2="65.0"/>
+              <line x1="40" y1="38.0" x2="300" y2="38.0"/>
             </g>
-            <line x1="40" y1="100" x2="300" y2="100" stroke="#8A8A8A" stroke-width="0.6"/>
-            <text class="s e g" x="34" y="103">50%</text>
-            <text class="s e g" x="34" y="71">55%</text>
-            <text class="s e g" x="34" y="39">60%</text>
-            <text class="s c g" x="70"  y="112">2</text>
-            <text class="s c g" x="145" y="112">4</text>
-            <text class="s c g" x="220" y="112">8</text>
-            <text class="s c g" x="295" y="112">16</text>
-            <text class="s c g" x="170" y="126">contatos por dia (capacidade)</text>
+            <line x1="40" y1="92.0" x2="300" y2="92.0" stroke="#8A8A8A" stroke-width="0.6"/>
+            <text class="s e g" x="34" y="95.0">50%</text>
+            <text class="s e g" x="34" y="68.0">55%</text>
+            <text class="s e g" x="34" y="41.0">60%</text>
+            <text class="s c g" x="70"  y="104">2</text>
+            <text class="s c g" x="145" y="104">4</text>
+            <text class="s c g" x="220" y="104">8</text>
+            <text class="s c g" x="295" y="104">16</text>
+            <text class="s c g" x="170" y="118">contatos por dia (capacidade)</text>
 
-            <polyline points="70,84.0 145,75.04 220,49.44 295,22.56" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4 2.5"/>
-            <polyline points="70,82.08 145,71.2 220,37.92 295,22.56" fill="none" stroke="#333" stroke-width="1.6"/>
-            <polyline points="70,51.36 145,41.12 220,29.6 295,22.56" fill="none" stroke="#C00000" stroke-width="2.6"/>
-            <g fill="#C00000"><circle cx="70" cy="51.36" r="2.3"/><circle cx="145" cy="41.12" r="2.3"/><circle cx="220" cy="29.6" r="2.3"/><circle cx="295" cy="22.56" r="2.3"/></g>
+            <polyline points="70,78.5 145,70.94 220,49.34 295,26.66" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4 2.5"/>
+            <polyline points="70,76.88 145,67.7 220,39.62 295,26.66" fill="none" stroke="#333" stroke-width="1.6"/>
+            <polyline points="70,50.96 145,42.32 220,32.6 295,26.66" fill="none" stroke="#C00000" stroke-width="2.6"/>
+            <g fill="#C00000"><circle cx="70" cy="50.96" r="2.3"/><circle cx="145" cy="42.32" r="2.3"/><circle cx="220" cy="32.6" r="2.3"/><circle cx="295" cy="26.66" r="2.3"/></g>
 
-            <line x1="78" y1="54" x2="78" y2="80" stroke="#C00000" stroke-width="0.9" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
-            <text class="k red" x="83" y="71">+4,8 pp</text>
+            <line x1="78" y1="53.96" x2="78" y2="73.88" stroke="#C00000" stroke-width="0.9" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+            <text class="k red" x="83" y="66.9">+4,8 pp</text>
 
-            <text class="s g" x="303" y="25">todos</text>
-            <text class="s g" x="303" y="35">iguais:</text>
-            <text class="s g" x="303" y="45">62,1%</text>
+            <text class="s g" x="303" y="27">todos</text>
+            <text class="s g" x="303" y="37">iguais:</text>
+            <text class="s g" x="303" y="47">62,1%</text>
           </svg>
           <figcaption><b>Figura 6 –</b> Simulação com 30 replicações pareadas (IC 95%).</figcaption>
         </figure>
@@ -296,7 +317,7 @@
     <!-- ===================== 06 engenharia | 07 conclusões ===================== -->
     <div class="row">
       <section>
-        <h2><span class="n">06</span>Engenharia</h2>
+        <h2><span class="n">07</span>Engenharia</h2>
         <ul class="eng">
           <!-- `uv run pytest --collect-only -q` on 2026-11-14: 849 tests -->
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#C00000" stroke-width="1.8"/><path d="M7.5 12.3l3 3 6-6.5" fill="none" stroke="#C00000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -317,7 +338,7 @@
       </section>
 
       <section>
-        <h2><span class="n">07</span>Conclusões</h2>
+        <h2><span class="n">08</span>Conclusões</h2>
         <!-- article/main.tex §5 (Discussão, Conclusão); docs/experiment-results.md Findings 1, 3, 7 -->
         <ol class="concl">
           <li><strong>Sim, com uma condição:</strong> a predição recupera mais quanto mais escasso é o contato (+4,7 a +4,8 pp com 2 a 4 contatos/dia) e não muda nada quando dá para contatar todos.</li>
@@ -331,7 +352,7 @@
     <!-- ===================== 08 acesse | 09 referências ===================== -->
     <div class="row">
       <section>
-        <h2><span class="n">08</span>Acesse</h2>
+        <h2><span class="n">09</span>Acesse</h2>
         <!-- QR targets: poster/qr-targets.conf (regenerated by `make poster`) -->
         <div class="access">
           <figure class="qr main" data-qr="prod">
@@ -360,7 +381,7 @@
       </section>
 
       <section>
-        <h2><span class="n">09</span>Referências</h2>
+        <h2><span class="n">10</span>Referências</h2>
         <!-- Entries from article/refs.bib, plus the Serasa 2025 indicator used by the pitch. -->
         <div class="refs">
           <p>BRASIL. <strong>Lei nº 13.709/2018</strong>. Lei Geral de Proteção de Dados Pessoais (LGPD).</p>

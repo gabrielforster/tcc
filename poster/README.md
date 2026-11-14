@@ -3,10 +3,10 @@
 The A0 portrait poster (841 × 1189 mm) for the Poster + Demo Day, in pt-BR. It is a single
 HTML page printed to PDF by headless Chromium.
 
-The layout is editorial: a strict two-column grid with 30 mm margins and gutter, nine
-numbered sections (grey `01`–`09`, red uppercase letter-spaced title on a thin grey rule),
+The layout is editorial: a strict two-column grid with 30 mm margins and gutter, ten
+numbered sections (grey `01`–`10`, red uppercase letter-spaced title on a thin grey rule),
 light fills instead of outlined boxes, and red as the one strong accent. Reading order:
-contexto → solução (with one flow per agent) → the system in use (screenshots) →
+contexto and a compact ética e LGPD list (left column) → solução (with one flow per agent) → the system in use (screenshots) →
 arquitetura → resultados (four key numbers and the recovery chart) → engenharia →
 conclusões → QR codes → referências.
 
@@ -48,8 +48,10 @@ Two independent measurements, both run on the current build:
 - **In the browser** (`poster.js`, `?check`): every visible text node's computed `font-size`,
   multiplied by the SVG's screen transform for diagram labels, converted px → pt (× 0.75).
   The smallest is printed by the build (currently 20.00 pt, the references and source line).
-  Text *inside* the screenshots is part of an image and is not measured; the screenshots
-  illustrate, and nothing on the poster depends on reading them.
+  Text *inside* the screenshots is part of an image and is not measured by the build. It
+  was sized by hand instead: each screenshot is cropped to what matters and captured so its
+  smallest text, at the width it prints on the poster, is about 20 pt or more (chat 22 pt,
+  call 21 pt, queue 21 pt; see "Screenshots").
 - **In the PDF**: `pdftotext -bbox poster.pdf -` gives each word's box; Liberation Sans' box
   is 1.117 em tall, so the smallest box (22.34 pt) is a 20.0 pt font. The PDF page is
   2383.92 × 3370.08 pt = 841 × 1189 mm, so these are real printed sizes.
@@ -110,17 +112,20 @@ institution's communication office would be better still.
 ## Screenshots
 
 `assets/tela-*.png` are the running app, captured on 2026-11-14 with headless Chromium
-(puppeteer-core driving the system `chromium`) at device scale factor 3–4, so each prints at
-well over 250 dpi at its size on the poster. Synthetic data only.
+(puppeteer-core driving the system `chromium`) at device scale factor 5. Synthetic data
+only. Each one is cropped to the part that matters, and the page was laid out narrow (or
+its smallest labels enlarged with an injected stylesheet) so that the smallest text in the
+crop prints at about 20 pt or more at its width on the poster — recaptured larger, never
+upscaled.
 
-| File | Page | How it was captured |
-|---|---|---|
-| `tela-chat.png` | `/app/chat`, widget open | `collection serve` on the seeded *Desenvolvimento* tenant, with `LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b` on the local Ollama (the template responder quotes the whole FAQ, which is unreadable in a bubble — see `default_responder` in `api/chat.py`). Question: *quais sao os juros e a multa por atraso?* |
-| `tela-chamada.png` | `/app/call`, mid-call | `collection call serve` with the LiveKit container; Chromium's fake microphone played *"Quais são os juros e a multa por atraso?"* synthesised with the local Piper voice. The transcript (*"ataso"*) and the per-stage timing line are what the page showed. |
-| `tela-fila.png` | `/app/fila` | `collection serve` with a freshly trained local model; first five rows. |
+| File | Page | What was changed for print | How it was captured |
+|---|---|---|---|
+| `tela-chat.png` | `/app/chat`, widget open: the question and its answer | timestamps and source line 11 → 12.5 px | `collection serve` on the seeded *Desenvolvimento* tenant with `LLM_PROVIDER=openai LLM_MODEL=qwen2.5:3b` on the local Ollama (production uses an external provider; the template responder quotes the whole FAQ, unreadable in a bubble — see `default_responder` in `api/chat.py`) |
+| `tela-chamada.png` | `/app/call`: the per-stage timing line, the question and the answer | orb, status and buttons hidden; timing line 12 → 16 px; earlier turns (disclaimer, greeting) hidden | `collection call serve` with the LiveKit container, 420 px wide. Chromium's fake microphone played *"Quais são os juros e a multa por atraso?"* synthesised with the local Piper voice `pt_BR-cadu-medium` at `length_scale=1.1`; the `faber` voice was transcribed as *"ataso"* in every take, `cadu` cleanly |
+| `tela-fila.png` | `/app/fila`: the heading and the top three rows | lead text, model facts and the *Cliente* column hidden; root font 20 px; headers, ids and tags 0.9 rem | `collection serve` with a freshly trained local model and the duplicate-column fix from PR #58 |
 
 To recapture, run both servers as in the main README, open the pages with the `aviso_lido`
-cookie set, and crop to the widget/call card/table.
+cookie set, and crop to the widget, the call card plus transcript, and the table.
 
 The diagrams went lighter too: the old 4 × 5 pipeline grid is now one three-step flow under
 each agent inside the *Solução proposta* figure, and the architecture keeps every
@@ -146,6 +151,7 @@ Each number also has an HTML comment next to it in `index.html` naming its sourc
 | Simulação | 30 replicações, IC 95 % | `docs/experiment-results.md`, generated header |
 | Conclusão 1 | +4,7 a +4,8 pp com 2 a 4 contatos/dia | `docs/experiment-results.md`, Finding 1 (4/day +4.7, 2/day +4.8); article §5 |
 | Conclusão 3 | cerca de 2 s | article §5.3 (*responde em cerca de 2 s*) |
+| Ética e LGPD | 6 meses de retenção | `docs/architecture.md`, `transcript_retention_days` (180) |
 | Testes | 800+ | `uv run pytest --collect-only -q` on 2026-11-14: 849 tests |
 | Ferramentas de análise | 6 | `docs/static-analysis.md`: ruff, Semgrep CE, gitleaks, pip-audit, Trivy, zizmor |
 
