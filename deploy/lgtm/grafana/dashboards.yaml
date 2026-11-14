@@ -1,0 +1,16 @@
+# The project's dashboards, provisioned from the JSON beside this file. Provisioned rather
+# than saved in Grafana's database, so a redeploy (or a lost data volume) brings them back
+# exactly as reviewed, and an edit in the UI cannot drift from what is in git: the UI may
+# not save over them.
+apiVersion: 1
+
+providers:
+  - name: tcc
+    folder: TCC
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/tcc
+      foldersFromFilesStructure: false

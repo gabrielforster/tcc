@@ -44,6 +44,7 @@ from collection.config import settings
 from collection.db.session import unit_of_work
 from collection.models.store import load_bundle
 from collection.storage.objects import ObjectStoreError
+from collection.telemetry import instrument_app
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +181,9 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # Every request a span and a duration when telemetry is on; nothing otherwise.
+    instrument_app(app, "collection-api")
 
     if settings.chat_enabled:
         # The widget is embedded on another origin by definition, so without CORS the

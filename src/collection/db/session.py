@@ -72,6 +72,7 @@ from sqlalchemy.sql.expression import UpdateBase
 
 from collection.config import settings
 from collection.db.base import TenantScoped
+from collection.telemetry import instrument_engine
 
 TENANT_COLUMN = "tenant_id"
 
@@ -97,7 +98,10 @@ class CrossTenantWrite(RuntimeError):
 def engine() -> Engine:
     # `pool_pre_ping` because a long-lived worker outlives a Postgres restart and would
     # otherwise hand out a dead connection on the next request.
-    return create_engine(settings.database_url, pool_pre_ping=True)
+    created = create_engine(settings.database_url, pool_pre_ping=True)
+    # Every query a span, when a server has turned telemetry on; nothing otherwise.
+    instrument_engine(created)
+    return created
 
 
 @cache

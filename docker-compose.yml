@@ -139,7 +139,50 @@ services:
       retries: 5
       start_period: 180s
 
+  # Observability, as production runs it (deploy/compose.prod.yml), in the `obs` profile:
+  # `docker compose --profile obs up -d lgtm otelcol`, then OTEL_EXPORTER_OTLP_ENDPOINT=
+  # http://127.0.0.1:4318 for the servers. Grafana on http://127.0.0.1:3000 with the image's
+  # anonymous admin -- loopback only, so that is this machine's user and nobody else.
+  # docs/observability.md.
+  lgtm:
+    image: grafana/otel-lgtm:0.40.0@sha256:72e05804790e6e0d8c0b70a6d5ff1f721ef7b203463374631e99aa3429bd0cf6
+    container_name: collection-lgtm
+    profiles: ["obs"]
+    environment:
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/tcc/service-overview.json
+      GRAFANA_ALERT_EMAIL: alerts@localhost
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - lgtmdata:/data
+      - ./deploy/lgtm/tempo.yaml:/otel-lgtm/tempo-config.yaml:ro
+      - ./deploy/lgtm/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc.yaml:ro
+      - ./deploy/lgtm/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/tcc:ro
+      - ./deploy/lgtm/grafana/alerting.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/tcc.yaml:ro
+
+  # Host networking, as the app's containers: the probe has to reach the servers where
+  # `make dev` and `uv run` put them, on this machine's loopback.
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
+    container_name: collection-otelcol
+    profiles: ["obs"]
+    network_mode: host
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      OTLP_ENDPOINT: http://127.0.0.1:4318
+      API_HEALTH_URL: http://127.0.0.1:8000/health
+      CALL_HEALTH_URL: http://127.0.0.1:8100/health
+      DEPLOYMENT_ENVIRONMENT: dev
+    volumes:
+      - ./deploy/lgtm/otelcol.yaml:/etc/otelcol/config.yaml:ro
+      - /:/hostfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
 volumes:
   pgdata:
   miniodata:
   ollamadata:
+  lgtmdata:

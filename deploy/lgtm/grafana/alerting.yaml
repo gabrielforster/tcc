@@ -1,0 +1,101 @@
+# Alerting, provisioned: two rules about the API and one email contact point.
+#
+# The address is $GRAFANA_ALERT_EMAIL, read from the container's environment when Grafana
+# loads this file, so no address is in the repository; mail goes out through the GF_SMTP_*
+# settings (compose). Without them the alerts still fire and show in Grafana under
+# Alerting, and only the email is missing.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: tcc-email
+    receivers:
+      - uid: tcc-email
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: $GRAFANA_ALERT_EMAIL
+          singleEmail: true
+
+policies:
+  - orgId: 1
+    receiver: tcc-email
+    group_by: [grafana_folder, alertname]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+groups:
+  - orgId: 1
+    name: api
+    folder: TCC
+    interval: 1m
+    rules:
+      # Black-box, from the `otelcol` probe: a crashed process cannot report its own
+      # absence, and a hung one may keep exporting. No data means the probe itself is gone,
+      # which is worth an email too.
+      - uid: tcc-api-down
+        title: API down
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Alerting
+        annotations:
+          summary: The API has not answered /health for two minutes.
+          description: >-
+            The probe in the `otelcol` service gets no 2xx from the API's /health. Check
+            `docker compose ps` and the api container's log on the host.
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: max(last_over_time(httpcheck_status{http_url=~".*:8000/health", http_status_class="2xx"}[2m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      # Errors the API answered with, as a share of everything it answered. Only 5xx: a
+      # 4xx is the caller's mistake (an expired session, a malformed batch) and says
+      # nothing about the service. Quiet hours have no traffic, and no traffic is not an
+      # incident, hence noDataState OK.
+      - uid: tcc-api-5xx
+        title: API 5xx rate above 5%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: More than 5% of API responses were server errors over five minutes.
+          description: >-
+            Open the Service overview dashboard, then the failing route's traces in Tempo.
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(rate(http_server_request_duration_seconds_count{job="collection-api", http_response_status_code=~"5.."}[5m]))
+                /
+                sum(rate(http_server_request_duration_seconds_count{job="collection-api"}[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }

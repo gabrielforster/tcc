@@ -33,6 +33,7 @@ from collection.llm.prompt import (
     build_user_prompt,
 )
 from collection.rag.index import Retrieved
+from collection.telemetry import LLM_TOKENS, RESPONDER_FALLBACKS, describe_responder, span
 from collection.voice.speak import spoken_words
 
 
@@ -79,11 +80,24 @@ class LLMResponder(Responder):
         if max_words is not None:
             system += SPOKEN_INSTRUCTION.format(max_words=max_words)
         user = build_user_prompt(message, intent, passages, history)
-        try:
-            completion = self.client.complete(system, user)
-        except LLMError as error:
-            self.failures.append(str(error))
-            return self._fall_back(message, intent, passages, history, max_words, "fallback")
+        about = describe_responder(self)
+        with span("llm.complete", **about) as current:
+            try:
+                completion = self.client.complete(system, user)
+            except LLMError as error:
+                self.failures.append(str(error))
+                current.set_attribute("error.type", type(error.__cause__ or error).__name__)
+                return self._fall_back(message, intent, passages, history, max_words, "fallback")
+            # Counts, never content: the prompt carries the customer's message.
+            current.set_attributes(
+                {
+                    "gen_ai.response.model": completion.model,
+                    "gen_ai.usage.input_tokens": completion.input_tokens,
+                    "gen_ai.usage.output_tokens": completion.output_tokens,
+                }
+            )
+        LLM_TOKENS.add(completion.input_tokens, {**about, "gen_ai.token.type": "input"})
+        LLM_TOKENS.add(completion.output_tokens, {**about, "gen_ai.token.type": "output"})
 
         text = completion.text.strip()
         if not text or _is_refusal(text):
@@ -112,6 +126,7 @@ class LLMResponder(Responder):
         max_words: int | None,
         why: str,
     ) -> Answer:
+        RESPONDER_FALLBACKS.add(1, {**describe_responder(self), "reason": why})
         answer = self.fallback.respond(message, intent, passages, history, max_words=max_words)
         answer.responder = f"{self.name}:{why}"
         return answer

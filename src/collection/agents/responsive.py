@@ -37,6 +37,14 @@ from collection.agents.events import Event, EventType
 from collection.agents.intent import Classification, Intent, IntentClassifier
 from collection.agents.spoken import select
 from collection.rag.index import MIN_RELEVANCE, TOP_K, Retrieved, VectorIndex
+from collection.telemetry import (
+    RESPONDER_DURATION,
+    RETRIEVAL_DURATION,
+    RETRIEVAL_TOP_SCORE,
+    describe_responder,
+    span,
+    timed,
+)
 from collection.voice.audio import AudioError
 from collection.voice.speak import spoken_words
 from collection.voice.transcribe import (
@@ -268,9 +276,7 @@ class ResponsiveAgent(Agent):
         # would have found; adding a query cannot.
         queries = self.rewriter.queries(message, history)
         passages = self._retrieve(queries)
-        answer = self.responder.respond(
-            message, classification.intent, passages, history, max_words=max_words
-        )
+        answer = self._respond(message, classification.intent, passages, history, max_words)
 
         return Reply(
             answer=answer,
@@ -284,7 +290,46 @@ class ResponsiveAgent(Agent):
             queries=queries,
         )
 
+    def _respond(
+        self,
+        message: str,
+        intent: Intent,
+        passages: list[Retrieved],
+        history: Conversation | None,
+        max_words: int | None,
+    ) -> Answer:
+        """The responder's answer, timed and labelled with who wrote it.
+
+        `responder` on the measurement is what the answer says wrote it, so an LLM answer
+        replaced by the template is counted as `llm:fallback`, never as the model's.
+        """
+        about = describe_responder(self.responder)
+        with (
+            span("responder", responder=self.responder.name, intent=intent.value, **about) as cur,
+            timed(RESPONDER_DURATION, **about) as labels,
+        ):
+            answer = self.responder.respond(message, intent, passages, history, max_words=max_words)
+            labels["responder"] = answer.responder
+            labels["grounded"] = answer.grounded
+            cur.set_attributes({"answer.responder": answer.responder, "grounded": answer.grounded})
+        return answer
+
     def _retrieve(self, queries: list[str]) -> list[Retrieved]:
+        retriever = type(self.index).__name__
+        with (
+            span("retrieval", retriever=retriever, queries=len(queries)) as current,
+            timed(RETRIEVAL_DURATION, retriever=retriever) as labels,
+        ):
+            passages = self._merge(queries)
+            labels["outcome"] = "hit" if passages else "empty"
+            current.set_attribute("hits", len(passages))
+            if passages:
+                top = max(hit.score for hit in passages)
+                current.set_attribute("top_score", round(top, 4))
+                RETRIEVAL_TOP_SCORE.record(top, {"retriever": retriever})
+        return passages
+
+    def _merge(self, queries: list[str]) -> list[Retrieved]:
         """Best passages across every query, interleaved by rank rather than by score.
 
         Sorting the union by score looks obvious and is wrong. A longer query produces

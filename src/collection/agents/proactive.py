@@ -27,9 +27,10 @@ from collection.agents.base import Agent
 from collection.agents.events import Event, EventType
 from collection.data.sources.synthetic import delinquency_stage
 from collection.outreach.brief import Brief
-from collection.outreach.compliance import check
+from collection.outreach.compliance import Compliance, check
 from collection.outreach.compose import Composer, TemplateComposer
 from collection.rules.policy import ContactHistory, ContactPolicy
+from collection.telemetry import COMPLIANCE_CHECKS, COMPLIANCE_VIOLATIONS
 
 #: Channel by delinquency stage. Cheap and unobtrusive first, costly and direct last.
 CHANNEL_BY_STAGE = {
@@ -45,6 +46,19 @@ HistoryLookup = Callable[[str, str | None], ContactHistory]
 
 def _no_history(customer_id: str, invoice_id: str | None) -> ContactHistory:
     return ContactHistory()
+
+
+def _measure(compliance: Compliance, composer: str, channel: str) -> None:
+    """Count the gate's verdict, and each kind of violation it found.
+
+    The kind, not the violation: `invented:1500` names an amount, and the amount is the
+    customer's. `invented` is enough to see which composer makes figures up.
+    """
+    labels = {"composer": composer, "channel": channel}
+    outcome = "sendable" if compliance.sendable else "blocked"
+    COMPLIANCE_CHECKS.add(1, {**labels, "outcome": outcome})
+    for violation in compliance.violations:
+        COMPLIANCE_VIOLATIONS.add(1, {**labels, "kind": violation.split(":", 1)[0]})
 
 
 class ProactiveAgent(Agent):
@@ -97,6 +111,7 @@ class ProactiveAgent(Agent):
         )
         message = self.composer.compose(brief)
         compliance = check(message, brief)
+        _measure(compliance, composer=message.composer, channel=channel)
 
         if not compliance.sendable:
             return [

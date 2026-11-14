@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     # A process run from a checkout has no build, and says so.
     app_version: str = "dev"
 
+    # Telemetry (collection/telemetry.py). Off when the endpoint is empty, which is the
+    # default: tests and a plain `uv run` export nothing and need no collector. Production
+    # names the `lgtm` service; the environment tells its data apart from a laptop's.
+    otel_exporter_otlp_endpoint: str = ""
+    deployment_environment: str = "dev"
+
     # S3-compatible object storage. The defaults are the MinIO in docker-compose.yml, so a
     # fresh clone and the test suite need no configuration. Production sets the endpoint and
     # both keys to the empty string, which means "AWS itself": no endpoint is the regional

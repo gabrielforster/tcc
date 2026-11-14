@@ -246,6 +246,7 @@ Production is one EC2 host running [`deploy/compose.prod.yml`](./deploy/compose.
 | `migrate` | One-shot, run on every deploy: `db upgrade`, then the idempotent `tenant seed` |
 | `livekit` | The WebRTC server, with its TURN relay behind Caddy |
 | `postgres` | pgvector, data on the separate EBS volume (`/srv/tcc/data/postgres`) |
+| `lgtm`, `otelcol` | Observability: traces, metrics and logs in Grafana, behind a login — see [`docs/observability.md`](./docs/observability.md) |
 
 There is no MinIO in production: with `S3_ENDPOINT_URL`, `S3_ACCESS_KEY` and
 `S3_SECRET_KEY` empty the object store is AWS S3 and the credentials are the instance

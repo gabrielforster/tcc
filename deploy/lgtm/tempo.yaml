@@ -1,0 +1,53 @@
+# Tempo's configuration in the `lgtm` image (docker/tempo-config.yaml upstream, v0.40.0),
+# mounted over the image's own for one change at the bottom: traces are kept 7 days instead
+# of Tempo's default 14. Everything else is upstream's, unchanged, so an image bump is a
+# diff against that file.
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9096
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "127.0.0.1:4417"
+        http:
+          endpoint: "127.0.0.1:4418"
+
+memberlist:
+  bind_addr: [127.0.0.1]
+  bind_port: 7947
+
+querier:
+  frontend_worker:
+    frontend_address: 127.0.0.1:9096
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /data/tempo/wal
+    local:
+      path: /data/tempo/blocks
+
+metrics_generator:
+  processor:
+    span_metrics:
+      dimensions:
+        - service_name
+        - operation
+        - status_code
+  storage:
+    path: /data/tempo/generator/wal
+    remote_write:
+      - url: http://127.0.0.1:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+    compaction:
+      # 7 days, as for logs; the 20 GB data volume holds metrics for 30.
+      block_retention: 168h

@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from collection.api.schemas import ScoredReceivable, ScoreResponse
+from collection.telemetry import SCORING_BATCH, SCORING_DURATION, span, timed
 
 #: Columns carried through to the response but never fed to the model.
 PASSTHROUGH = ("invoice_id", "customer_id")
@@ -36,10 +37,17 @@ def rank(bundle: dict[str, Any], frame: pd.DataFrame, task: str) -> ScoreRespons
     if unexpected:
         raise InvalidBatch(f"Unknown columns: {unexpected[:10]}")
 
-    probabilities = bundle["pipeline"].predict_proba(frame[expected])[:, 1]
+    # The batch size and the champion are what move the latency, so they label it.
+    labels = {"task": task, "model": str(bundle["champion"])}
+    with (
+        span("scoring.predict", batch_size=len(frame), **labels),
+        timed(SCORING_DURATION, **labels),
+    ):
+        probabilities = bundle["pipeline"].predict_proba(frame[expected])[:, 1]
+        ordered = sorted(range(len(frame)), key=lambda i: float(probabilities[i]), reverse=True)
+    SCORING_BATCH.record(len(frame), labels)
     threshold = float(bundle["threshold"])
 
-    ordered = sorted(range(len(frame)), key=lambda i: float(probabilities[i]), reverse=True)
     priority = {index: position for position, index in enumerate(ordered, start=1)}
 
     results = [

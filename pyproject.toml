@@ -30,6 +30,11 @@ dependencies = [
     # Already pulled in by sentence-transformers; named here only because uv applies a
     # source (the CPU-only index below) to direct dependencies, never to transitive ones.
     "torch>=2.4",
+    # The API only, not the SDK: the code that names a span or a counter imports this, and
+    # without an SDK installed and configured every call is a no-op. It is what OpenTelemetry
+    # asks of instrumented libraries, it has one dependency (typing-extensions), and the LLM
+    # SDK already pulls it in. Exporting is the `otel` extra's job.
+    "opentelemetry-api>=1.45",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +47,20 @@ api = [
 rag = ["pypdf>=4.2", "python-docx>=1.1"]
 llm = ["anthropic>=0.40"]
 voice = ["faster-whisper>=1.0"]
+# Exporting telemetry: the SDK, the OTLP/HTTP exporter and the auto-instrumentation. An
+# extra rather than a default because it only matters to a process that has a collector
+# to talk to (OTEL_EXPORTER_OTLP_ENDPOINT); a laptop running the pipeline needs none of it.
+# requests and SQLAlchemy cover the LLM's openai-protocol client and every query; there is
+# no psycopg instrumentation because SQLAlchemy is the only way the code reaches Postgres,
+# and both would draw every query twice.
+otel = [
+    "opentelemetry-sdk>=1.45",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-instrumentation-fastapi>=0.66b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
+    "opentelemetry-instrumentation-requests>=0.66b0",
+    "opentelemetry-instrumentation-logging>=0.66b0",
+]
 call = [
     "livekit>=1.2.1",
     "livekit-api>=1.2.2",

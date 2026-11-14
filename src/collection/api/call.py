@@ -34,6 +34,7 @@ from collection.channels.voice_call import VoiceCallChannel
 from collection.config import settings
 from collection.rag.documents import load_customer_facing
 from collection.rag.index import VectorIndex
+from collection.telemetry import instrument_app
 from collection.voice.speak import PiperSynthesizer, Synthesizer
 from collection.voice.transcribe import WhisperTranscriber
 
@@ -102,6 +103,7 @@ def create_call_app(
             task.cancel()
 
     app = FastAPI(title="Voice call", lifespan=lifespan)
+    instrument_app(app, "collection-call")
 
     @app.get("/app/call", response_class=HTMLResponse)
     def page(request: Request) -> Response:
