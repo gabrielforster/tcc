@@ -13,6 +13,7 @@
     img.onerror = function () { slot.remove(); };
     // Caption without the scheme; a line may break only after a "/", never mid-word.
     var cap = slot.querySelector('.url');
+    if (!cap) return;
     url.replace(/^https?:\/\//, '').replace(/\/$/, '').split('/').forEach(function (part, i) {
       if (i) { cap.appendChild(document.createTextNode('/')); cap.appendChild(document.createElement('wbr')); }
       cap.appendChild(document.createTextNode(part));
