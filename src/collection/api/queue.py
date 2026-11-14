@@ -98,7 +98,10 @@ def create_queue_router(registry: "ModelRegistry") -> APIRouter:
         bundle = registry.get(TASK)
         today = date.today()
         invoices, features = demo_book(today)
-        columns = [c for c in (*PASSTHROUGH, *bundle["features"]) if c in features.columns]
+        # A trained bundle lists the ids among its features too (its pipeline drops them), so
+        # the same name can come twice; a frame with duplicate columns cannot be scored.
+        wanted = dict.fromkeys((*PASSTHROUGH, *bundle["features"]))
+        columns = [c for c in wanted if c in features.columns]
         try:
             ranked = rank(bundle, features[columns], TASK)
         except InvalidBatch as error:
