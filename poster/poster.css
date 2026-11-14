@@ -1,0 +1,187 @@
+/* A0 poster — header, footer and colours follow the official Católica SC template
+   (The-Portfolio-Playbook, demoday/TEMPLATE_POSTER_PORTFOLIO.pptx):
+   - red bars #C00000 under the header and at the foot of the page;
+   - title in bold #C00000, author in bold italic black, e-mail in bold italic #000099,
+     course line in bold italic #C00000, all centred to the right of the logo;
+   - section headings in bold uppercase #C00000, centred; body in Arial, black on white.
+   Sizes are in pt and mm so the screen preview and the print are the same object. */
+
+@page { size: 841mm 1189mm; margin: 0; }
+
+:root {
+  --red: #C00000;        /* template: title, headings, bars */
+  --navy: #000099;       /* template: e-mail */
+  --ink: #000000;        /* template: body text */
+  --ink-2: #333333;      /* secondary text, still >= 12:1 on white */
+  --paper: #FFFFFF;
+  --red-tint: #FCEDED;
+  --navy-tint: #ECEEFA;
+  --grey-tint: #F2F2F2;
+  --rule: #9A9A9A;
+
+  --page-w: 841mm;
+  --page-h: 1189mm;
+  --gutter: 25mm;        /* side margin and column gap */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Arial, "Liberation Sans", Arimo, Helvetica, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.page {
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* ---------- header (template) ----------------------------------------------- */
+.hdr {
+  height: 136mm;
+  display: grid;
+  grid-template-columns: 240mm 1fr;
+  align-items: center;
+  padding: 0 18mm 0 24mm;
+}
+.hdr .logo { width: 214mm; height: auto; display: block; }
+.hdr .who { text-align: center; }
+.hdr h1 {
+  color: var(--red);
+  font-size: 64pt;
+  font-weight: 700;
+  line-height: 1.08;
+  margin-bottom: 7mm;
+}
+.hdr .name   { font-size: 39pt; font-weight: 700; font-style: italic; line-height: 1.2; }
+.hdr .mail   { font-size: 34pt; font-weight: 700; font-style: italic; color: var(--navy); line-height: 1.25; }
+.hdr .course { font-size: 29pt; font-weight: 700; font-style: italic; color: var(--red); line-height: 1.3; }
+.hdr .advisor{ font-size: 26pt; font-style: italic; line-height: 1.3; }
+
+.bar { background: var(--red); height: 7.4mm; flex: none; }
+.bar.foot { position: absolute; left: 0; right: 0; bottom: 1.1mm; }
+
+/* ---------- body grid -------------------------------------------------------- */
+main {
+  flex: 1;
+  padding: 5mm var(--gutter) 10mm;
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+  min-height: 0;
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--gutter); }
+.row.results { grid-template-columns: 412mm 1fr; }
+
+section h2 {
+  color: var(--red);
+  font-size: 40pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  margin-bottom: 4mm;
+}
+section h2.left { text-align: left; }
+
+p, li { font-size: 26pt; line-height: 1.24; }
+.small { font-size: 22pt; line-height: 1.25; }
+.src   { font-size: 20pt; line-height: 1.25; color: var(--ink-2); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+
+svg.dia { display: block; width: 100%; height: auto; overflow: visible; }
+svg.dia text { font-family: Arial, "Liberation Sans", Arimo, Helvetica, sans-serif; fill: var(--ink); }
+svg.dia .t  { font-size: 9px;   font-weight: 700; }   /* 9 mm  = 25.5 pt (1 unit = 1 mm) */
+svg.dia .k  { font-size: 8.5px; font-weight: 700; }   /* 8.5mm = 24.1 pt */
+svg.dia .s  { font-size: 7.8px; }                     /* 7.8mm = 22.1 pt */
+svg.dia .c  { text-anchor: middle; }
+svg.dia .e  { text-anchor: end; }
+svg.dia .navy { fill: var(--navy); }
+svg.dia .red  { fill: var(--red); }
+svg.dia .white { fill: #fff; }
+
+/* ---------- contexto -------------------------------------------------------- */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-bottom: 2mm; }
+.stat { border-left: 3mm solid var(--red); padding: 1mm 0 1mm 5mm; }
+.stat .num { display: block; color: var(--red); font-size: 84pt; font-weight: 700; line-height: 1; }
+.stat .num small { font-size: 46pt; }
+.stat .cap { display: block; font-size: 24pt; line-height: 1.2; margin-top: 2mm; }
+
+.icons { list-style: none; margin-top: 6mm; display: grid; gap: 4.5mm; }
+.icons li { display: grid; grid-template-columns: 19mm 1fr; column-gap: 5mm; align-items: start; }
+.icons svg { width: 19mm; height: 19mm; }
+.question {
+  margin-top: 6mm;
+  background: var(--navy-tint);
+  border-left: 3mm solid var(--navy);
+  padding: 4mm 6mm;
+}
+.question p { font-size: 26pt; }
+.question .lbl { display: block; color: var(--navy); font-weight: 700; font-size: 24pt; }
+
+/* ---------- resultados -------------------------------------------------------- */
+.legend { display: flex; flex-wrap: wrap; gap: 3mm 9mm; margin: 1mm 0 2mm; }
+.legend span { font-size: 22pt; display: inline-flex; align-items: center; gap: 3mm; }
+.legend i { display: inline-block; width: 14mm; height: 2mm; background: currentColor; }
+.legend .sys { color: var(--red); }
+.legend .semi { color: var(--navy); }
+.legend .man { color: #555; }
+.legend .sys b, .legend .semi b, .legend .man b { color: var(--ink); font-weight: 400; }
+.chart-title { font-size: 24pt; font-weight: 700; }
+
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm 7mm; align-content: start; }
+.kpi { border-top: 1.6mm solid var(--navy); padding-top: 2mm; }
+.kpi.hl { border-top-color: var(--red); }
+.kpi .v { display: block; font-size: 50pt; font-weight: 700; line-height: 1.05; color: var(--navy); }
+.kpi.hl .v { color: var(--red); }
+.kpi .d { display: block; font-size: 22pt; line-height: 1.22; margin-top: 1mm; }
+
+.takeaway {
+  margin-top: 4mm;
+  background: var(--red-tint);
+  border-left: 3mm solid var(--red);
+  padding: 3mm 5mm;
+}
+.takeaway p { font-size: 25pt; }
+
+/* ---------- ética / QR / referências -------------------------------------------- */
+.checks { list-style: none; display: grid; gap: 3.5mm; }
+.checks li { display: grid; grid-template-columns: 11mm 1fr; column-gap: 3mm; font-size: 24pt; }
+.checks li::before {
+  content: ""; width: 9mm; height: 9mm; margin-top: 0.8mm; border-radius: 50%;
+  background: var(--navy) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/70% no-repeat;
+}
+
+.qrs { display: flex; flex-wrap: wrap; gap: 6mm 6mm; justify-content: center; align-items: flex-start; }
+.qr { display: flex; flex-direction: column; align-items: center; text-align: center; width: 78mm; }
+.qr.main { width: 90mm; }
+.qr .code { background: #fff; padding: 4mm; border: 0.6mm solid var(--rule); }
+.qr img { display: block; width: 54mm; height: 54mm; image-rendering: pixelated; }
+.qr.main img { width: 74mm; height: 74mm; }
+.qr.main .code { border: 1.4mm solid var(--red); }
+.qr .lbl { font-size: 24pt; font-weight: 700; margin-top: 2mm; line-height: 1.15; }
+.qr.main .lbl { color: var(--red); font-size: 28pt; }
+.qr .url { font-size: 20pt; color: var(--ink-2); line-height: 1.15; }
+
+.refs { columns: 2; column-gap: var(--gutter); }
+.refs p { font-size: 20pt; line-height: 1.22; margin-bottom: 1.6mm; break-inside: avoid; padding-left: 6mm; text-indent: -6mm; }
+
+/* screen preview: grey surround so the page edge is visible */
+@media screen {
+  html { background: #888; }
+  body { background: #888; padding: 10mm; }
+  .page { box-shadow: 0 0 6mm rgba(0,0,0,.4); }
+}
+@media print {
+  body { padding: 0; }
+}
