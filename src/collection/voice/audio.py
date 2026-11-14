@@ -62,7 +62,8 @@ def ffmpeg_available() -> bool:
 
 def _run(command: list[str]) -> str:
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        # An argument list and no shell: a file name reaches ffmpeg as one argv entry.
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=60)  # noqa: S603
     except FileNotFoundError as error:
         raise AudioError("ffmpeg/ffprobe is not installed; audio cannot be decoded") from error
     except subprocess.TimeoutExpired as error:

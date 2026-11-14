@@ -180,7 +180,7 @@ def run(
         for draw in range(draws):
             # Seeded per message and per draw: the same sweep run twice reports the same
             # numbers, which is the minimum for a figure that goes in the paper.
-            rng = random.Random(f"{seed}:{message.id}:{rate}:{draw}")
+            rng = random.Random(f"{seed}:{message.id}:{rate}:{draw}")  # noqa: S311  reproducible
             heard = degrade(message.text, rate, rng)
             intent = classifier.classify(heard).intent
 

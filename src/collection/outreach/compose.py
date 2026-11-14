@@ -30,7 +30,7 @@ from collection.llm.client import LLMClient, LLMError, get_client
 from collection.outreach.brief import Brief, brl
 
 #: What every message must contain, whoever wrote it. See `compliance.py`.
-OPT_OUT_TOKEN = "SAIR"
+OPT_OUT_TOKEN = "SAIR"  # noqa: S105  the opt-out keyword a customer types
 AUTOMATED_MARKER = "mensagem automática"
 
 #: At or below this cap the short templates are used instead of the full ones.

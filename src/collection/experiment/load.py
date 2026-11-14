@@ -97,12 +97,14 @@ class Level:
 
 def _post(url: str, body: dict, timeout: float) -> tuple[int, dict | None, float]:
     data = json.dumps(body).encode()
-    request = urllib.request.Request(
+    # S310 warns about `file:` and custom schemes; every URL here is the
+    # http://127.0.0.1:<port> that `run_load` builds for the server it started.
+    request = urllib.request.Request(  # noqa: S310
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
     started = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
             payload = json.loads(response.read() or b"null")
             return response.status, payload, time.perf_counter() - started
     except urllib.error.HTTPError as error:
@@ -154,7 +156,7 @@ def _wait_ready(base: str, process: subprocess.Popen, timeout: float = 120.0) ->
         if process.poll() is not None:
             raise RuntimeError(f"the chat server exited with {process.returncode}")
         try:
-            with urllib.request.urlopen(f"{base}/health", timeout=2) as response:
+            with urllib.request.urlopen(f"{base}/health", timeout=2) as response:  # noqa: S310
                 if response.status == 200:
                     return
         except (urllib.error.URLError, ConnectionError, TimeoutError):
@@ -173,7 +175,8 @@ def run_load(
     ]
     port = _free_port()
     base = f"http://127.0.0.1:{port}"
-    process = subprocess.Popen(
+    # The interpreter running this, with a fixed program; `port` is an int from the OS.
+    process = subprocess.Popen(  # noqa: S603
         [sys.executable, "-c", f"from collection.experiment.load import serve; serve({port})"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,

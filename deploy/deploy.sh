@@ -82,9 +82,11 @@ render_env
 
 # Docker would create missing bind-mount sources as root, and the app runs as UID 10001
 # (see the Dockerfile): the recordings directory must be its own before the call server
-# writes the first one.
+# writes the first one. Caddy runs as UID 10002 (deploy/caddy/Dockerfile) and writes its
+# certificates and ACME account under caddy/.
 install -d -m 0750 -o 10001 -g 10001 "$data_dir/calls"
-install -d -m 0700 "$data_dir/postgres" "$data_dir/caddy"
+install -d -m 0700 -o 10002 -g 10002 "$data_dir/caddy"
+install -d -m 0700 "$data_dir/postgres"
 
 log "pulling ghcr.io/gabrielforster/tcc:${tag}"
 compose pull --ignore-buildable --quiet
