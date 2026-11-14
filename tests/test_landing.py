@@ -205,3 +205,25 @@ def test_the_queue_page_handles_every_state(acknowledged):
     assert "Nenhum modelo treinado ainda" in page
     assert "indisponível no momento" in page
     assert "Tentar de novo" in page
+
+
+class _ByLateRateNamed(_ByLateRate):
+    """Reads its column by name, like a trained pipeline that drops the id columns."""
+
+    def predict_proba(self, x):
+        positive = 1.0 - np.clip(x["hist_late_rate"].to_numpy(dtype=float), 0.0, 1.0)
+        return np.column_stack([1 - positive, positive])
+
+
+def test_the_queue_ranks_a_bundle_that_lists_the_ids_among_its_features(index):
+    """Trained bundles carry `invoice_id`/`customer_id` in `features`; asking for them twice
+    used to build a frame with duplicate columns and answer 500."""
+    bundle = {
+        **_bundle(),
+        "pipeline": _ByLateRateNamed().fit(None),
+        "features": ["invoice_id", "customer_id", *FEATURES],
+    }
+    with _client(index, ModelRegistry(loader=lambda: {"propensity": bundle})) as http:
+        response = http.get("/queue")
+    assert response.status_code == 200, response.text
+    assert response.json()["entries"]
