@@ -1,0 +1,106 @@
+#!/bin/bash
+# First-boot setup of the tcc prod host. A Terraform templatefile: a doubled dollar sign
+# before a brace is how a literal shell expansion is written here.
+#
+# Leaves the host ready for deploy.sh and nothing more: Docker + compose plugin, AWS CLI v2,
+# the data volume mounted at /srv/tcc/data, and the directories the compose bundle expects.
+# The application itself arrives with the first deploy (SSM Run Command), not from here, so
+# this script never needs to change when the app does.
+#
+# Runs once per instance. Every step is safe to re-run by hand (`sudo bash
+# /var/lib/cloud/instance/user-data.txt`), which matters most for the volume: it is
+# formatted only when it has no filesystem, so a replacement instance mounts the existing
+# data instead of wiping it.
+set -euo pipefail
+exec > >(tee -a /var/log/tcc-user-data.log) 2>&1
+echo "tcc user data: start $(date -Is)"
+
+export DEBIAN_FRONTEND=noninteractive
+# unattended-upgrades often holds the dpkg lock right after first boot; wait for it
+# instead of failing the whole setup on a lock race.
+APT="apt-get -o DPkg::Lock::Timeout=600 -y"
+
+# --- Docker Engine + compose plugin, from Docker's apt repository ------------------------
+# Ubuntu's docker.io package lags and ships no compose v2 plugin.
+$APT update
+$APT install ca-certificates curl unzip
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+. /etc/os-release
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $${VERSION_CODENAME} stable" \
+  > /etc/apt/sources.list.d/docker.list
+$APT update
+$APT install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Bounded container logs: the default json-file driver never rotates, and on a box that
+# runs for months the root disk would fill up. Loki keeps the history that matters.
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'JSON'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "20m", "max-file": "5" }
+}
+JSON
+
+# --- AWS CLI v2 (deploy.sh reads /tcc/prod/* from SSM with it) ---------------------------
+# Not in the Ubuntu AMI, and the distro's awscli is v1.
+if ! command -v aws >/dev/null 2>&1; then
+  tmp=$(mktemp -d)
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "$tmp/awscliv2.zip"
+  unzip -q "$tmp/awscliv2.zip" -d "$tmp"
+  "$tmp/aws/install" --update
+  rm -rf "$tmp"
+fi
+
+# --- Data volume at /srv/tcc/data ---------------------------------------------------------
+# Terraform attaches the volume only after the instance is running, so it may not exist
+# yet. On Nitro instances it appears as an NVMe disk whose by-id name embeds the volume id
+# (without the dash) -- a stable handle, unlike /dev/nvme1n1 whose number is not.
+DEVICE="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(data_volume_id, "-", "")}"
+for _ in $(seq 1 120); do
+  [ -e "$DEVICE" ] && break
+  sleep 5
+done
+if [ ! -e "$DEVICE" ]; then
+  echo "tcc user data: data volume ${data_volume_id} never attached" >&2
+  exit 1
+fi
+
+# Format only a blank volume. Anything with a filesystem is the existing database.
+if [ -z "$(blkid -o value -s TYPE "$DEVICE" || true)" ]; then
+  echo "tcc user data: formatting blank data volume"
+  mkfs.ext4 -L tcc-data "$DEVICE"
+fi
+
+# fstab by UUID (device names can change across instance types and reboots). nofail keeps
+# the instance bootable -- and reachable through SSM -- if the volume is ever missing.
+UUID=$(blkid -o value -s UUID "$DEVICE")
+mkdir -p /srv/tcc/data
+if ! grep -q "UUID=$UUID" /etc/fstab; then
+  echo "UUID=$UUID /srv/tcc/data ext4 defaults,nofail,x-systemd.device-timeout=30s 0 2" >> /etc/fstab
+fi
+systemctl daemon-reload
+mountpoint -q /srv/tcc/data || mount /srv/tcc/data
+
+mkdir -p /srv/tcc/data/postgres /srv/tcc/data/lgtm /srv/tcc/data/caddy
+
+# Docker must not start without the data volume: with nofail the boot goes on, and a
+# Postgres container started on the bare mount point would initialize an empty database on
+# the root disk and look healthy. RequiresMountsFor makes Docker wait for (and depend on)
+# the mount instead.
+mkdir -p /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/10-tcc-data.conf <<'UNIT'
+[Unit]
+RequiresMountsFor=/srv/tcc/data
+UNIT
+systemctl daemon-reload
+systemctl enable docker
+systemctl restart docker
+
+# --- Deploy bundle directory ---------------------------------------------------------------
+# deploy.sh, compose.prod.yml, Caddyfile and the rendered .env land here on each deploy.
+# Root-only: the .env holds every secret from SSM.
+install -d -m 0700 /opt/tcc
+
+echo "tcc user data: done $(date -Is)"

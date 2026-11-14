@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) for a local plan. CI does not use this file: it
+# passes the one value without a default as TF_VAR_budget_email.
+budget_email = "you@example.com"
+
+# Everything else has a production default; override only to experiment.
+# instance_type    = "t3.large"
+# budget_limit_usd = 80
