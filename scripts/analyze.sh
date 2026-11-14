@@ -4,6 +4,10 @@
 #   scripts/analyze.sh              # every check, in order
 #   scripts/analyze.sh semgrep      # one of: ruff semgrep gitleaks pip-audit trivy zizmor
 #   GITLEAKS_LOG_OPTS="base..head" scripts/analyze.sh gitleaks   # only a range of commits
+#   TRIVY_IMAGE_REF=ghcr.io/gabrielforster/tcc:<sha> scripts/analyze.sh trivy-image
+#
+# `trivy-image` scans a built image, so it is not part of the default run: CI calls it in
+# the image job, between `docker build` and `docker push`.
 #
 # CI calls this script one check per step rather than repeating the commands in the
 # workflow, so `make analyze` cannot drift from what gates a pull request. Each check
@@ -91,7 +95,7 @@ run_trivy() {
   # Kubernetes manifest and Helm chart in the tree (infra/ and the app's Dockerfile are
   # picked up as they land, with no change here), and `vuln` reads uv.lock -- a second,
   # severity-rated opinion on the dependencies, which pip-audit cannot give. The image
-  # itself is scanned in the deploy pipeline, where it is built. The cache keeps the
+  # itself is scanned by `trivy-image` below, where it is built. The cache keeps the
   # 130 MB vulnerability database between runs.
   rm -f "$out/trivy.sarif"
   local cache="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}"
@@ -102,6 +106,28 @@ run_trivy() {
     --scanners vuln,misconfig --skip-dirs /repo/.venv --skip-dirs /repo/analysis \
     --format sarif --output /out/trivy.sarif || return 1
   gate trivy "$out/trivy.sarif" || return 1
+}
+
+run_trivy_image() {
+  # The image as it will run: the base image's OS packages and the Python packages as
+  # installed, which `fs` cannot see. Same scanner image, cache and gate -- a HIGH/CRITICAL
+  # fails it -- plus `--ignore-unfixed`: a vulnerability Debian has not patched yet has no
+  # fix to apply, and would otherwise block every deploy until upstream ships one. The image
+  # is read from the local Docker daemon through its socket; the scanner joins the socket's
+  # group rather than running as root.
+  rm -f "$out/trivy-image.sarif"
+  if [ -z "${TRIVY_IMAGE_REF:-}" ]; then
+    echo "trivy-image: set TRIVY_IMAGE_REF to the image to scan" >&2
+    return 1
+  fi
+  local cache="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}" sock=/var/run/docker.sock
+  mkdir -p "$cache" || return 1
+  docker run --rm --user "$(id -u):$(id -g)" --group-add "$(stat -c %g "$sock")" \
+    -v "$sock:$sock" -v "$cache:/cache" -v "$out:/out" \
+    "$TRIVY_IMAGE" image "$TRIVY_IMAGE_REF" --cache-dir /cache --quiet \
+    --scanners vuln --ignore-unfixed \
+    --format sarif --output /out/trivy-image.sarif || return 1
+  gate trivy-image "$out/trivy-image.sarif" || return 1
 }
 
 run_zizmor() {
@@ -127,6 +153,7 @@ for check in "${checks[@]}"; do
   case "$check" in
     ruff | semgrep | gitleaks | trivy | zizmor) "run_$check" || failed+=("$check") ;;
     pip-audit) run_pip_audit || failed+=("$check") ;;
+    trivy-image) run_trivy_image || failed+=("$check") ;;
     *)
       echo "unknown check: $check" >&2
       exit 2
