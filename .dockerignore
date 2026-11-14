@@ -1,0 +1,15 @@
+# An allowlist rather than a denylist: the build context is only what the image needs, so a
+# new directory (a dataset dropped in data/, a local .env, the article's TeX tree) can never
+# reach the image or bloat the context by being forgotten here.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!alembic.ini
+!migrations/
+!knowledge/
+!src/
+
+# Bytecode is compiled inside the image, for the image's interpreter.
+**/__pycache__
+**/*.py[cod]

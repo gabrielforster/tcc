@@ -1,0 +1,188 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "name": "Trivy",
+          "rules": [
+            {
+              "id": "DS-0026",
+              "name": "Misconfiguration",
+              "shortDescription": {
+                "text": "No HEALTHCHECK defined"
+              },
+              "fullDescription": {
+                "text": "You should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "helpUri": "https://avd.aquasec.com/misconfig/ds-0026",
+              "help": {
+                "text": "Misconfiguration DS-0026\nType: Dockerfile Security Check\nSeverity: LOW\nCheck: No HEALTHCHECK defined\nMessage: Add HEALTHCHECK instruction in your Dockerfile\nLink: [DS-0026](https://avd.aquasec.com/misconfig/ds-0026)\nYou should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers.",
+                "markdown": "**Misconfiguration DS-0026**\n| Type | Severity | Check | Message | Link |\n| --- | --- | --- | --- | --- |\n|Dockerfile Security Check|LOW|No HEALTHCHECK defined|Add HEALTHCHECK instruction in your Dockerfile|[DS-0026](https://avd.aquasec.com/misconfig/ds-0026)|\n\nYou should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers."
+              },
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "2.0",
+                "tags": [
+                  "misconfiguration",
+                  "security",
+                  "LOW"
+                ]
+              }
+            },
+            {
+              "id": "DS-0001",
+              "name": "Misconfiguration",
+              "shortDescription": {
+                "text": "':latest' tag used"
+              },
+              "fullDescription": {
+                "text": "When using a 'FROM' statement you should use a specific tag to avoid uncontrolled behavior when the image is updated."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://avd.aquasec.com/misconfig/ds-0001",
+              "help": {
+                "text": "Misconfiguration DS-0001\nType: Dockerfile Security Check\nSeverity: MEDIUM\nCheck: ':latest' tag used\nMessage: Specify a tag in the 'FROM' statement for image 'pandoc/extra'\nLink: [DS-0001](https://avd.aquasec.com/misconfig/ds-0001)\nWhen using a 'FROM' statement you should use a specific tag to avoid uncontrolled behavior when the image is updated.",
+                "markdown": "**Misconfiguration DS-0001**\n| Type | Severity | Check | Message | Link |\n| --- | --- | --- | --- | --- |\n|Dockerfile Security Check|MEDIUM|':latest' tag used|Specify a tag in the 'FROM' statement for image 'pandoc/extra'|[DS-0001](https://avd.aquasec.com/misconfig/ds-0001)|\n\nWhen using a 'FROM' statement you should use a specific tag to avoid uncontrolled behavior when the image is updated."
+              },
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "5.5",
+                "tags": [
+                  "misconfiguration",
+                  "security",
+                  "MEDIUM"
+                ]
+              }
+            }
+          ],
+          "version": "0.76.2"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "DS-0026",
+          "ruleIndex": 0,
+          "level": "note",
+          "message": {
+            "text": "Artifact: Dockerfile\nType: dockerfile\nVulnerability DS-0026\nSeverity: LOW\nMessage: Add HEALTHCHECK instruction in your Dockerfile\nLink: [DS-0026](https://avd.aquasec.com/misconfig/ds-0026)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              },
+              "message": {
+                "text": "Dockerfile"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DS-0001",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "Artifact: article/Dockerfile\nType: dockerfile\nVulnerability DS-0001\nSeverity: MEDIUM\nMessage: Specify a tag in the 'FROM' statement for image 'pandoc/extra'\nLink: [DS-0001](https://avd.aquasec.com/misconfig/ds-0001)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "article/Dockerfile",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 6,
+                  "startColumn": 1,
+                  "endLine": 6,
+                  "endColumn": 1
+                }
+              },
+              "message": {
+                "text": "article/Dockerfile"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DS-0026",
+          "ruleIndex": 0,
+          "level": "note",
+          "message": {
+            "text": "Artifact: article/Dockerfile\nType: dockerfile\nVulnerability DS-0026\nSeverity: LOW\nMessage: Add HEALTHCHECK instruction in your Dockerfile\nLink: [DS-0026](https://avd.aquasec.com/misconfig/ds-0026)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "article/Dockerfile",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              },
+              "message": {
+                "text": "article/Dockerfile"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DS-0026",
+          "ruleIndex": 0,
+          "level": "note",
+          "message": {
+            "text": "Artifact: deploy/caddy/Dockerfile\nType: dockerfile\nVulnerability DS-0026\nSeverity: LOW\nMessage: Add HEALTHCHECK instruction in your Dockerfile\nLink: [DS-0026](https://avd.aquasec.com/misconfig/ds-0026)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "deploy/caddy/Dockerfile",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              },
+              "message": {
+                "text": "deploy/caddy/Dockerfile"
+              }
+            }
+          ]
+        }
+      ],
+      "columnKind": "utf16CodeUnits",
+      "originalUriBaseIds": {
+        "ROOTPATH": {
+          "uri": "file:///repo/"
+        }
+      }
+    }
+  ]
+}

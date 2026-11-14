@@ -129,9 +129,21 @@ def default_responder() -> Responder:
     right default *when it is available*, and falling back rather than failing is what
     keeps a fresh clone, CI and the demo page working with no key at all.
     """
-    if settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY"):
+    if llm_configured():
         return get_responder("llm")
     return get_responder("template")
+
+
+def llm_configured() -> bool:
+    """Whether the configured provider can answer: a key for Anthropic, a chosen endpoint for
+    an OpenAI-compatible one.
+
+    `LLM_PROVIDER=openai` is an explicit choice (a hosted API or an Ollama box); the default
+    `anthropic` is not, so it needs its key before the chat leans on it.
+    """
+    if settings.llm_provider == "openai":
+        return True
+    return bool(settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
 
 class ChatService:

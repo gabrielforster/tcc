@@ -727,3 +727,21 @@ def test_nothing_is_seeded_by_default(channel):
         session = open_session(http, token=issue_token("cus_a"))
         transcript = http.get(f"/chat/sessions/{session['session_id']}").json()["turns"]
     assert len(transcript) == 1, "greeting only"
+
+
+def test_the_chat_uses_the_llm_only_when_its_provider_can_answer(monkeypatch):
+    from collection.api import chat
+    from collection.config import settings
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    monkeypatch.setattr(settings, "llm_provider", "anthropic")
+    assert not chat.llm_configured()
+
+    monkeypatch.setattr(settings, "anthropic_api_key", "sk-test")
+    assert chat.llm_configured()
+
+    # An OpenAI-compatible endpoint is chosen on purpose and needs no Anthropic key.
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    monkeypatch.setattr(settings, "llm_provider", "openai")
+    assert chat.llm_configured()

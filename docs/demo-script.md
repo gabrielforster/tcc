@@ -19,7 +19,7 @@ Then run the whole demo once, end to end, on the same machine and the same brows
 browser microphone permission for `http://127.0.0.1:8100` during the rehearsal — the
 permission prompt is the most likely thing to stall on stage.
 
-`make up` also starts Postgres, Redis and MinIO; the demo does not need them. Leave
+`make up` also starts Postgres and MinIO; the demo does not need them. Leave
 `DEFAULT_TENANT_KEY` empty in `.env` so the chat serves the in-memory demo tenant: it starts
 with nothing else running and cannot be broken by the state of a database.
 

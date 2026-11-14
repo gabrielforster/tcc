@@ -126,7 +126,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
 ```sh
 cp .env.example .env      # set your own ANONYMIZATION_SALT
 make setup                # creates .venv (Python 3.12) and installs dependencies
-make up                   # docker compose up -d: Postgres with pgvector, Redis and MinIO
+make up                   # docker compose up -d: Postgres with pgvector, MinIO and LiveKit
 make migrate              # apply the migrations (alembic upgrade head)
 make seed                 # create the development tenant and leave it servable
 export COLLECTION_TENANT=desenvolvimento   # the tenant the pipeline commands work on
@@ -172,6 +172,40 @@ published. It prints the tenant's `tenant_key`; put that in
 | `data/raw/` | A download cache, not pipeline output: sources that read local files (e.g. Home Credit CSVs) keep the fetched archive here rather than fetch it again |
 | `docs/data-dictionary.md` | Dictionary generated from the domain schema |
 | `docs/eda-<source>.md` + `docs/eda/<source>/*.png` | Exploratory report and charts, one set per data source |
+
+### Container image and production
+
+One image runs both servers; the command picks which:
+
+```sh
+docker build -t tcc --build-arg APP_VERSION=$(git rev-parse --short HEAD) .
+docker run tcc collection serve          # the API on :8000
+docker run tcc collection call serve     # the voice call on :8100
+```
+
+The `Dockerfile` installs the locked dependencies with uv (CPU-only torch), adds ffmpeg, runs
+as a non-root user (UID 10001), and bakes in the embedding model, Whisper `small` and the
+agent's Piper voice, so a container starts without touching the network. Trained models are
+not in the image: the API loads the published champion from object storage, as it does from
+a checkout. `APP_VERSION` is what `/health` reports as `version`.
+
+Production is one EC2 host running [`deploy/compose.prod.yml`](./deploy/compose.prod.yml):
+
+| Service | What |
+|---|---|
+| `caddy` | TLS (Let's Encrypt) and routing by host; built with caddy-l4 so TURN over TLS shares :443 ([`deploy/Caddyfile`](./deploy/Caddyfile)) |
+| `api`, `call` | This image, `collection serve` and `collection call serve` |
+| `migrate` | One-shot, run on every deploy: `db upgrade`, then the idempotent `tenant seed` |
+| `livekit` | The WebRTC server, with its TURN relay behind Caddy |
+| `postgres` | pgvector, data on the separate EBS volume (`/srv/tcc/data/postgres`) |
+
+There is no MinIO in production: with `S3_ENDPOINT_URL`, `S3_ACCESS_KEY` and
+`S3_SECRET_KEY` empty the object store is AWS S3 and the credentials are the instance
+role's. [`deploy/deploy.sh <tag>`](./deploy/deploy.sh) renders `.env` from SSM Parameter
+Store (`/tcc/prod/<NAME>` becomes `NAME`), pulls the image, runs `migrate`, starts the
+stack, waits for every health check and fails unless `/health` reports the tag it was
+given. The host needs inbound 80/tcp, 443/tcp+udp, 7881/tcp (WebRTC over TCP), 7882/udp
+(WebRTC media) and 3478/udp (TURN).
 
 ### Data source
 

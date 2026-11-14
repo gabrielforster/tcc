@@ -1,0 +1,59 @@
+# Ingress for production. Every hostname comes from the environment (the rendered
+# /opt/tcc/.env, through compose), so nothing here names a domain. Certificates are Let's
+# Encrypt's, obtained and renewed by Caddy on its own, and kept on the data volume so a
+# container restart does not ask for them again and run into the rate limit.
+{
+	# TURN over TLS shares :443 with HTTPS. The layer4 wrapper sees each connection before
+	# the HTTP server does: a TLS ClientHello whose SNI is TURN_DOMAIN has its TLS terminated
+	# here (with the certificate the TURN_DOMAIN site below makes Caddy obtain) and the plain
+	# TURN stream proxied to LiveKit's TURN listener, which runs with `external_tls` for
+	# exactly this. Anything else falls through to the `tls` wrapper and the HTTP server, as
+	# if the layer4 wrapper were not there. The order of the two wrappers is the whole trick:
+	# layer4 must read the raw ClientHello, so it goes first.
+	servers :443 {
+		listener_wrappers {
+			layer4 {
+				@turn tls sni {$TURN_DOMAIN}
+				route @turn {
+					tls
+					proxy livekit:5349
+				}
+			}
+			tls
+		}
+	}
+}
+
+# The application. The call page and its API go to the call server, which holds Whisper and
+# the voice in memory; everything else -- the landing page, /app/chat, the chat API, the
+# scoring API, /docs, /health -- to the API.
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	@call path /app/call* /call/*
+	handle @call {
+		reverse_proxy call:8100
+	}
+	handle {
+		reverse_proxy api:8000
+	}
+}
+
+# LiveKit signalling: the browser opens a WebSocket here. Media does not pass through Caddy;
+# it goes straight to LiveKit's published UDP/TCP ports, or through TURN when it cannot.
+{$RTC_DOMAIN} {
+	reverse_proxy livekit:7880
+}
+
+# Grafana, from the observability stack (`lgtm`). Until that service exists this answers
+# 502, which is the honest answer; the route is here so adding it is one compose service.
+{$GRAFANA_DOMAIN} {
+	reverse_proxy lgtm:3000
+}
+
+# Not a website. Listed so Caddy obtains and renews a certificate for the TURN name, which
+# the layer4 route above presents. A plain-HTTP visitor on :80 is redirected here and gets
+# an empty 404; a TURN client never reaches this block, layer4 takes it first.
+{$TURN_DOMAIN} {
+	respond 404
+}

@@ -60,6 +60,31 @@ def _segment(value: str, what: str) -> str:
     return value
 
 
+def s3_client(endpoint_url: str | None = None) -> Any:
+    """A client for the configured store: MinIO when an endpoint is set, AWS S3 when not.
+
+    Empty settings become `None` rather than being passed through, because `None` is what
+    tells boto3 to look further: no endpoint is the regional AWS endpoint, and no keys is
+    the default credential chain (environment, then the instance role). An empty string
+    would be taken literally instead and fail to sign. Path-style addressing is what MinIO
+    needs; AWS gets boto3's own choice, virtual-hosted, which every new bucket supports.
+    """
+    endpoint = endpoint_url or settings.s3_endpoint_url or None
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=settings.s3_access_key or None,
+        aws_secret_access_key=settings.s3_secret_key or None,
+        region_name=settings.aws_region,
+        config=Config(
+            connect_timeout=3,
+            read_timeout=30,
+            retries={"max_attempts": 4, "mode": "standard"},
+            s3={"addressing_style": "path" if endpoint else "auto"},
+        ),
+    )
+
+
 class ObjectStore:
     def __init__(
         self,
@@ -75,19 +100,7 @@ class ObjectStore:
         self.bucket = bucket or settings.s3_bucket
         self.prefix = f"tenants/{scope.tenant_id}/" if scope is not None else PLATFORM_PREFIX
         self._session = session
-        self._client: Any = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.s3_endpoint_url,
-            aws_access_key_id=settings.s3_access_key,
-            aws_secret_access_key=settings.s3_secret_key,
-            region_name="us-east-1",
-            config=Config(
-                connect_timeout=3,
-                read_timeout=30,
-                retries={"max_attempts": 4, "mode": "standard"},
-                s3={"addressing_style": "path"},
-            ),
-        )
+        self._client: Any = s3_client(endpoint_url)
         self._bucket_ready = False
 
     def put(self, name: str, data: bytes, *, kind: str, content_type: str) -> StoredObject:

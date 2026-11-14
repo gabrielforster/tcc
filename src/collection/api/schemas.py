@@ -47,6 +47,8 @@ class ModelInfo(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     models: list[str]
+    #: The running build: `APP_VERSION`, the commit SHA in an image, `dev` from a checkout.
+    version: str
 
 
 # ------------------------------------------------------------------- web chat
