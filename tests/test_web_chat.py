@@ -745,3 +745,35 @@ def test_the_chat_uses_the_llm_only_when_its_provider_can_answer(monkeypatch):
     monkeypatch.setattr(settings, "anthropic_api_key", "")
     monkeypatch.setattr(settings, "llm_provider", "openai")
     assert chat.llm_configured()
+
+
+def test_the_default_tenant_can_be_named_by_its_slug(monkeypatch):
+    # The development compose file names the seeded tenant this way: its key is random and
+    # does not exist until `tenant seed` has run, so it cannot be written down beforehand.
+    from collection.api import chat as chat_api
+
+    monkeypatch.setattr(settings, "default_tenant_key", "")
+    monkeypatch.setattr(settings, "default_tenant_slug", "desenvolvimento")
+    monkeypatch.setattr(chat_api, "tenant_key_for_slug", lambda slug: f"key-of-{slug}")
+
+    assert ChatService().default_key == "key-of-desenvolvimento"
+
+
+def test_an_explicit_default_key_wins_over_the_slug(monkeypatch):
+    from collection.api import chat as chat_api
+
+    def never(slug):
+        raise AssertionError("the slug must not be looked up when a key is set")
+
+    monkeypatch.setattr(settings, "default_tenant_key", "explicit")
+    monkeypatch.setattr(settings, "default_tenant_slug", "desenvolvimento")
+    monkeypatch.setattr(chat_api, "tenant_key_for_slug", never)
+
+    assert ChatService().default_key == "explicit"
+
+
+def test_neither_key_nor_slug_is_the_in_memory_channel(monkeypatch):
+    monkeypatch.setattr(settings, "default_tenant_key", "")
+    monkeypatch.setattr(settings, "default_tenant_slug", "")
+
+    assert ChatService().default_key == ""

@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # the channel runs on the in-memory store, which is what a fresh clone and the test
     # suite do. A key is public (it travels in an embed) and identifies, never authorises.
     default_tenant_key: str = ""
+    # The same tenant named by slug, used when `default_tenant_key` is empty. The key is
+    # random, minted when `tenant seed` first creates the tenant, so a configuration written
+    # before that (the development compose file) cannot know it; the slug it can:
+    # `desenvolvimento`. Empty, like the key, means the in-memory channel.
+    default_tenant_slug: str = ""
 
     # Generation. The key is read from the environment like any other secret and is never
     # committed; without it the LLM responder refuses and the template arm still runs.

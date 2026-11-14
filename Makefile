@@ -1,13 +1,27 @@
-.PHONY: setup up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma article
+.PHONY: setup dev dev-logs dev-stop up down ollama seed extract ingest dictionary eda features train score explain serve demo rag answer outreach voice voices call call-bench contacts experiment concurrency sweep purge queue migrate pipeline test coverage lint fmt cronograma article
 
 setup:            ## install dependencies (uv creates .venv with Python 3.12)
 	uv sync --all-extras
 
-up:               ## start Postgres (pgvector), MinIO and LiveKit (the voice call)
+dev:              ## the whole demo in Docker: chat on :8000/chat/demo, call on :8100/call/demo
+	docker compose up -d --wait postgres minio livekit
+	APP_VERSION=$$(git rev-parse --short HEAD 2>/dev/null || echo dev) docker compose --profile app build migrate
+	docker compose --profile app run --rm migrate
+	docker compose --profile app up -d --wait api call
+	@echo "chat  http://127.0.0.1:8000/chat/demo"
+	@echo "call  http://127.0.0.1:8100/call/demo"
+
+dev-logs:         ## follow the API and call server logs of `make dev`
+	docker compose --profile app logs -f api call
+
+dev-stop:         ## stop the API and call server, leaving the infrastructure up for `uv run`
+	docker compose --profile app stop api call
+
+up:               ## start the infrastructure only: Postgres (pgvector), MinIO and LiveKit
 	docker compose up -d
 
-down:             ## stop the compose services (volumes are kept)
-	docker compose down
+down:             ## stop every compose service, the app's included (volumes are kept)
+	docker compose --profile app down
 
 OLLAMA_MODEL ?= qwen2.5:3b
 ollama:           ## start the local model server and pull OLLAMA_MODEL (LLM_PROVIDER=openai)
